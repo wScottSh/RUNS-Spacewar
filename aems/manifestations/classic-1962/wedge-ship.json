@@ -1,0 +1,65 @@
+{
+    "kind": 30002,
+    "pubkey": "<TO_BE_SIGNED>",
+    "created_at": 0,
+    "tags": [
+        [
+            "d",
+            "classic-1962:wedge-ship"
+        ],
+        [
+            "entity",
+            "<std:spacewar-wedge-ship_event_id>",
+            "std:spacewar-wedge-ship"
+        ],
+        [
+            "category",
+            "spacecraft"
+        ],
+        [
+            "style",
+            "vector-graphics"
+        ]
+    ],
+    "content": {
+        "style": "Classic 1962 Vector",
+        "description": "Original PDP-1 vector graphics rendering of the wedge ship",
+        "outline": [
+            {
+                "x": 10,
+                "y": 0,
+                "comment": "Nose"
+            },
+            {
+                "x": -5,
+                "y": 8,
+                "comment": "Left wing"
+            },
+            {
+                "x": -5,
+                "y": -8,
+                "comment": "Right wing"
+            }
+        ],
+        "thrust_flame": [
+            {
+                "x": -5,
+                "y": 0
+            },
+            {
+                "x": -8,
+                "y": 2
+            },
+            {
+                "x": -8,
+                "y": -2
+            }
+        ],
+        "color": "white",
+        "scale": 1.0,
+        "line_width": 1,
+        "rendering_notes": "Draw as closed polygon. Display thrust_flame when thrust active."
+    },
+    "id": "<TO_BE_GENERATED>",
+    "sig": "<TO_BE_SIGNED>"
+}

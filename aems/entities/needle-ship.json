@@ -1,0 +1,35 @@
+{
+    "kind": 30001,
+    "pubkey": "<TO_BE_SIGNED>",
+    "created_at": 0,
+    "tags": [
+        [
+            "d",
+            "std:spacewar-needle-ship"
+        ],
+        [
+            "category",
+            "spacecraft"
+        ],
+        [
+            "type",
+            "player-controlled"
+        ],
+        [
+            "origin",
+            "spacewar-1962"
+        ],
+        [
+            "subtype",
+            "fighter"
+        ]
+    ],
+    "content": {
+        "name": "Needle Ship",
+        "description": "Elongated needle-shaped spacecraft from Spacewar! (1962). Identical mechanics to wedge ship with different visual profile.",
+        "lore": "Player 2's ship in the original Spacewar! The elongated needle design provided visual distinction in the two-player battles.",
+        "gameplay_notes": "Same fuel capacity, torpedo count, and physics as wedge ship. Visual variety only."
+    },
+    "id": "<TO_BE_GENERATED>",
+    "sig": "<TO_BE_SIGNED>"
+}

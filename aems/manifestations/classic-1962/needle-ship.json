@@ -1,0 +1,70 @@
+{
+    "kind": 30002,
+    "pubkey": "<TO_BE_SIGNED>",
+    "created_at": 0,
+    "tags": [
+        [
+            "d",
+            "classic-1962:needle-ship"
+        ],
+        [
+            "entity",
+            "<std:spacewar-needle-ship_event_id>",
+            "std:spacewar-needle-ship"
+        ],
+        [
+            "category",
+            "spacecraft"
+        ],
+        [
+            "style",
+            "vector-graphics"
+        ]
+    ],
+    "content": {
+        "style": "Classic 1962 Vector",
+        "description": "Original PDP-1 vector graphics rendering of the needle ship",
+        "outline": [
+            {
+                "x": 12,
+                "y": 0,
+                "comment": "Nose"
+            },
+            {
+                "x": -6,
+                "y": 3,
+                "comment": "Top rear"
+            },
+            {
+                "x": -4,
+                "y": 0,
+                "comment": "Center rear"
+            },
+            {
+                "x": -6,
+                "y": -3,
+                "comment": "Bottom rear"
+            }
+        ],
+        "thrust_flame": [
+            {
+                "x": -6,
+                "y": 0
+            },
+            {
+                "x": -9,
+                "y": 2
+            },
+            {
+                "x": -9,
+                "y": -2
+            }
+        ],
+        "color": "white",
+        "scale": 1.0,
+        "line_width": 1,
+        "rendering_notes": "Draw as closed polygon. Elongated profile distinguishes from wedge ship."
+    },
+    "id": "<TO_BE_GENERATED>",
+    "sig": "<TO_BE_SIGNED>"
+}

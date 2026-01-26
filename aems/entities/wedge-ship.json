@@ -1,0 +1,35 @@
+{
+    "kind": 30001,
+    "pubkey": "<TO_BE_SIGNED>",
+    "created_at": 0,
+    "tags": [
+        [
+            "d",
+            "std:spacewar-wedge-ship"
+        ],
+        [
+            "category",
+            "spacecraft"
+        ],
+        [
+            "type",
+            "player-controlled"
+        ],
+        [
+            "origin",
+            "spacewar-1962"
+        ],
+        [
+            "subtype",
+            "fighter"
+        ]
+    ],
+    "content": {
+        "name": "Wedge Ship",
+        "description": "Classic wedge-shaped spacecraft from Spacewar! (1962). The iconic triangular ship design from the first computer game. Agile fighter with limited fuel and torpedo capacity.",
+        "lore": "Player 1's ship in the original Spacewar! Recognizable by its distinctive wedge profile, this vessel became one of gaming's first iconic player avatars.",
+        "gameplay_notes": "Identical mechanics to needle ship - visual distinction only. Original PDP-1 used vector graphics to render the outline."
+    },
+    "id": "<TO_BE_GENERATED>",
+    "sig": "<TO_BE_SIGNED>"
+}

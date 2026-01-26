@@ -1,0 +1,34 @@
+{
+    "kind": 30002,
+    "pubkey": "<TO_BE_SIGNED>",
+    "created_at": 0,
+    "tags": [
+        [
+            "d",
+            "ascii:wedge-ship"
+        ],
+        [
+            "entity",
+            "<std:spacewar-wedge-ship_event_id>",
+            "std:spacewar-wedge-ship"
+        ],
+        [
+            "category",
+            "spacecraft"
+        ],
+        [
+            "style",
+            "text"
+        ]
+    ],
+    "content": {
+        "style": "ASCII Text",
+        "description": "Text-based rendering for terminals and minimal environments",
+        "symbol": "▲",
+        "thrust_symbol": "▲*",
+        "color": "cyan",
+        "rendering_notes": "Rotate symbol based on ship angle. Append * when thrusting."
+    },
+    "id": "<TO_BE_GENERATED>",
+    "sig": "<TO_BE_SIGNED>"
+}

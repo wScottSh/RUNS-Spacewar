@@ -1,0 +1,33 @@
+{
+    "kind": 30002,
+    "pubkey": "<TO_BE_SIGNED>",
+    "created_at": 0,
+    "tags": [
+        [
+            "d",
+            "ascii:torpedo"
+        ],
+        [
+            "entity",
+            "<std:spacewar-torpedo_event_id>",
+            "std:spacewar-torpedo"
+        ],
+        [
+            "category",
+            "projectile"
+        ],
+        [
+            "style",
+            "text"
+        ]
+    ],
+    "content": {
+        "style": "ASCII Text",
+        "description": "Simple dot character for torpedoes",
+        "symbol": "●",
+        "color": "white",
+        "rendering_notes": "No rotation needed. Simple filled circle character."
+    },
+    "id": "<TO_BE_GENERATED>",
+    "sig": "<TO_BE_SIGNED>"
+}

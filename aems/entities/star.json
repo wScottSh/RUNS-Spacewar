@@ -1,0 +1,35 @@
+{
+    "kind": 30001,
+    "pubkey": "<TO_BE_SIGNED>",
+    "created_at": 0,
+    "tags": [
+        [
+            "d",
+            "std:spacewar-star"
+        ],
+        [
+            "category",
+            "celestial-body"
+        ],
+        [
+            "type",
+            "hazard"
+        ],
+        [
+            "origin",
+            "spacewar-1962"
+        ],
+        [
+            "subtype",
+            "gravity-well"
+        ]
+    ],
+    "content": {
+        "name": "Central Star",
+        "description": "Gravitational attractor at screen center. Collision is fatal. Exerts inverse-square gravity on all physics objects.",
+        "lore": "The star creates the strategic tension in Spacewar! Players must balance avoiding the deadly gravity well while using it to curve torpedo trajectories.",
+        "gameplay_notes": "Original used simplified inverse-square gravity. Capture radius of 1 unit for collision detection. Immobile at screen center (0, 0)."
+    },
+    "id": "<TO_BE_GENERATED>",
+    "sig": "<TO_BE_SIGNED>"
+}

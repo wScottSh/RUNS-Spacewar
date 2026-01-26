@@ -1,0 +1,37 @@
+{
+    "kind": 30002,
+    "pubkey": "<TO_BE_SIGNED>",
+    "created_at": 0,
+    "tags": [
+        [
+            "d",
+            "classic-1962:star"
+        ],
+        [
+            "entity",
+            "<std:spacewar-star_event_id>",
+            "std:spacewar-star"
+        ],
+        [
+            "category",
+            "celestial-body"
+        ],
+        [
+            "style": "vector-graphics"
+        ]
+    ],
+    "content": {
+        "style": "Classic 1962 Vector",
+        "description": "Central star rendered as radiating lines",
+        "shape": "star",
+        "rays": 8,
+        "inner_radius": 8,
+        "outer_radius": 16,
+        "color": "white",
+        "flicker": true,
+        "flicker_rate": 0.1,
+        "rendering_notes": "Draw 8 rays from center. Optional flicker effect for visual interest."
+    },
+    "id": "<TO_BE_GENERATED>",
+    "sig": "<TO_BE_SIGNED>"
+}
