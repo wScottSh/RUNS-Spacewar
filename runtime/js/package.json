@@ -1,0 +1,21 @@
+{
+    "name": "spacewar-runs-runtime",
+    "version": "0.1.0",
+    "description": "JavaScript runtime for Spacewar! RUNS prototype",
+    "type": "module",
+    "main": "src/index.js",
+    "scripts": {
+        "start": "node src/index.js",
+        "dev": "node --watch src/index.js",
+        "test": "node --test src/**/*.test.js"
+    },
+    "keywords": [
+        "runs",
+        "spacewar",
+        "game",
+        "ecs",
+        "nostr"
+    ],
+    "author": "",
+    "license": "MIT"
+}
