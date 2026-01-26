@@ -1,0 +1,37 @@
+processor fire_torpedo
+inputs:
+  control: spacewar:control_state
+  ship_pos: runs:position_2d
+  ship_vel: runs:velocity_2d
+  ship_angle: runs:angle
+  torpedo_count: spacewar:torpedo_count
+  torpedo_speed: i32
+  player_id: spacewar:player_id
+outputs:
+  torpedo_count: spacewar:torpedo_count
+  spawn_torpedo: bool
+  torpedo_pos: runs:position_2d
+  torpedo_vel: runs:velocity_2d
+  torpedo_owner: spacewar:player_id
+
+; Fire torpedo from ship
+; Inherits ship velocity + muzzle velocity in facing direction
+; Original constants: tvl = sar 4s (torpedo velocity), rlt = 20 (reload time)
+
+spawn_torpedo = false
+
+if control.fire and torpedo_count > 0:
+  torpedo_count -= 1
+  spawn_torpedo = true
+  torpedo_pos = ship_pos
+  torpedo_owner = player_id
+  
+  ; Get muzzle direction
+  sin, cos = sin_cos(ship_angle)
+  
+  ; Inherit ship velocity + add muzzle velocity
+  torpedo_vel.dx = ship_vel.dx + ((torpedo_speed * cos) >> 16)
+  torpedo_vel.dy = ship_vel.dy + ((torpedo_speed * sin) >> 16)
+
+; Note: Runtime processes spawn_torpedo flag to create new Record
+; with spacewar:entity_type = torpedo, spacewar:lifetime = 140

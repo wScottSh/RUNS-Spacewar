@@ -1,0 +1,14 @@
+processor check_collision
+inputs:
+  pos_a: runs:position_2d
+  pos_b: runs:position_2d
+  radius_sum_sq: i32
+outputs:
+  collided: bool
+
+; Radius-based collision detection
+; Uses distance_squared to avoid expensive sqrt
+; Original constant: me1 = 6000 (collision radius)
+
+dist_sq = distance_squared(pos_a, pos_b)
+collided = (dist_sq < radius_sum_sq)

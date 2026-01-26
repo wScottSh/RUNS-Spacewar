@@ -1,0 +1,18 @@
+processor wrap_position
+inputs:
+  position: runs:position_2d
+  bounds: struct { width: i32, height: i32 }
+outputs:
+  position: runs:position_2d
+
+; Toroidal screen wrap (edges connect)
+; Matches original Spacewar! behavior
+
+position.x = position.x mod bounds.width
+position.y = position.y mod bounds.height
+
+; Handle negative wrap correctly
+if position.x < 0:
+  position.x += bounds.width
+if position.y < 0:
+  position.y += bounds.height

@@ -1,0 +1,13 @@
+processor distance_squared
+inputs:
+  a: runs:position_2d
+  b: runs:position_2d
+outputs:
+  result: i32
+
+; Calculate distance squared without sqrt (faster)
+; Used for collision detection with radius_sum_sq
+
+dx = a.x - b.x
+dy = a.y - b.y
+result = dx * dx + dy * dy

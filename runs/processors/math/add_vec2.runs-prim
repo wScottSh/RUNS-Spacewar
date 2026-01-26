@@ -1,0 +1,9 @@
+processor add_vec2
+inputs:
+  a: runs:position_2d
+  b: runs:velocity_2d
+outputs:
+  result: runs:position_2d
+
+result.x = a.x + b.x
+result.y = a.y + b.y

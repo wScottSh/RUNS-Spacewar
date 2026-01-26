@@ -1,0 +1,24 @@
+processor apply_thrust
+inputs:
+  velocity: runs:velocity_2d
+  angle: runs:angle
+  control: spacewar:control_state
+  thrust_power: i32
+  fuel: spacewar:fuel
+outputs:
+  velocity: runs:velocity_2d
+  fuel: spacewar:fuel
+
+; Apply thrust impulse in facing direction
+; Consumes fuel (original constant: sac = sar 4s, ship acceleration)
+
+if control.thrust and fuel > 0:
+  ; Get direction from angle
+  sin, cos = sin_cos(angle)
+  
+  ; Apply thrust in facing direction
+  velocity.dx += (thrust_power * cos) >> 16
+  velocity.dy += (thrust_power * sin) >> 16
+  
+  ; Consume fuel
+  fuel -= 1

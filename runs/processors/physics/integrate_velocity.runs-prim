@@ -1,0 +1,13 @@
+processor integrate_velocity
+inputs:
+  position: runs:position_2d
+  velocity: runs:velocity_2d
+  delta_time: runs:delta_time
+outputs:
+  position: runs:position_2d
+
+; Euler integration: position += velocity * dt
+; Q16.16 fixed-point arithmetic with proper scaling
+
+position.x += (velocity.dx * delta_time) >> 16
+position.y += (velocity.dy * delta_time) >> 16

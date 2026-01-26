@@ -1,0 +1,16 @@
+processor collision_response_destroy
+inputs:
+  collided: bool
+  is_alive: spacewar:is_alive
+outputs:
+  is_alive: spacewar:is_alive
+
+; Simple collision response: mark entity as destroyed
+; Used for ship-star, ship-ship, and torpedo-ship collisions
+
+if collided:
+  is_alive = false
+
+; Note: Respawn behavior handled by game mode logic
+; - Instant respawn mode: Runtime recreates ship Record next tick
+; - Game over mode: Ship remains dead, game ends when both dead

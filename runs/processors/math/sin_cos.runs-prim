@@ -1,0 +1,18 @@
+processor sin_cos
+inputs:
+  angle: runs:angle
+outputs:
+  sin: i32
+  cos: i32
+
+; Lookup table implementation for Q16.16 fixed-point
+; Table covers 0 to 2π with 256 entries for fast access
+; Runtime should provide optimized implementation
+
+; Pseudocode (runtime implements actual lookup):
+; index = (angle >> 8) & 0xFF  ; 256 entries
+; sin = SIN_TABLE[index]
+; cos = COS_TABLE[index]
+
+; Returns Q16.16 fixed-point values in range [-1.0, 1.0]
+; -65536 to 65536 in Q16.16 representation

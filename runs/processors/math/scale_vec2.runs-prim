@@ -1,0 +1,10 @@
+processor scale_vec2
+inputs:
+  v: runs:velocity_2d
+  scalar: i32
+outputs:
+  result: runs:velocity_2d
+
+; Q16.16 fixed-point multiplication with right shift
+result.dx = (v.dx * scalar) >> 16
+result.dy = (v.dy * scalar) >> 16

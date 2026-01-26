@@ -1,0 +1,16 @@
+processor tick_lifetime
+inputs:
+  lifetime: spacewar:lifetime
+outputs:
+  lifetime: spacewar:lifetime
+  expired: bool
+
+; Decrement lifetime counter
+; Used for torpedoes and temporary effects
+
+if lifetime > 0:
+  lifetime -= 1
+
+expired = (lifetime == 0)
+
+; Note: Runtime destroys Records where expired = true

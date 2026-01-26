@@ -1,0 +1,27 @@
+processor apply_rotation
+inputs:
+  angle: runs:angle
+  angular_velocity: runs:angular_velocity
+  control: spacewar:control_state
+  angular_accel: i32
+outputs:
+  angle: runs:angle
+  angular_velocity: runs:angular_velocity
+
+; Apply angular acceleration based on control input
+; Original Spacewar! constant: maa = 10 (angular acceleration)
+
+if control.rotate_ccw:
+  angular_velocity -= angular_accel
+if control.rotate_cw:
+  angular_velocity += angular_accel
+
+; Integrate angular velocity
+angle += angular_velocity
+
+; Wrap angle to [0, 2π)
+; 411775 = 2π in Q16.16 fixed-point
+if angle >= 411775:
+  angle -= 411775
+if angle < 0:
+  angle += 411775

@@ -1,0 +1,42 @@
+processor hyperspace_jump
+inputs:
+  control: spacewar:control_state
+  hyperspace_charges: spacewar:hyperspace_charges
+  position: runs:position_2d
+  velocity: runs:velocity_2d
+  bounds: struct { width: i32, height: i32 }
+  random_seed: u32
+outputs:
+  hyperspace_charges: spacewar:hyperspace_charges
+  position: runs:position_2d
+  velocity: runs:velocity_2d
+  random_seed: u32
+  jumping: bool
+
+; Emergency hyperspace jump with random uncertainty
+; Risky: random position + velocity impulse
+; Original constant: mhs = 10 (hyperspace shots available)
+
+jumping = false
+
+if control.hyperspace and hyperspace_charges > 0:
+  hyperspace_charges -= 1
+  jumping = true
+  
+  ; Generate random position using LFSR
+  rand_x, random_seed = lfsr_random(random_seed)
+  rand_y, random_seed = lfsr_random(random_seed)
+  
+  position.x = (rand_x mod bounds.width)
+  position.y = (rand_y mod bounds.height)
+  
+  ; Random velocity impulse (danger of hyperspace!)
+  ; Uncertainty range: ±2.0 units/tick in Q16.16
+  rand_vx, random_seed = lfsr_random(random_seed)
+  rand_vy, random_seed = lfsr_random(random_seed)
+  
+  uncertainty = 131072  ; 2.0 in Q16.16
+  velocity.dx += ((rand_vx mod (uncertainty * 2)) - uncertainty)
+  velocity.dy += ((rand_vy mod (uncertainty * 2)) - uncertainty)
+
+; Note: Runtime maintains persistent random_seed across ticks

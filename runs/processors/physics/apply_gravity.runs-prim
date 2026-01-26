@@ -1,0 +1,27 @@
+processor apply_gravity
+inputs:
+  position: runs:position_2d
+  velocity: runs:velocity_2d
+  attractor_pos: runs:position_2d
+  gravity_strength: i32
+outputs:
+  velocity: runs:velocity_2d
+
+; Inverse-square gravity toward central star
+; Simplified for performance (matches original Spacewar! approach)
+
+; Calculate direction to attractor
+dx = attractor_pos.x - position.x
+dy = attractor_pos.y - position.y
+
+; Distance squared (avoid sqrt for speed)
+dist_sq = dx * dx + dy * dy
+dist_sq = max(dist_sq, 1)  ; Prevent divide-by-zero at star center
+
+; Inverse-square gravity: accel = G / dist^2
+; Applied in direction of attractor
+accel_x = (gravity_strength * dx) / dist_sq
+accel_y = (gravity_strength * dy) / dist_sq
+
+velocity.dx += accel_x
+velocity.dy += accel_y
