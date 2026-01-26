@@ -1,0 +1,246 @@
+# Spacewar! Main Network
+# Wires all Processors together in tick execution order
+
+network: spacewar_main
+umbrella: spacewar:
+version: 0.1.0
+tick_rate: 60  # Hz (matches original PDP-1 display refresh)
+
+# Game configuration constants
+constants:
+  screen_width: 67108864      # 1024 << 16 (Q16.16)
+  screen_height: 50331648     # 768 << 16 (Q16.16)
+  star_position: { x: 33554432, y: 25165824 }  # Screen center
+  gravity_strength: 65536000  # Tuned for gameplay feel
+  thrust_power: 4096          # Ship acceleration
+  angular_accel: 655          # ~0.01 rad/tick
+  torpedo_speed: 32768        # 0.5 units/tick
+  collision_radius_star_sq: 429496729600  # Star collision
+  collision_radius_ship_sq: 214748364800  # Ship-ship collision
+  collision_radius_torpedo_sq: 107374182400  # Torpedo-ship collision
+
+# Game mode (runtime selects one)
+mode: instant_respawn  # or: game_over
+
+#==============================================================================
+# PHASE 1: INPUT
+# Read player controls, map to control_state Field
+#==============================================================================
+- phase: input
+  description: "Read player input and update control_state"
+  processors:
+    - read_player_input:
+        description: "Runtime-specific input mapping"
+        query: entity_type == ship and is_alive
+        outputs: [spacewar:control_state]
+        notes: |
+          Runtime implements this Processor:
+          - Player 1 (player_id=0): WASD/Space/Shift
+          - Player 2 (player_id=1): Arrows/Enter/RCtrl
+          Maps physical input to control_state bitfield
+
+#==============================================================================
+# PHASE 2: PHYSICS
+# Apply rotation, thrust, gravity, integration, wrapping
+#==============================================================================
+- phase: physics
+  description: "Update positions and velocities"
+  processors:
+    # Ship rotation
+    - apply_rotation:
+        query: entity_type == ship and is_alive
+        inputs:
+          - runs:angle
+          - runs:angular_velocity
+          - spacewar:control_state
+        params:
+          angular_accel: ${constants.angular_accel}
+        outputs:
+          - runs:angle
+          - runs:angular_velocity
+          
+    # Ship thrust
+    - apply_thrust:
+        query: entity_type == ship and is_alive
+        inputs:
+          - runs:velocity_2d
+          - runs:angle
+          - spacewar:control_state
+          - spacewar:fuel
+        params:
+          thrust_power: ${constants.thrust_power}
+        outputs:
+          - runs:velocity_2d
+          - spacewar:fuel
+          
+    # Gravity (all physics objects)
+    - apply_gravity:
+        query: entity_type in [ship, torpedo]
+        inputs:
+          - runs:position_2d
+          - runs:velocity_2d
+        params:
+          attractor_pos: ${constants.star_position}
+          gravity_strength: ${constants.gravity_strength}
+        outputs:
+          - runs:velocity_2d
+          
+    # Velocity integration
+    - integrate_velocity:
+        query: entity_type in [ship, torpedo]
+        inputs:
+          - runs:position_2d
+          - runs:velocity_2d
+          - runs:delta_time
+        outputs:
+          - runs:position_2d
+          
+    # Screen wrap (toroidal topology)
+    - wrap_position:
+        query: entity_type in [ship, torpedo]
+        inputs:
+          - runs:position_2d
+        params:
+          bounds:
+            width: ${constants.screen_width}
+            height: ${constants.screen_height}
+        outputs:
+          - runs:position_2d
+
+#==============================================================================
+# PHASE 3: COMBAT
+# Fire torpedoes, tick lifetime, hyperspace
+#==============================================================================
+- phase: combat
+  description: "Handle weapons and special abilities"
+  processors:
+    # Fire torpedoes
+    - fire_torpedo:
+        query: entity_type == ship and is_alive
+        inputs:
+          - spacewar:control_state
+          - runs:position_2d
+          - runs:velocity_2d
+          - runs:angle
+          - spacewar:torpedo_count
+          - spacewar:player_id
+        params:
+          torpedo_speed: ${constants.torpedo_speed}
+        outputs:
+          - spacewar:torpedo_count
+        spawns:
+          type: torpedo
+          fields:
+            spacewar:entity_type: torpedo
+            spacewar:lifetime: 140
+            spacewar:is_alive: true
+            runs:position_2d: ${output.torpedo_pos}
+            runs:velocity_2d: ${output.torpedo_vel}
+            spacewar:player_id: ${output.torpedo_owner}
+            
+    # Hyperspace jump
+    - hyperspace_jump:
+        query: entity_type == ship and is_alive
+        inputs:
+          - spacewar:control_state
+          - spacewar:hyperspace_charges
+          - runs:position_2d
+          - runs:velocity_2d
+        params:
+          bounds:
+            width: ${constants.screen_width}
+            height: ${constants.screen_height}
+        outputs:
+          - spacewar:hyperspace_charges
+          - runs:position_2d
+          - runs:velocity_2d
+          
+    # Torpedo lifetime tick
+    - tick_lifetime:
+        query: entity_type == torpedo
+        inputs:
+          - spacewar:lifetime
+        outputs:
+          - spacewar:lifetime
+          
+    # Despawn expired torpedoes
+    - despawn_expired:
+        query: entity_type == torpedo and lifetime == 0
+        action: destroy
+
+#==============================================================================
+# PHASE 4: COLLISION
+# Check and respond to all collision types
+#==============================================================================
+- phase: collision
+  description: "Detect and respond to collisions"
+  processors:
+    # Ship-Star collision (fatal)
+    - check_collision:
+        cross_product:
+          a_query: entity_type == ship and is_alive
+          b_query: entity_type == star
+        params:
+          radius_sum_sq: ${constants.collision_radius_star_sq}
+        on_collision:
+          - collision_response_destroy:
+              target: a
+              
+    # Ship-Ship collision (both die)
+    - check_collision:
+        cross_product:
+          a_query: entity_type == ship and player_id == 0 and is_alive
+          b_query: entity_type == ship and player_id == 1 and is_alive
+        params:
+          radius_sum_sq: ${constants.collision_radius_ship_sq}
+        on_collision:
+          - collision_response_destroy:
+              target: a
+          - collision_response_destroy:
+              target: b
+              
+    # Torpedo-Ship collision (friendly fire disabled)
+    - check_collision:
+        cross_product:
+          a_query: entity_type == torpedo
+          b_query: entity_type == ship and is_alive
+        filter: a.player_id != b.player_id
+        params:
+          radius_sum_sq: ${constants.collision_radius_torpedo_sq}
+        on_collision:
+          - collision_response_destroy:
+              target: a
+          - collision_response_destroy:
+              target: b
+
+    # Torpedo-Star collision (torpedo destroyed)
+    - check_collision:
+        cross_product:
+          a_query: entity_type == torpedo
+          b_query: entity_type == star
+        params:
+          radius_sum_sq: ${constants.collision_radius_star_sq}
+        on_collision:
+          - action: destroy
+            target: a
+
+#==============================================================================
+# PHASE 5: RESPAWN (conditional on game mode)
+#==============================================================================
+- phase: respawn
+  description: "Handle death and respawn based on game mode"
+  condition: mode == instant_respawn
+  processors:
+    - respawn_ship:
+        query: entity_type == ship and not is_alive
+        description: "Reset ship to starting position"
+        sets:
+          spacewar:is_alive: true
+          spacewar:fuel: 20000
+          spacewar:torpedo_count: 32
+          spacewar:hyperspace_charges: 3
+          runs:velocity_2d: { dx: 0, dy: 0 }
+          runs:angular_velocity: 0
+        # Position based on player_id
+        # Player 0: left side, facing right
+        # Player 1: right side, facing left

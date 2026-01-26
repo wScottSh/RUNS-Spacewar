@@ -1,0 +1,86 @@
+# Initial Game State
+
+Initial Records for a new Spacewar! game session.
+
+records:
+  #============================================================================
+  # CENTRAL STAR
+  # Stationary gravitational attractor at screen center
+  #============================================================================
+  - id: 1
+    fields:
+      # AEMS reference
+      aems:entity_ref: "<std:spacewar-star_event_id>"
+      aems:entity_d: "std:spacewar-star"
+      aems:manifestation_d: "classic-1962:star"
+      
+      # RUNS Fields
+      spacewar:entity_type: star
+      runs:position_2d:
+        x: 33554432   # 512 << 16 (screen center X)
+        y: 25165824   # 384 << 16 (screen center Y)
+
+  #============================================================================
+  # PLAYER 1 SHIP (Wedge)
+  # Starts left of center, facing right
+  #============================================================================
+  - id: 2
+    fields:
+      # AEMS reference
+      aems:entity_ref: "<std:spacewar-wedge-ship_event_id>"
+      aems:entity_d: "std:spacewar-wedge-ship"
+      aems:manifestation_d: "classic-1962:wedge-ship"
+      
+      # RUNS Fields
+      spacewar:entity_type: ship
+      spacewar:player_id: 0
+      runs:position_2d:
+        x: 13107200   # 200 << 16 (left of center)
+        y: 25165824   # 384 << 16 (vertical center)
+      runs:velocity_2d:
+        dx: 0
+        dy: 0
+      runs:angle: 0   # Facing right
+      runs:angular_velocity: 0
+      spacewar:fuel: 20000
+      spacewar:torpedo_count: 32
+      spacewar:hyperspace_charges: 3
+      spacewar:is_alive: true
+
+  #============================================================================
+  # PLAYER 2 SHIP (Needle)
+  # Starts right of center, facing left
+  #============================================================================
+  - id: 3
+    fields:
+      # AEMS reference
+      aems:entity_ref: "<std:spacewar-needle-ship_event_id>"
+      aems:entity_d: "std:spacewar-needle-ship"
+      aems:manifestation_d: "classic-1962:needle-ship"
+      
+      # RUNS Fields
+      spacewar:entity_type: ship
+      spacewar:player_id: 1
+      runs:position_2d:
+        x: 53477376   # 816 << 16 (right of center)
+        y: 25165824   # 384 << 16 (vertical center)
+      runs:velocity_2d:
+        dx: 0
+        dy: 0
+      runs:angle: 205887   # π in Q16.16 (facing left)
+      runs:angular_velocity: 0
+      spacewar:fuel: 20000
+      spacewar:torpedo_count: 32
+      spacewar:hyperspace_charges: 3
+      spacewar:is_alive: true
+
+#==============================================================================
+# RUNTIME STATE
+# Managed by runtime, not stored in Records
+#==============================================================================
+runtime_state:
+  random_seed: 0xDEADBEEF  # Initial LFSR seed (or from timestamp)
+  tick_count: 0
+  delta_time: 0.016667     # 1/60 second
+  game_mode: instant_respawn
+  next_record_id: 4        # For spawning new entities
