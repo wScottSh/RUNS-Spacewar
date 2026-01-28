@@ -4,10 +4,10 @@
  * JavaScript implementations of all RUNS Processors
  * Each function is pure and matches the .runs-prim specification
  * 
- * COORDINATE SYSTEM: Normalized (0.0 to 1.0)
- * - Position (0.5, 0.5) = center of screen
- * - Velocity in "screen-widths per tick"
- * - Conversion to pixels happens ONLY at render time
+ * PHYSICS TUNED FOR ORIGINAL GAME FEEL:
+ * - Crisp rotation (no momentum by default, like sense switch 10 OFF)
+ * - Gravity zone cutoff (no long-range gravity)
+ * - Torpedoes have negligible warpage, not full gravity
  */
 
 import { CONFIG } from './config.js';
@@ -87,27 +87,58 @@ export function integrateVelocity(position, velocity) {
 }
 
 /**
- * apply_gravity - Inverse-square gravity toward attractor
+ * apply_gravity - Gravity with zone cutoff (like original)
+ * Only applies within gravityZone radius, weaker than true inverse-square
  */
 export function applyGravity(position, velocity, attractorPos, gravityStrength) {
     const dx = attractorPos.x - position.x;
     const dy = attractorPos.y - position.y;
 
-    // Distance (with minimum to prevent singularity)
+    // Distance calculation
     const distSq = dx * dx + dy * dy;
-    const minDist = CONFIG.physics.gravityMinDistance;
-    const dist = Math.max(Math.sqrt(distSq), minDist);
+    const dist = Math.sqrt(distSq);
 
-    // Inverse-square force magnitude
-    const force = gravityStrength / (dist * dist);
+    // Gravity zone cutoff - no gravity outside this radius (like original)
+    const gravityZone = CONFIG.physics.gravityZone;
+    if (dist > gravityZone) {
+        return velocity;  // No gravity effect
+    }
+
+    // Minimum distance to prevent singularity
+    const minDist = CONFIG.physics.gravityMinDistance;
+    const effectiveDist = Math.max(dist, minDist);
+
+    // Weaker gravity: use 1/r^2.5 instead of 1/r^2 for gentler pull
+    // This matches the original's approximated gravity feel
+    const force = gravityStrength / (effectiveDist * effectiveDist * Math.sqrt(effectiveDist));
 
     // Apply in direction of attractor (normalized)
-    const nx = dx / dist;
-    const ny = dy / dist;
+    const nx = dx / effectiveDist;
+    const ny = dy / effectiveDist;
 
     return {
         dx: velocity.dx + nx * force,
         dy: velocity.dy + ny * force
+    };
+}
+
+/**
+ * apply_torpedo_warpage - Negligible "space warpage" for torpedoes
+ * Original used sar 9s twice = divide by 262144, nearly invisible effect
+ */
+export function applyTorpedoWarpage(position, velocity, attractorPos) {
+    const dx = attractorPos.x - position.x;
+    const dy = attractorPos.y - position.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < 0.01) return velocity;  // Avoid division by zero
+
+    // Negligible warpage - cosmetic effect only
+    const warpage = CONFIG.combat.torpedoWarpage;
+
+    return {
+        dx: velocity.dx + (dx / dist) * warpage,
+        dy: velocity.dy + (dy / dist) * warpage
     };
 }
 
@@ -132,25 +163,33 @@ export function wrapPosition(position) {
 //=============================================================================
 
 /**
- * apply_rotation - Angular velocity with control input and damping
+ * apply_rotation - CRISP rotation like original (sense switch 10 OFF)
+ * Angular velocity is directly set by input, not accumulated
  */
-export function applyRotation(angle, angularVelocity, control, angularAccel, angularDamping) {
-    let newAngularVelocity = angularVelocity;
+export function applyRotation(angle, angularVelocity, control) {
+    let newAngularVelocity;
 
-    // Apply control input
-    if (control.rotateCcw) {
-        newAngularVelocity -= angularAccel;
+    if (CONFIG.physics.rotationMode === 'momentum') {
+        // Momentum mode (sense switch 10 ON) - accumulate angular velocity
+        newAngularVelocity = angularVelocity;
+        if (control.rotateCcw) {
+            newAngularVelocity -= CONFIG.physics.angularAccelMomentum;
+        }
+        if (control.rotateCw) {
+            newAngularVelocity += CONFIG.physics.angularAccelMomentum;
+        }
+        // Apply damping
+        newAngularVelocity *= CONFIG.physics.angularDampingMomentum;
+    } else {
+        // CRISP mode (default, sense switch 10 OFF) - direct rotation
+        if (control.rotateCcw) {
+            newAngularVelocity = -CONFIG.physics.angularSpeed;
+        } else if (control.rotateCw) {
+            newAngularVelocity = CONFIG.physics.angularSpeed;
+        } else {
+            newAngularVelocity = 0;  // Immediate stop when key released
+        }
     }
-    if (control.rotateCw) {
-        newAngularVelocity += angularAccel;
-    }
-
-    // Apply damping
-    newAngularVelocity *= angularDamping;
-
-    // Clamp to max angular velocity
-    const maxAV = CONFIG.physics.maxAngularVelocity;
-    newAngularVelocity = Math.max(-maxAV, Math.min(maxAV, newAngularVelocity));
 
     // Integrate angle
     let newAngle = angle + newAngularVelocity;
@@ -287,7 +326,7 @@ export function hyperspaceJump(control, hyperspaceCharges, position, velocity, r
     // Random velocity impulse
     let { value: rvx, nextSeed: seed3 } = lfsrRandom(seed2);
     let { value: rvy, nextSeed: seed4 } = lfsrRandom(seed3);
-    const impulse = 0.005;
+    const impulse = 0.003;
 
     return {
         hyperspaceCharges: hyperspaceCharges - 1,
@@ -311,6 +350,7 @@ export default {
     // Physics
     integrateVelocity,
     applyGravity,
+    applyTorpedoWarpage,
     wrapPosition,
     // Control
     applyRotation,

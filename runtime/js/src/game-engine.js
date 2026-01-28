@@ -136,13 +136,11 @@ export class GameEngine {
             const playerId = ship.fields['spacewar:player_id'];
             const control = this.playerControls[playerId];
 
-            // Apply rotation (with damping)
+            // Apply rotation (crisp by default, like original)
             const rotResult = Processors.applyRotation(
                 ship.fields['runs:angle'],
                 ship.fields['runs:angular_velocity'],
-                control,
-                CONFIG.physics.angularAcceleration,
-                CONFIG.physics.angularDamping
+                control
             );
             ship.fields['runs:angle'] = rotResult.angle;
             ship.fields['runs:angular_velocity'] = rotResult.angularVelocity;
@@ -180,15 +178,14 @@ export class GameEngine {
             }
         }
 
-        // Also process torpedoes (gravity + integration + wrap)
+        // Also process torpedoes (minimal warpage, not full gravity - like original)
         const torpedoes = this.storage.queryByFields({ 'spacewar:entity_type': ENTITY_TORPEDO });
         for (const torpedo of torpedoes) {
-            // Apply gravity
-            torpedo.fields['runs:velocity_2d'] = Processors.applyGravity(
+            // Apply negligible "space warpage" instead of full gravity
+            torpedo.fields['runs:velocity_2d'] = Processors.applyTorpedoWarpage(
                 torpedo.fields['runs:position_2d'],
                 torpedo.fields['runs:velocity_2d'],
-                starPos,
-                CONFIG.physics.gravityStrength
+                starPos
             );
 
             // Integrate

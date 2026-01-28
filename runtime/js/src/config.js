@@ -6,7 +6,8 @@
  * - Velocity in "screen-widths per tick"
  * - Works at ANY resolution - conversion to pixels happens only at render time
  * 
- * Original PDP-1 ran at ~60 Hz with fixed timestep, we match that model.
+ * Physics tuned to match ORIGINAL PDP-1 game feel, not realistic physics.
+ * Original ran at ~30 Hz; we run at 60 Hz so time-based values are halved.
  */
 
 export const CONFIG = {
@@ -14,25 +15,30 @@ export const CONFIG = {
     physics: {
         tickRate: 60,                    // Fixed 60 Hz simulation
 
-        // Gravity (central star)
-        gravityStrength: 0.000008,       // G*M constant in normalized space
+        // Gravity (central star) - WEAKER than true inverse-square, like original
+        gravityStrength: 0.000002,       // Reduced from 0.000008 for authentic feel
         gravityMinDistance: 0.05,        // Prevents infinite force at center
+        gravityZone: 0.35,               // No gravity beyond this radius (original had cutoff)
 
-        // Ship movement
-        thrustAcceleration: 0.00008,     // Per-tick acceleration when thrusting
-        maxVelocity: 0.015,              // Terminal velocity cap
+        // Ship movement (halved for 60 Hz vs original 30 Hz)
+        thrustAcceleration: 0.00005,     // Per-tick acceleration when thrusting
+        maxVelocity: 0.012,              // Terminal velocity cap
 
-        // Rotation
-        angularAcceleration: 0.004,      // Radians per tick² when rotating
-        angularDamping: 0.96,            // Multiplier per tick (1.0 = no damping)
-        maxAngularVelocity: 0.15,        // Radians per tick cap
+        // Rotation - CRISP like original (no damping by default)
+        // Original sense switch 10 toggled between crisp and momentum modes
+        rotationMode: 'crisp',           // 'crisp' or 'momentum'
+        angularSpeed: 0.06,              // Radians per tick when key held (crisp mode)
+        // Momentum mode settings (optional, set rotationMode: 'momentum' to enable)
+        angularAccelMomentum: 0.002,     // Radians per tick² (momentum mode only)
+        angularDampingMomentum: 0.98,    // Multiplier per tick (momentum mode only)
     },
 
     // === Combat ===
     combat: {
-        torpedoSpeed: 0.012,             // Muzzle velocity (screen-widths/tick)
-        torpedoLifetime: 120,            // Ticks before despawn (~2 seconds)
-        torpedoInheritVelocity: 0.5,     // Fraction of ship velocity inherited
+        torpedoSpeed: 0.007,             // Muzzle velocity (halved for 60Hz)
+        torpedoLifetime: 180,            // Ticks before despawn (~3 seconds at 60Hz)
+        torpedoInheritVelocity: 0.3,     // Fraction of ship velocity inherited
+        torpedoWarpage: 0.0000003,       // Negligible "space warpage" - cosmetic only
 
         // Hyperspace
         hyperspaceCooldown: 180,         // Ticks between uses (~3 seconds)
@@ -42,14 +48,14 @@ export const CONFIG = {
 
     // === Collision Radii ===
     collision: {
-        shipRadius: 0.025,               // 2.5% of screen width
-        torpedoRadius: 0.008,            // Small hitbox
-        starRadius: 0.04,                // 4% of screen width (danger zone)
+        shipRadius: 0.022,               // Slightly smaller for tighter gameplay
+        torpedoRadius: 0.007,            // Small hitbox
+        starRadius: 0.035,               // Danger zone
     },
 
     // === Resources ===
     resources: {
-        maxFuel: 1000,                   // Fuel units per ship
+        maxFuel: 2000,                   // More fuel for longer games
         fuelPerThrust: 1,                // Fuel consumed per thrust tick
         maxTorpedoes: 32,                // Limited ammo
         maxHyperspaceCharges: 3,         // Emergency escapes
@@ -61,9 +67,9 @@ export const CONFIG = {
         player2: { x: 0.75, y: 0.5 },    // Right side
         star: { x: 0.5, y: 0.5 },        // Center
 
-        // Initial velocities (orbital hint)
-        player1Velocity: { dx: 0, dy: -0.002 },
-        player2Velocity: { dx: 0, dy: 0.002 },
+        // Initial velocities (slight orbital motion)
+        player1Velocity: { dx: 0, dy: -0.001 },
+        player2Velocity: { dx: 0, dy: 0.001 },
     },
 
     // === Screen Wrapping ===
