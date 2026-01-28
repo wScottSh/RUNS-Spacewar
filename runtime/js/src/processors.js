@@ -3,21 +3,14 @@
  * 
  * JavaScript implementations of all RUNS Processors
  * Each function is pure and matches the .runs-prim specification
+ * 
+ * COORDINATE SYSTEM: Normalized (0.0 to 1.0)
+ * - Position (0.5, 0.5) = center of screen
+ * - Velocity in "screen-widths per tick"
+ * - Conversion to pixels happens ONLY at render time
  */
 
-import {
-    FIXED_ONE,
-    toFixed,
-    fromFixed,
-    fixedMul,
-    fixedSin,
-    fixedCos,
-    lfsrRandom,
-    lfsrRandomRange,
-    vec2Add,
-    vec2Scale,
-    vec2DistanceSquared
-} from './fixed-math.js';
+import { CONFIG } from './config.js';
 
 //=============================================================================
 // MATH PROCESSORS
@@ -28,28 +21,28 @@ import {
  */
 export function addVec2(a, b) {
     return {
-        x: a.x + (b.dx || b.x),
-        y: a.y + (b.dy || b.y)
+        x: a.x + (b.dx !== undefined ? b.dx : b.x),
+        y: a.y + (b.dy !== undefined ? b.dy : b.y)
     };
 }
 
 /**
- * scale_vec2 - Vector scaling with Q16.16
+ * scale_vec2 - Vector scaling
  */
 export function scaleVec2(v, scalar) {
     return {
-        dx: fixedMul(v.dx, scalar),
-        dy: fixedMul(v.dy, scalar)
+        dx: v.dx * scalar,
+        dy: v.dy * scalar
     };
 }
 
 /**
- * sin_cos - Trigonometric lookup
+ * sin_cos - Trigonometric functions (native)
  */
 export function sinCos(angle) {
     return {
-        sin: fixedSin(angle),
-        cos: fixedCos(angle)
+        sin: Math.sin(angle),
+        cos: Math.cos(angle)
     };
 }
 
@@ -57,7 +50,25 @@ export function sinCos(angle) {
  * distance_squared - Fast distance without sqrt
  */
 export function distanceSquared(a, b) {
-    return vec2DistanceSquared(a, b);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    return dx * dx + dy * dy;
+}
+
+/**
+ * lfsr_random - Linear Feedback Shift Register RNG
+ * Returns value in [0, 1) range and next seed
+ */
+export function lfsrRandom(seed) {
+    // 16-bit LFSR with taps at 16, 14, 13, 11
+    let s = seed;
+    const bit = ((s >> 0) ^ (s >> 2) ^ (s >> 3) ^ (s >> 5)) & 1;
+    s = (s >> 1) | (bit << 15);
+
+    return {
+        value: s / 65536,  // Normalize to [0, 1)
+        nextSeed: s
+    };
 }
 
 //=============================================================================
@@ -65,47 +76,53 @@ export function distanceSquared(a, b) {
 //=============================================================================
 
 /**
- * integrate_velocity - Euler integration
+ * integrate_velocity - Simple per-tick Euler integration
+ * No deltaTime needed - velocity is in "screen-widths per tick"
  */
-export function integrateVelocity(position, velocity, deltaTime) {
-    // deltaTime is in seconds, convert to fixed-point multiplier
-    const dtFixed = toFixed(deltaTime);
+export function integrateVelocity(position, velocity) {
     return {
-        x: position.x + fixedMul(velocity.dx, dtFixed),
-        y: position.y + fixedMul(velocity.dy, dtFixed)
+        x: position.x + velocity.dx,
+        y: position.y + velocity.dy
     };
 }
 
 /**
- * apply_gravity - Inverse-square gravity
+ * apply_gravity - Inverse-square gravity toward attractor
  */
 export function applyGravity(position, velocity, attractorPos, gravityStrength) {
     const dx = attractorPos.x - position.x;
     const dy = attractorPos.y - position.y;
 
-    // Distance squared (avoid sqrt)
-    let distSq = vec2DistanceSquared(position, attractorPos);
-    distSq = Math.max(distSq, 1);  // Prevent divide-by-zero
+    // Distance (with minimum to prevent singularity)
+    const distSq = dx * dx + dy * dy;
+    const minDist = CONFIG.physics.gravityMinDistance;
+    const dist = Math.max(Math.sqrt(distSq), minDist);
 
-    // Inverse-square gravity with BigInt for precision
-    const accelX = Number((BigInt(gravityStrength) * BigInt(dx)) / BigInt(distSq));
-    const accelY = Number((BigInt(gravityStrength) * BigInt(dy)) / BigInt(distSq));
+    // Inverse-square force magnitude
+    const force = gravityStrength / (dist * dist);
+
+    // Apply in direction of attractor (normalized)
+    const nx = dx / dist;
+    const ny = dy / dist;
 
     return {
-        dx: velocity.dx + accelX,
-        dy: velocity.dy + accelY
+        dx: velocity.dx + nx * force,
+        dy: velocity.dy + ny * force
     };
 }
 
 /**
- * wrap_position - Toroidal screen wrap
+ * wrap_position - Toroidal screen wrap (normalized 0-1)
  */
-export function wrapPosition(position, bounds) {
-    let x = position.x % bounds.width;
-    let y = position.y % bounds.height;
+export function wrapPosition(position) {
+    let x = position.x;
+    let y = position.y;
 
-    if (x < 0) x += bounds.width;
-    if (y < 0) y += bounds.height;
+    // Wrap to [0, 1)
+    while (x < 0) x += 1;
+    while (x >= 1) x -= 1;
+    while (y < 0) y += 1;
+    while (y >= 1) y -= 1;
 
     return { x, y };
 }
@@ -115,11 +132,12 @@ export function wrapPosition(position, bounds) {
 //=============================================================================
 
 /**
- * apply_rotation - Angular velocity with control input
+ * apply_rotation - Angular velocity with control input and damping
  */
-export function applyRotation(angle, angularVelocity, control, angularAccel) {
+export function applyRotation(angle, angularVelocity, control, angularAccel, angularDamping) {
     let newAngularVelocity = angularVelocity;
 
+    // Apply control input
     if (control.rotateCcw) {
         newAngularVelocity -= angularAccel;
     }
@@ -127,12 +145,20 @@ export function applyRotation(angle, angularVelocity, control, angularAccel) {
         newAngularVelocity += angularAccel;
     }
 
+    // Apply damping
+    newAngularVelocity *= angularDamping;
+
+    // Clamp to max angular velocity
+    const maxAV = CONFIG.physics.maxAngularVelocity;
+    newAngularVelocity = Math.max(-maxAV, Math.min(maxAV, newAngularVelocity));
+
+    // Integrate angle
     let newAngle = angle + newAngularVelocity;
 
     // Wrap angle to [0, 2π)
-    const twoPi = toFixed(2 * Math.PI);
-    while (newAngle >= twoPi) newAngle -= twoPi;
-    while (newAngle < 0) newAngle += twoPi;
+    const TWO_PI = 2 * Math.PI;
+    while (newAngle >= TWO_PI) newAngle -= TWO_PI;
+    while (newAngle < 0) newAngle += TWO_PI;
 
     return {
         angle: newAngle,
@@ -147,12 +173,21 @@ export function applyThrust(velocity, angle, control, thrustPower, fuel) {
     if (control.thrust && fuel > 0) {
         const { sin, cos } = sinCos(angle);
 
+        let newDx = velocity.dx + thrustPower * cos;
+        let newDy = velocity.dy + thrustPower * sin;
+
+        // Clamp to max velocity
+        const speed = Math.sqrt(newDx * newDx + newDy * newDy);
+        const maxV = CONFIG.physics.maxVelocity;
+        if (speed > maxV) {
+            const scale = maxV / speed;
+            newDx *= scale;
+            newDy *= scale;
+        }
+
         return {
-            velocity: {
-                dx: velocity.dx + fixedMul(thrustPower, cos),
-                dy: velocity.dy + fixedMul(thrustPower, sin)
-            },
-            fuel: fuel - 1
+            velocity: { dx: newDx, dy: newDy },
+            fuel: fuel - CONFIG.resources.fuelPerThrust
         };
     }
 
@@ -166,28 +201,36 @@ export function applyThrust(velocity, angle, control, thrustPower, fuel) {
 /**
  * fire_torpedo - Spawn torpedo with inherited velocity
  */
-export function fireTorpedo(control, shipPos, shipVel, shipAngle, torpedoCount, torpedoSpeed, playerId) {
-    if (control.fire && torpedoCount > 0) {
-        const { sin, cos } = sinCos(shipAngle);
-
+export function fireTorpedo(control, shipPos, shipVel, shipAngle, torpedoCount, torpedoSpeed, playerId, cooldown = 0) {
+    // Check cooldown and ammo
+    if (!control.fire || torpedoCount <= 0 || cooldown > 0) {
         return {
-            torpedoCount: torpedoCount - 1,
-            spawnTorpedo: true,
-            torpedoPos: { x: shipPos.x, y: shipPos.y },
-            torpedoVel: {
-                dx: shipVel.dx + fixedMul(torpedoSpeed, cos),
-                dy: shipVel.dy + fixedMul(torpedoSpeed, sin)
-            },
-            torpedoOwner: playerId
+            torpedoCount,
+            spawnTorpedo: false,
+            torpedoPos: null,
+            torpedoVel: null,
+            torpedoOwner: null
         };
     }
 
+    const { sin, cos } = sinCos(shipAngle);
+    const inheritFactor = CONFIG.combat.torpedoInheritVelocity;
+
+    // Spawn slightly in front of ship to avoid self-collision
+    const spawnOffset = 0.03;
+
     return {
-        torpedoCount,
-        spawnTorpedo: false,
-        torpedoPos: null,
-        torpedoVel: null,
-        torpedoOwner: null
+        torpedoCount: torpedoCount - 1,
+        spawnTorpedo: true,
+        torpedoPos: {
+            x: shipPos.x + cos * spawnOffset,
+            y: shipPos.y + sin * spawnOffset
+        },
+        torpedoVel: {
+            dx: shipVel.dx * inheritFactor + torpedoSpeed * cos,
+            dy: shipVel.dy * inheritFactor + torpedoSpeed * sin
+        },
+        torpedoOwner: playerId
     };
 }
 
@@ -205,9 +248,10 @@ export function tickLifetime(lifetime) {
 /**
  * check_collision - Radius-based overlap detection
  */
-export function checkCollision(posA, posB, radiusSumSq) {
-    const distSq = vec2DistanceSquared(posA, posB);
-    return distSq < radiusSumSq;
+export function checkCollision(posA, posB, radiusA, radiusB) {
+    const distSq = distanceSquared(posA, posB);
+    const radiusSum = radiusA + radiusB;
+    return distSq < radiusSum * radiusSum;
 }
 
 /**
@@ -220,35 +264,40 @@ export function collisionResponseDestroy(collided, isAlive) {
 /**
  * hyperspace_jump - Random teleport with uncertainty
  */
-export function hyperspaceJump(control, hyperspaceCharges, position, velocity, bounds, randomSeed) {
-    if (control.hyperspace && hyperspaceCharges > 0) {
-        // Random position
-        let { value: randX, nextSeed: seed1 } = lfsrRandomRange(randomSeed, 0, bounds.width);
-        let { value: randY, nextSeed: seed2 } = lfsrRandomRange(seed1, 0, bounds.height);
-
-        // Random velocity impulse
-        const uncertainty = toFixed(2.0);  // ±2.0 units/tick
-        let { value: randVx, nextSeed: seed3 } = lfsrRandomRange(seed2, -uncertainty, uncertainty);
-        let { value: randVy, nextSeed: seed4 } = lfsrRandomRange(seed3, -uncertainty, uncertainty);
-
+export function hyperspaceJump(control, hyperspaceCharges, position, velocity, randomSeed) {
+    if (!control.hyperspace || hyperspaceCharges <= 0) {
         return {
-            hyperspaceCharges: hyperspaceCharges - 1,
-            position: { x: randX, y: randY },
-            velocity: {
-                dx: velocity.dx + randVx,
-                dy: velocity.dy + randVy
-            },
-            randomSeed: seed4,
-            jumping: true
+            hyperspaceCharges,
+            position,
+            velocity,
+            randomSeed,
+            jumping: false
         };
     }
 
+    // Generate random position (avoiding center star)
+    let { value: rx, nextSeed: seed1 } = lfsrRandom(randomSeed);
+    let { value: ry, nextSeed: seed2 } = lfsrRandom(seed1);
+
+    // Scatter around center, but not too close to star
+    const scatter = CONFIG.combat.hyperspaceScatter;
+    let newX = 0.5 + (rx - 0.5) * scatter * 2;
+    let newY = 0.5 + (ry - 0.5) * scatter * 2;
+
+    // Random velocity impulse
+    let { value: rvx, nextSeed: seed3 } = lfsrRandom(seed2);
+    let { value: rvy, nextSeed: seed4 } = lfsrRandom(seed3);
+    const impulse = 0.005;
+
     return {
-        hyperspaceCharges,
-        position,
-        velocity,
-        randomSeed,
-        jumping: false
+        hyperspaceCharges: hyperspaceCharges - 1,
+        position: { x: newX, y: newY },
+        velocity: {
+            dx: velocity.dx + (rvx - 0.5) * impulse * 2,
+            dy: velocity.dy + (rvy - 0.5) * impulse * 2
+        },
+        randomSeed: seed4,
+        jumping: true
     };
 }
 
@@ -258,6 +307,7 @@ export default {
     scaleVec2,
     sinCos,
     distanceSquared,
+    lfsrRandom,
     // Physics
     integrateVelocity,
     applyGravity,

@@ -2,22 +2,30 @@
  * Spacewar! Canvas Renderer
  * 
  * Renders game state using classic-1962 vector graphics style
+ * 
+ * COORDINATE SYSTEM: Receives normalized (0.0 to 1.0) coordinates
+ * Converts to pixel coordinates at render time for resolution independence
  */
-
-import { fromFixed, toFixed } from './fixed-math.js';
 
 export class Renderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
-        this.width = canvas.width;
-        this.height = canvas.height;
+        this.updateDimensions();
 
-        // Convert screen coordinates from fixed-point
-        this.screenWidth = 1024;
-        this.screenHeight = 768;
-        this.scaleX = this.width / this.screenWidth;
-        this.scaleY = this.height / this.screenHeight;
+        // Listen for resize events
+        this.resizeObserver = new ResizeObserver(() => this.updateDimensions());
+        this.resizeObserver.observe(canvas);
+    }
+
+    /**
+     * Update dimensions (called on resize)
+     */
+    updateDimensions() {
+        this.width = this.canvas.width;
+        this.height = this.canvas.height;
+        // Use smaller dimension for scale to maintain aspect ratio of game elements
+        this.baseScale = Math.min(this.width, this.height);
     }
 
     /**
@@ -29,13 +37,20 @@ export class Renderer {
     }
 
     /**
-     * Convert fixed-point game coordinates to canvas coordinates
+     * Convert normalized game coordinates (0-1) to canvas pixel coordinates
      */
     toScreen(pos) {
         return {
-            x: fromFixed(pos.x) * this.scaleX,
-            y: fromFixed(pos.y) * this.scaleY
+            x: pos.x * this.width,
+            y: pos.y * this.height
         };
+    }
+
+    /**
+     * Scale a normalized distance to pixels (uses width as reference)
+     */
+    scaleToPixels(normalizedSize) {
+        return normalizedSize * this.baseScale;
     }
 
     /**
@@ -70,8 +85,8 @@ export class Renderer {
     drawStar(record) {
         const pos = this.toScreen(record.fields['runs:position_2d']);
         const rays = 8;
-        const innerRadius = 8 * this.scaleX;
-        const outerRadius = 16 * this.scaleX;
+        const innerRadius = this.scaleToPixels(0.01);
+        const outerRadius = this.scaleToPixels(0.025);
 
         this.ctx.strokeStyle = '#fff';
         this.ctx.lineWidth = 2;
@@ -94,7 +109,7 @@ export class Renderer {
         // Center dot
         this.ctx.fillStyle = '#fff';
         this.ctx.beginPath();
-        this.ctx.arc(pos.x, pos.y, 4 * this.scaleX, 0, Math.PI * 2);
+        this.ctx.arc(pos.x, pos.y, this.scaleToPixels(0.006), 0, Math.PI * 2);
         this.ctx.fill();
     }
 
@@ -105,14 +120,14 @@ export class Renderer {
         if (!record.fields['spacewar:is_alive']) return;
 
         const pos = this.toScreen(record.fields['runs:position_2d']);
-        const angle = fromFixed(record.fields['runs:angle']);
+        const angle = record.fields['runs:angle'];  // Already a float in radians
         const playerId = record.fields['spacewar:player_id'];
 
         this.ctx.save();
         this.ctx.translate(pos.x, pos.y);
         this.ctx.rotate(angle);
 
-        const scale = 12 * this.scaleX;
+        const scale = this.scaleToPixels(0.02);  // Ship size: 2% of screen
 
         if (playerId === 0) {
             // Wedge ship (Player 1) - cyan
@@ -125,6 +140,9 @@ export class Renderer {
         }
 
         this.ctx.restore();
+
+        // Draw thrust flame if thrusting
+        // (Could add a 'thrusting' field to show this)
     }
 
     /**
@@ -133,7 +151,7 @@ export class Renderer {
     drawWedge(scale) {
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.moveTo(scale * 1.0, 0);          // Nose
+        this.ctx.moveTo(scale * 1.0, 0);             // Nose
         this.ctx.lineTo(scale * -0.5, scale * 0.8);  // Left wing
         this.ctx.lineTo(scale * -0.3, 0);            // Center back
         this.ctx.lineTo(scale * -0.5, scale * -0.8); // Right wing
@@ -147,10 +165,10 @@ export class Renderer {
     drawNeedle(scale) {
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.moveTo(scale * 1.2, 0);          // Nose
-        this.ctx.lineTo(scale * -0.6, scale * 0.3);  // Top rear
-        this.ctx.lineTo(scale * -0.4, 0);            // Center
-        this.ctx.lineTo(scale * -0.6, scale * -0.3); // Bottom rear
+        this.ctx.moveTo(scale * 1.2, 0);              // Nose
+        this.ctx.lineTo(scale * -0.6, scale * 0.3);   // Top rear
+        this.ctx.lineTo(scale * -0.4, 0);             // Center
+        this.ctx.lineTo(scale * -0.6, scale * -0.3);  // Bottom rear
         this.ctx.closePath();
         this.ctx.stroke();
     }
@@ -160,7 +178,7 @@ export class Renderer {
      */
     drawTorpedo(record) {
         const pos = this.toScreen(record.fields['runs:position_2d']);
-        const radius = 3 * this.scaleX;
+        const radius = this.scaleToPixels(0.005);
 
         this.ctx.fillStyle = '#fff';
         this.ctx.beginPath();
@@ -204,6 +222,15 @@ export class Renderer {
         this.ctx.fillStyle = '#666';
         this.ctx.textAlign = 'center';
         this.ctx.fillText(`Tick: ${state.tickCount}`, this.width / 2, this.height - 10);
+    }
+
+    /**
+     * Cleanup
+     */
+    destroy() {
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+        }
     }
 }
 

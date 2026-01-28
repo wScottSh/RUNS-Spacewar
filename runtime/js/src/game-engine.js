@@ -3,11 +3,15 @@
  * 
  * Core game loop implementing the RUNS Network execution
  * Processes all phases in order each tick
+ * 
+ * COORDINATE SYSTEM: Normalized (0.0 to 1.0)
+ * All positions and velocities are resolution-independent.
+ * Conversion to pixels happens only at render time.
  */
 
 import RecordStorage from './record-storage.js';
 import * as Processors from './processors.js';
-import { toFixed, fromFixed, FIXED_ONE } from './fixed-math.js';
+import { CONFIG } from './config.js';
 
 // Entity type constants
 const ENTITY_SHIP = 'ship';
@@ -22,7 +26,6 @@ export class GameEngine {
     constructor(options = {}) {
         this.storage = new RecordStorage();
         this.tickCount = 0;
-        this.deltaTime = 1 / 60;  // 60 Hz
         this.randomSeed = options.randomSeed || 0xDEADBEEF;
         this.gameMode = options.gameMode || MODE_INSTANT_RESPAWN;
 
@@ -30,26 +33,14 @@ export class GameEngine {
         this.spawnQueue = [];
         this.destroyQueue = [];
 
-        // Game constants (matching Network definition)
-        this.constants = {
-            screenWidth: toFixed(1024),
-            screenHeight: toFixed(768),
-            starPosition: { x: toFixed(512), y: toFixed(384) },
-            gravityStrength: toFixed(1000),
-            thrustPower: toFixed(0.0625),  // ~4096 in original scale
-            angularAccel: toFixed(0.01),
-            torpedoSpeed: toFixed(0.5),
-            torpedoLifetime: 140,
-            collisionRadiusStarSq: toFixed(100) * toFixed(100),
-            collisionRadiusShipSq: toFixed(80) * toFixed(80),
-            collisionRadiusTorpedoSq: toFixed(50) * toFixed(50)
-        };
-
         // Player control states
         this.playerControls = [
             { rotateCcw: false, rotateCw: false, thrust: false, fire: false, hyperspace: false },
             { rotateCcw: false, rotateCw: false, thrust: false, fire: false, hyperspace: false }
         ];
+
+        // Fire cooldown to prevent machine-gun firing
+        this.fireCooldown = [0, 0];
     }
 
     /**
@@ -59,20 +50,20 @@ export class GameEngine {
         // Create central star
         this.storage.create({
             'spacewar:entity_type': ENTITY_STAR,
-            'runs:position_2d': { ...this.constants.starPosition }
+            'runs:position_2d': { ...CONFIG.spawn.star }
         });
 
         // Create Player 1 ship (wedge)
         this.storage.create({
             'spacewar:entity_type': ENTITY_SHIP,
             'spacewar:player_id': 0,
-            'runs:position_2d': { x: toFixed(200), y: toFixed(384) },
-            'runs:velocity_2d': { dx: 0, dy: 0 },
-            'runs:angle': 0,
+            'runs:position_2d': { ...CONFIG.spawn.player1 },
+            'runs:velocity_2d': { ...CONFIG.spawn.player1Velocity },
+            'runs:angle': 0,  // Facing right
             'runs:angular_velocity': 0,
-            'spacewar:fuel': 20000,
-            'spacewar:torpedo_count': 32,
-            'spacewar:hyperspace_charges': 3,
+            'spacewar:fuel': CONFIG.resources.maxFuel,
+            'spacewar:torpedo_count': CONFIG.resources.maxTorpedoes,
+            'spacewar:hyperspace_charges': CONFIG.resources.maxHyperspaceCharges,
             'spacewar:is_alive': true
         });
 
@@ -80,13 +71,13 @@ export class GameEngine {
         this.storage.create({
             'spacewar:entity_type': ENTITY_SHIP,
             'spacewar:player_id': 1,
-            'runs:position_2d': { x: toFixed(824), y: toFixed(384) },
-            'runs:velocity_2d': { dx: 0, dy: 0 },
-            'runs:angle': toFixed(Math.PI),  // Facing left
+            'runs:position_2d': { ...CONFIG.spawn.player2 },
+            'runs:velocity_2d': { ...CONFIG.spawn.player2Velocity },
+            'runs:angle': Math.PI,  // Facing left
             'runs:angular_velocity': 0,
-            'spacewar:fuel': 20000,
-            'spacewar:torpedo_count': 32,
-            'spacewar:hyperspace_charges': 3,
+            'spacewar:fuel': CONFIG.resources.maxFuel,
+            'spacewar:torpedo_count': CONFIG.resources.maxTorpedoes,
+            'spacewar:hyperspace_charges': CONFIG.resources.maxHyperspaceCharges,
             'spacewar:is_alive': true
         });
     }
@@ -104,6 +95,10 @@ export class GameEngine {
     tick() {
         this.spawnQueue = [];
         this.destroyQueue = [];
+
+        // Decrement fire cooldowns
+        this.fireCooldown[0] = Math.max(0, this.fireCooldown[0] - 1);
+        this.fireCooldown[1] = Math.max(0, this.fireCooldown[1] - 1);
 
         // Phase 2: Physics
         this.phasePhysics();
@@ -133,7 +128,7 @@ export class GameEngine {
      */
     phasePhysics() {
         const ships = this.storage.queryByFields({ 'spacewar:entity_type': ENTITY_SHIP });
-        const bounds = { width: this.constants.screenWidth, height: this.constants.screenHeight };
+        const starPos = CONFIG.spawn.star;
 
         for (const ship of ships) {
             if (!ship.fields['spacewar:is_alive']) continue;
@@ -141,12 +136,13 @@ export class GameEngine {
             const playerId = ship.fields['spacewar:player_id'];
             const control = this.playerControls[playerId];
 
-            // Apply rotation
+            // Apply rotation (with damping)
             const rotResult = Processors.applyRotation(
                 ship.fields['runs:angle'],
                 ship.fields['runs:angular_velocity'],
                 control,
-                this.constants.angularAccel
+                CONFIG.physics.angularAcceleration,
+                CONFIG.physics.angularDamping
             );
             ship.fields['runs:angle'] = rotResult.angle;
             ship.fields['runs:angular_velocity'] = rotResult.angularVelocity;
@@ -156,7 +152,7 @@ export class GameEngine {
                 ship.fields['runs:velocity_2d'],
                 ship.fields['runs:angle'],
                 control,
-                this.constants.thrustPower,
+                CONFIG.physics.thrustAcceleration,
                 ship.fields['spacewar:fuel']
             );
             ship.fields['runs:velocity_2d'] = thrustResult.velocity;
@@ -166,22 +162,22 @@ export class GameEngine {
             ship.fields['runs:velocity_2d'] = Processors.applyGravity(
                 ship.fields['runs:position_2d'],
                 ship.fields['runs:velocity_2d'],
-                this.constants.starPosition,
-                this.constants.gravityStrength
+                starPos,
+                CONFIG.physics.gravityStrength
             );
 
-            // Integrate velocity
+            // Integrate velocity (simple per-tick addition)
             ship.fields['runs:position_2d'] = Processors.integrateVelocity(
                 ship.fields['runs:position_2d'],
-                ship.fields['runs:velocity_2d'],
-                this.deltaTime
+                ship.fields['runs:velocity_2d']
             );
 
             // Wrap position
-            ship.fields['runs:position_2d'] = Processors.wrapPosition(
-                ship.fields['runs:position_2d'],
-                bounds
-            );
+            if (CONFIG.wrap.enabled) {
+                ship.fields['runs:position_2d'] = Processors.wrapPosition(
+                    ship.fields['runs:position_2d']
+                );
+            }
         }
 
         // Also process torpedoes (gravity + integration + wrap)
@@ -191,22 +187,22 @@ export class GameEngine {
             torpedo.fields['runs:velocity_2d'] = Processors.applyGravity(
                 torpedo.fields['runs:position_2d'],
                 torpedo.fields['runs:velocity_2d'],
-                this.constants.starPosition,
-                this.constants.gravityStrength
+                starPos,
+                CONFIG.physics.gravityStrength
             );
 
             // Integrate
             torpedo.fields['runs:position_2d'] = Processors.integrateVelocity(
                 torpedo.fields['runs:position_2d'],
-                torpedo.fields['runs:velocity_2d'],
-                this.deltaTime
+                torpedo.fields['runs:velocity_2d']
             );
 
             // Wrap
-            torpedo.fields['runs:position_2d'] = Processors.wrapPosition(
-                torpedo.fields['runs:position_2d'],
-                bounds
-            );
+            if (CONFIG.wrap.enabled) {
+                torpedo.fields['runs:position_2d'] = Processors.wrapPosition(
+                    torpedo.fields['runs:position_2d']
+                );
+            }
         }
     }
 
@@ -222,15 +218,16 @@ export class GameEngine {
             const playerId = ship.fields['spacewar:player_id'];
             const control = this.playerControls[playerId];
 
-            // Fire torpedo
+            // Fire torpedo (with cooldown)
             const fireResult = Processors.fireTorpedo(
                 control,
                 ship.fields['runs:position_2d'],
                 ship.fields['runs:velocity_2d'],
                 ship.fields['runs:angle'],
                 ship.fields['spacewar:torpedo_count'],
-                this.constants.torpedoSpeed,
-                playerId
+                CONFIG.combat.torpedoSpeed,
+                playerId,
+                this.fireCooldown[playerId]
             );
             ship.fields['spacewar:torpedo_count'] = fireResult.torpedoCount;
 
@@ -242,10 +239,12 @@ export class GameEngine {
                         'spacewar:player_id': fireResult.torpedoOwner,
                         'runs:position_2d': fireResult.torpedoPos,
                         'runs:velocity_2d': fireResult.torpedoVel,
-                        'spacewar:lifetime': this.constants.torpedoLifetime,
+                        'spacewar:lifetime': CONFIG.combat.torpedoLifetime,
                         'spacewar:is_alive': true
                     }
                 });
+                // Set cooldown (10 ticks = ~0.17 seconds between shots)
+                this.fireCooldown[playerId] = 10;
             }
 
             // Hyperspace jump
@@ -254,7 +253,6 @@ export class GameEngine {
                 ship.fields['spacewar:hyperspace_charges'],
                 ship.fields['runs:position_2d'],
                 ship.fields['runs:velocity_2d'],
-                { width: this.constants.screenWidth, height: this.constants.screenHeight },
                 this.randomSeed
             );
             ship.fields['spacewar:hyperspace_charges'] = hyperResult.hyperspaceCharges;
@@ -288,6 +286,10 @@ export class GameEngine {
         const stars = this.storage.queryByFields({ 'spacewar:entity_type': ENTITY_STAR });
         const star = stars[0];
 
+        const shipRadius = CONFIG.collision.shipRadius;
+        const starRadius = CONFIG.collision.starRadius;
+        const torpedoRadius = CONFIG.collision.torpedoRadius;
+
         // Ship-Star collision
         for (const ship of ships) {
             if (!ship.fields['spacewar:is_alive']) continue;
@@ -295,7 +297,8 @@ export class GameEngine {
             if (Processors.checkCollision(
                 ship.fields['runs:position_2d'],
                 star.fields['runs:position_2d'],
-                this.constants.collisionRadiusStarSq
+                shipRadius,
+                starRadius
             )) {
                 ship.fields['spacewar:is_alive'] = false;
             }
@@ -311,7 +314,8 @@ export class GameEngine {
             if (Processors.checkCollision(
                 ship0.fields['runs:position_2d'],
                 ship1.fields['runs:position_2d'],
-                this.constants.collisionRadiusShipSq
+                shipRadius,
+                shipRadius
             )) {
                 ship0.fields['spacewar:is_alive'] = false;
                 ship1.fields['spacewar:is_alive'] = false;
@@ -329,7 +333,8 @@ export class GameEngine {
                 if (Processors.checkCollision(
                     torpedo.fields['runs:position_2d'],
                     ship.fields['runs:position_2d'],
-                    this.constants.collisionRadiusTorpedoSq
+                    torpedoRadius,
+                    shipRadius
                 )) {
                     ship.fields['spacewar:is_alive'] = false;
                     this.destroyQueue.push(torpedo.id);
@@ -340,7 +345,8 @@ export class GameEngine {
             if (Processors.checkCollision(
                 torpedo.fields['runs:position_2d'],
                 star.fields['runs:position_2d'],
-                this.constants.collisionRadiusStarSq
+                torpedoRadius,
+                starRadius
             )) {
                 this.destroyQueue.push(torpedo.id);
             }
@@ -358,21 +364,22 @@ export class GameEngine {
 
             const playerId = ship.fields['spacewar:player_id'];
 
-            // Reset to starting position
+            // Reset to starting state
             ship.fields['spacewar:is_alive'] = true;
-            ship.fields['spacewar:fuel'] = 20000;
-            ship.fields['spacewar:torpedo_count'] = 32;
-            ship.fields['spacewar:hyperspace_charges'] = 3;
-            ship.fields['runs:velocity_2d'] = { dx: 0, dy: 0 };
+            ship.fields['spacewar:fuel'] = CONFIG.resources.maxFuel;
+            ship.fields['spacewar:torpedo_count'] = CONFIG.resources.maxTorpedoes;
+            ship.fields['spacewar:hyperspace_charges'] = CONFIG.resources.maxHyperspaceCharges;
             ship.fields['runs:angular_velocity'] = 0;
 
-            // Position based on player
+            // Position and velocity based on player
             if (playerId === 0) {
-                ship.fields['runs:position_2d'] = { x: toFixed(200), y: toFixed(384) };
+                ship.fields['runs:position_2d'] = { ...CONFIG.spawn.player1 };
+                ship.fields['runs:velocity_2d'] = { ...CONFIG.spawn.player1Velocity };
                 ship.fields['runs:angle'] = 0;  // Facing right
             } else {
-                ship.fields['runs:position_2d'] = { x: toFixed(824), y: toFixed(384) };
-                ship.fields['runs:angle'] = toFixed(Math.PI);  // Facing left
+                ship.fields['runs:position_2d'] = { ...CONFIG.spawn.player2 };
+                ship.fields['runs:velocity_2d'] = { ...CONFIG.spawn.player2Velocity };
+                ship.fields['runs:angle'] = Math.PI;  // Facing left
             }
         }
     }
@@ -399,13 +406,12 @@ export class GameEngine {
 
     /**
      * Get game state for rendering
+     * Returns normalized coordinates (0-1 range)
      */
     getState() {
         return {
             tickCount: this.tickCount,
-            records: this.storage.all(),
-            screenWidth: this.constants.screenWidth,
-            screenHeight: this.constants.screenHeight
+            records: this.storage.all()
         };
     }
 }
