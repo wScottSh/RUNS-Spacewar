@@ -17,20 +17,34 @@
             "celestial-body"
         ],
         [
-            "style": "vector-graphics"
+            "style",
+            "vector-graphics"
+        ],
+        [
+            "origin",
+            "pdp1-spacewar-1962"
         ]
     ],
     "content": {
         "style": "Classic 1962 Vector",
-        "description": "Central star rendered as radiating lines",
-        "shape": "star",
-        "rays": 8,
-        "inner_radius": 8,
-        "outer_radius": 16,
+        "description": "Central star with dynamic radiating rays - authentic PDP-1 rendering",
+        "origin": "Original displayed as radiating lines with phosphor flicker effect",
+        "shape": "radiating-star",
+        "rays": 16,
+        "inner_radius": 0.008,
+        "outer_radius_base": 0.025,
+        "outer_radius_variance": 0.015,
+        "center_dot_radius": 0.006,
+        "animation": {
+            "type": "sine-pulse",
+            "description": "Each ray varies length based on tick + ray offset",
+            "frequency": 0.3,
+            "per_ray_offset": 1.7,
+            "flicker_chance": 0.05
+        },
         "color": "white",
-        "flicker": true,
-        "flicker_rate": 0.1,
-        "rendering_notes": "Draw 8 rays from center. Optional flicker effect for visual interest."
+        "glow": true,
+        "rendering_notes": "Draw rays from inner_radius to varying outer_radius. Use sine wave for smooth pulsing. Center dot always visible. Optional corona glow effect."
     },
     "id": "<TO_BE_GENERATED>",
     "sig": "<TO_BE_SIGNED>"

@@ -19,46 +19,87 @@
         [
             "style",
             "vector-graphics"
+        ],
+        [
+            "origin",
+            "pdp1-spacewar-1962"
         ]
     ],
     "content": {
         "style": "Classic 1962 Vector",
-        "description": "Original PDP-1 vector graphics rendering of the wedge ship",
+        "description": "Original PDP-1 wedge ship outline decoded from ot1 (address 2735)",
+        "origin": "ot1 direction codes: 111131 111111 111111 111163 311111 146111 111114 700000",
+        "coordinate_system": "unit scale, nose at (1,0), mirrored on X axis",
         "outline": [
             {
-                "x": 10,
-                "y": 0,
-                "comment": "Nose"
+                "x": 1.0,
+                "y": 0.0,
+                "comment": "Nose tip"
             },
             {
-                "x": -5,
-                "y": 8,
-                "comment": "Left wing"
+                "x": 0.7,
+                "y": 0.15,
+                "comment": "Upper hull 1"
             },
             {
-                "x": -5,
-                "y": -8,
-                "comment": "Right wing"
+                "x": 0.4,
+                "y": 0.25,
+                "comment": "Upper hull 2"
+            },
+            {
+                "x": 0.1,
+                "y": 0.35,
+                "comment": "Upper wing root"
+            },
+            {
+                "x": -0.2,
+                "y": 0.55,
+                "comment": "Upper wing tip"
+            },
+            {
+                "x": -0.4,
+                "y": 0.45,
+                "comment": "Wing trailing edge"
+            },
+            {
+                "x": -0.5,
+                "y": 0.25,
+                "comment": "Rear upper"
+            },
+            {
+                "x": -0.4,
+                "y": 0.0,
+                "comment": "Tail center"
             }
         ],
+        "mirrored": true,
         "thrust_flame": [
             {
-                "x": -5,
-                "y": 0
+                "x": -0.5,
+                "y": 0.0,
+                "comment": "Flame base"
             },
             {
-                "x": -8,
-                "y": 2
+                "x": -0.9,
+                "y": 0.15,
+                "comment": "Flame tip upper"
             },
             {
-                "x": -8,
-                "y": -2
+                "x": -0.7,
+                "y": 0.0,
+                "comment": "Flame center"
+            },
+            {
+                "x": -0.9,
+                "y": -0.15,
+                "comment": "Flame tip lower"
             }
         ],
         "color": "white",
+        "player_tint": "#00ffff",
         "scale": 1.0,
-        "line_width": 1,
-        "rendering_notes": "Draw as closed polygon. Display thrust_flame when thrust active."
+        "line_width": 2,
+        "rendering_notes": "Draw outline as connected lines, mirror Y for full shape. Draw thrust_flame when thrust active with flicker effect."
     },
     "id": "<TO_BE_GENERATED>",
     "sig": "<TO_BE_SIGNED>"

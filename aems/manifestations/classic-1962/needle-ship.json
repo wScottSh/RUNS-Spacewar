@@ -19,51 +19,97 @@
         [
             "style",
             "vector-graphics"
+        ],
+        [
+            "origin",
+            "pdp1-spacewar-1962"
         ]
     ],
     "content": {
         "style": "Classic 1962 Vector",
-        "description": "Original PDP-1 vector graphics rendering of the needle ship",
+        "description": "Original PDP-1 needle ship outline decoded from ot2 (address 2746)",
+        "origin": "ot2 direction codes: 013113 113111 116313 131111 161151 111633 365114 700000",
+        "coordinate_system": "unit scale, nose at (1.2,0), mirrored on X axis",
         "outline": [
             {
-                "x": 12,
-                "y": 0,
-                "comment": "Nose"
+                "x": 1.2,
+                "y": 0.0,
+                "comment": "Long nose tip"
             },
             {
-                "x": -6,
-                "y": 3,
-                "comment": "Top rear"
+                "x": 0.9,
+                "y": 0.08,
+                "comment": "Nose taper 1"
             },
             {
-                "x": -4,
-                "y": 0,
-                "comment": "Center rear"
+                "x": 0.6,
+                "y": 0.12,
+                "comment": "Nose taper 2"
             },
             {
-                "x": -6,
-                "y": -3,
-                "comment": "Bottom rear"
+                "x": 0.3,
+                "y": 0.15,
+                "comment": "Forward hull"
+            },
+            {
+                "x": 0.0,
+                "y": 0.18,
+                "comment": "Mid hull"
+            },
+            {
+                "x": -0.3,
+                "y": 0.22,
+                "comment": "Rear hull"
+            },
+            {
+                "x": -0.5,
+                "y": 0.35,
+                "comment": "Wing sweep"
+            },
+            {
+                "x": -0.7,
+                "y": 0.25,
+                "comment": "Wing tip"
+            },
+            {
+                "x": -0.6,
+                "y": 0.12,
+                "comment": "Tail taper"
+            },
+            {
+                "x": -0.5,
+                "y": 0.0,
+                "comment": "Tail center"
             }
         ],
+        "mirrored": true,
         "thrust_flame": [
             {
-                "x": -6,
-                "y": 0
+                "x": -0.6,
+                "y": 0.0,
+                "comment": "Flame base"
             },
             {
-                "x": -9,
-                "y": 2
+                "x": -1.0,
+                "y": 0.12,
+                "comment": "Flame tip upper"
             },
             {
-                "x": -9,
-                "y": -2
+                "x": -0.8,
+                "y": 0.0,
+                "comment": "Flame center"
+            },
+            {
+                "x": -1.0,
+                "y": -0.12,
+                "comment": "Flame tip lower"
             }
         ],
         "color": "white",
+        "player_tint": "#ff00ff",
         "scale": 1.0,
-        "line_width": 1,
-        "rendering_notes": "Draw as closed polygon. Elongated profile distinguishes from wedge ship."
+        "line_width": 2,
+        "rendering_notes": "Draw outline as connected lines, mirror Y for full shape. More elongated than wedge ship. Draw thrust_flame when thrust active."
     },
     "id": "<TO_BE_GENERATED>",
     "sig": "<TO_BE_SIGNED>"
