@@ -175,19 +175,19 @@ AEMS (What exists) → RUNS (How it executes) → WOCS (How ecosystem coordinate
 ```
 
 **For Spacewar!:**
-- **Entities (Kind 30001)**: Immutable archetypes ("wedge ship", "needle ship", "torpedo")
-- **Manifestations (Kind 30002)**: Visual/audio interpretations per style ("classic-1962", "modern-hd", "ascii")
-- **State (Kind 30078)**: Mutable instance data (current position, fuel, alive status)
-- **Asset (Kind 30003)**: Optional ownership chain (not used in this prototype)
+- **Entities (Kind 30050)**: Immutable archetypes ("wedge ship", "needle ship", "torpedo")
+- **Manifestations (Kind 30051)**: Visual/audio interpretations per style ("classic-1962", "modern-hd", "ascii")
+- **Asset (Kind 30052)**: Player's instance of a Manifestation (ownership)
+- **State (Kind 30053)**: Mutable instance data (current position, fuel, alive status)
 
-### Entity Definitions (Kind 30001)
+### Entity Definitions (Kind 30050)
 
 Following AEMS conventions (see `aems-conventions/README.md`), we use the `std:` prefix for community-ratified universal entities:
 
 **Wedge Ship Entity:**
 ```json
 {
-  "kind": 30001,
+  "kind": 30050,
   "pubkey": "<author_npub>",
   "tags": [
     ["d", "std:spacewar-wedge-ship"],
@@ -206,7 +206,7 @@ Following AEMS conventions (see `aems-conventions/README.md`), we use the `std:`
 **Torpedo Entity:**
 ```json
 {
-  "kind": 30001,
+  "kind": 30050,
   "pubkey": "<author_npub>",
   "tags": [
     ["d", "std:spacewar-torpedo"],
@@ -221,7 +221,7 @@ Following AEMS conventions (see `aems-conventions/README.md`), we use the `std:`
 }
 ```
 
-### Manifestation Definitions (Kind 30002)
+### Manifestation Definitions (Kind 30051)
 
 Following the pattern from `wScottSh/aems-french-52-deck`, we define multiple visual styles:
 
@@ -229,7 +229,7 @@ Following the pattern from `wScottSh/aems-french-52-deck`, we define multiple vi
 
 ```json
 {
-  "kind": 30002,
+  "kind": 30051,
   "pubkey": "<author_npub>",
   "tags": [
     ["d", "classic-1962:wedge-ship"],
@@ -257,7 +257,7 @@ Following the pattern from `wScottSh/aems-french-52-deck`, we define multiple vi
 
 ```json
 {
-  "kind": 30002,
+  "kind": 30051,
   "pubkey": "<author_npub>",
   "tags": [
     ["d", "ascii:wedge-ship"],
