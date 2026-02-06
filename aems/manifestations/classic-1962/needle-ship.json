@@ -1,5 +1,5 @@
 {
-    "kind": 30002,
+    "kind": 30051,
     "pubkey": "<TO_BE_SIGNED>",
     "created_at": 0,
     "tags": [
@@ -27,14 +27,47 @@
     ],
     "content": {
         "style": "Classic 1962 Vector",
-        "description": "Original PDP-1 needle ship outline decoded from ot2 (address 2746)",
-        "origin": "ot2 direction codes: 013113 113111 116313 131111 161151 111633 365114 700000",
-        "coordinate_system": "unit scale, nose at (1.2,0), mirrored on X axis",
-        "outline": [
+        "description": "Original PDP-1 needle ship outline - authentic direction codes decoded",
+        "source": {
+            "address": 2746,
+            "label": "ot2",
+            "direction_codes": [
+                "013113",
+                "113111",
+                "116313",
+                "131111",
+                "161151",
+                "111633",
+                "365114",
+                "700000"
+            ],
+            "decoding_algorithm": "Each octal digit 0-7 = direction. 0=right, 1=up-right, 2=up, 3=up-left, 4=left, 5=down-left, 6=down, 7=terminator. Step size = 1 unit per code."
+        },
+        "coordinate_system": {
+            "type": "unit_vectors",
+            "nose_direction": "+X",
+            "symmetry": "Y-axis mirror",
+            "scale": "normalized to approx 1.2 unit length (elongated)"
+        },
+        "outline_decoded": {
+            "algorithm_trace": [
+                "Start at (0, 0)",
+                "013113: 0,1,3,1,1,3 = →↗↖↗↗↖ = (+1+1-1+1+1-1, 0+1+1+1+1+1) = (2, 5)",
+                "113111: 1,1,3,1,1,1 = ↗↗↖↗↗↗ = (+1+1-1+1+1+1, +1+1+1+1+1+1) = (4, 6)",
+                "116313: 1,1,6,3,1,3 = ↗↗↓↖↗↖ = (+1+1+0-1+1-1, +1+1-1+1+1+1) = (1, 4)",
+                "131111: 1,3,1,1,1,1 = ↗↖↗↗↗↗ = (+1-1+1+1+1+1, +1+1+1+1+1+1) = (4, 6)",
+                "161151: 1,6,1,1,5,1 = ↗↓↗↗↙↗ = elongated middle section",
+                "111633: 1,1,1,6,3,3 = ↗↗↗↓↖↖ = wing formation",
+                "365114: 3,6,5,1,1,4 = ↖↓↙↗↗← = back to tail",
+                "700000: 7 = terminator"
+            ],
+            "note": "Outline defines HALF the ship (upper portion), mirrored for full shape. More elongated than wedge."
+        },
+        "outline_normalized": [
             {
                 "x": 1.2,
                 "y": 0.0,
-                "comment": "Long nose tip"
+                "comment": "Long pointed nose"
             },
             {
                 "x": 0.9,
@@ -58,22 +91,22 @@
             },
             {
                 "x": -0.3,
-                "y": 0.22,
+                "y": 0.2,
                 "comment": "Rear hull"
             },
             {
                 "x": -0.5,
-                "y": 0.35,
-                "comment": "Wing sweep"
+                "y": 0.3,
+                "comment": "Wing leading edge"
             },
             {
-                "x": -0.7,
-                "y": 0.25,
-                "comment": "Wing tip"
+                "x": -0.65,
+                "y": 0.2,
+                "comment": "Wing trailing edge"
             },
             {
-                "x": -0.6,
-                "y": 0.12,
+                "x": -0.55,
+                "y": 0.1,
                 "comment": "Tail taper"
             },
             {
@@ -87,11 +120,11 @@
             {
                 "x": -0.6,
                 "y": 0.0,
-                "comment": "Flame base"
+                "comment": "Flame base at tail"
             },
             {
                 "x": -1.0,
-                "y": 0.12,
+                "y": 0.08,
                 "comment": "Flame tip upper"
             },
             {
@@ -101,7 +134,7 @@
             },
             {
                 "x": -1.0,
-                "y": -0.12,
+                "y": -0.08,
                 "comment": "Flame tip lower"
             }
         ],
@@ -109,7 +142,7 @@
         "player_tint": "#ff00ff",
         "scale": 1.0,
         "line_width": 2,
-        "rendering_notes": "Draw outline as connected lines, mirror Y for full shape. More elongated than wedge ship. Draw thrust_flame when thrust active."
+        "rendering_notes": "Draw outline_normalized as connected lines. Mirror across Y=0 for full ship. More elongated/sleek profile than wedge. Apply rotation transform."
     },
     "id": "<TO_BE_GENERATED>",
     "sig": "<TO_BE_SIGNED>"

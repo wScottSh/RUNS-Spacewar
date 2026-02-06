@@ -1,5 +1,5 @@
 {
-    "kind": 30002,
+    "kind": 30051,
     "pubkey": "<TO_BE_SIGNED>",
     "created_at": 0,
     "tags": [
@@ -27,24 +27,50 @@
     ],
     "content": {
         "style": "Classic 1962 Vector",
-        "description": "Central star with dynamic radiating rays - authentic PDP-1 rendering",
-        "origin": "Original displayed as radiating lines with phosphor flicker effect",
-        "shape": "radiating-star",
-        "rays": 16,
-        "inner_radius": 0.008,
-        "outer_radius_base": 0.025,
-        "outer_radius_variance": 0.015,
-        "center_dot_radius": 0.006,
-        "animation": {
-            "type": "sine-pulse",
-            "description": "Each ray varies length based on tick + ray offset",
-            "frequency": 0.3,
-            "per_ray_offset": 1.7,
-            "flicker_chance": 0.05
+        "description": "Central star - authentic PDP-1 point-flicker rendering",
+        "source": {
+            "routine": "blp (star display)",
+            "algorithm": "LFSR random scatter around center point, single dpy-4000 commands",
+            "notes": "Original was NOT radiating rays - it was scattered points creating a flicker effect through phosphor persistence"
         },
+        "authentic_algorithm": {
+            "description": "The original uses LFSR random values to scatter display points around center",
+            "assembly_excerpt": [
+                "random \\ran",
+                "rar 9s",
+                "and (add 340",
+                "spa",
+                "xor (377777",
+                "dac \\bx",
+                "...",
+                "dpy-4000"
+            ],
+            "interpretation": "Random offset applied to center, then single point displayed. Multiple points per frame create scatter effect."
+        },
+        "shape": "point-scatter",
+        "rendering": {
+            "type": "lfsr-scatter",
+            "center": {
+                "x": 0.5,
+                "y": 0.5
+            },
+            "scatter_radius": 0.01,
+            "points_per_frame": 8,
+            "point_size": 2,
+            "use_lfsr": true,
+            "lfsr_shift": 9,
+            "lfsr_mask": "0x1BF"
+        },
+        "fallback_rendering": {
+            "description": "For runtimes without LFSR support, a simple bright dot with slight jitter",
+            "type": "dot-with-jitter",
+            "radius": 0.008,
+            "jitter_amount": 0.002
+        },
+        "collision_radius": 0.035,
         "color": "white",
         "glow": true,
-        "rendering_notes": "Draw rays from inner_radius to varying outer_radius. Use sine wave for smooth pulsing. Center dot always visible. Optional corona glow effect."
+        "rendering_notes": "Authentic: Use LFSR to generate scatter points around center each frame. The phosphor persistence creates the 'radiating' effect naturally. Runtime may use fallback if LFSR not available."
     },
     "id": "<TO_BE_GENERATED>",
     "sig": "<TO_BE_SIGNED>"

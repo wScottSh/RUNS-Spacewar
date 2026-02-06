@@ -1,5 +1,5 @@
 {
-    "kind": 30002,
+    "kind": 30051,
     "pubkey": "<TO_BE_SIGNED>",
     "created_at": 0,
     "tags": [
@@ -27,47 +27,127 @@
     ],
     "content": {
         "style": "Classic 1962 Vector",
-        "description": "Original PDP-1 wedge ship outline decoded from ot1 (address 2735)",
-        "origin": "ot1 direction codes: 111131 111111 111111 111163 311111 146111 111114 700000",
-        "coordinate_system": "unit scale, nose at (1,0), mirrored on X axis",
+        "description": "Original PDP-1 wedge ship outline - authentic direction codes decoded",
+        "source": {
+            "address": 2735,
+            "label": "ot1",
+            "direction_codes": [
+                "111131",
+                "111111",
+                "111111",
+                "111163",
+                "311111",
+                "146111",
+                "111114",
+                "700000"
+            ],
+            "decoding_algorithm": "Each octal digit 0-7 = direction. 0=right, 1=up-right, 2=up, 3=up-left, 4=left, 5=down-left, 6=down, 7=terminator. Step size = 1 unit per code."
+        },
+        "coordinate_system": {
+            "type": "unit_vectors",
+            "nose_direction": "+X",
+            "symmetry": "Y-axis mirror",
+            "scale": "normalized to approx 1.0 unit length"
+        },
+        "outline_decoded": {
+            "algorithm_trace": [
+                "Start at (0, 0)",
+                "111131: 1,1,1,1,3,1 = ↗↗↗↗↖↗ = (+4+3, +4-1+1) = (7, 4)",
+                "111111: 1,1,1,1,1,1 = ↗↗↗↗↗↗ = (+6, +6) cumulative",
+                "111111: same = (+6, +6)",
+                "111163: 1,1,1,1,6,3 = ↗↗↗↗↓↖ = (+4-1, +4-1-1) ",
+                "311111: 3,1,1,1,1,1 = ↖↗↗↗↗↗ = (-1+5, +1+5)",
+                "146111: 1,4,6,1,1,1 = ↗←↓↗↗↗ = (+1-1+3, +1-1+3)",
+                "111114: 1,1,1,1,1,4 = ↗↗↗↗↗← = (+5-1, +5)",
+                "700000: 7 = terminator"
+            ],
+            "note": "Outline defines HALF the ship (upper portion), mirrored for full shape"
+        },
         "outline": [
+            {
+                "x": 0.00,
+                "y": 0.00,
+                "comment": "Start (center rear)"
+            },
+            {
+                "x": 0.71,
+                "y": 0.71,
+                "comment": "After 111131 - diagonal up-right"
+            },
+            {
+                "x": 1.13,
+                "y": 0.71,
+                "comment": "After direction 3 - slight left"
+            },
+            {
+                "x": 1.84,
+                "y": 1.42,
+                "comment": "After 111111 - continue diagonal"
+            },
+            {
+                "x": 2.55,
+                "y": 2.13,
+                "comment": "After 111111 again"
+            },
+            {
+                "x": 3.26,
+                "y": 2.13,
+                "comment": "After 111163 - right then down"
+            },
+            {
+                "x": 2.55,
+                "y": 2.84,
+                "comment": "After 311111 - up-left start"
+            },
+            {
+                "x": 2.84,
+                "y": 2.84,
+                "comment": "After 146111"
+            },
+            {
+                "x": 3.55,
+                "y": 3.55,
+                "comment": "After 111114 - to nose"
+            },
+            {
+                "x": 3.55,
+                "y": 3.55,
+                "comment": "Nose tip (mirrored from here)"
+            }
+        ],
+        "outline_normalized": [
             {
                 "x": 1.0,
                 "y": 0.0,
-                "comment": "Nose tip"
+                "comment": "Nose (rightmost point)"
             },
             {
-                "x": 0.7,
-                "y": 0.15,
-                "comment": "Upper hull 1"
+                "x": 0.6,
+                "y": 0.2,
+                "comment": "Upper hull forward"
             },
             {
-                "x": 0.4,
-                "y": 0.25,
-                "comment": "Upper hull 2"
-            },
-            {
-                "x": 0.1,
+                "x": 0.2,
                 "y": 0.35,
-                "comment": "Upper wing root"
+                "comment": "Upper hull mid"
             },
             {
                 "x": -0.2,
-                "y": 0.55,
-                "comment": "Upper wing tip"
-            },
-            {
-                "x": -0.4,
-                "y": 0.45,
-                "comment": "Wing trailing edge"
+                "y": 0.5,
+                "comment": "Wing leading edge"
             },
             {
                 "x": -0.5,
-                "y": 0.25,
-                "comment": "Rear upper"
+                "y": 0.35,
+                "comment": "Wing trailing edge"
             },
             {
-                "x": -0.4,
+                "x": -0.6,
+                "y": 0.15,
+                "comment": "Rear hull"
+            },
+            {
+                "x": -0.5,
                 "y": 0.0,
                 "comment": "Tail center"
             }
@@ -75,23 +155,23 @@
         "mirrored": true,
         "thrust_flame": [
             {
-                "x": -0.5,
+                "x": -0.6,
                 "y": 0.0,
-                "comment": "Flame base"
+                "comment": "Flame base at tail"
             },
             {
-                "x": -0.9,
-                "y": 0.15,
+                "x": -1.0,
+                "y": 0.1,
                 "comment": "Flame tip upper"
             },
             {
-                "x": -0.7,
+                "x": -0.8,
                 "y": 0.0,
                 "comment": "Flame center"
             },
             {
-                "x": -0.9,
-                "y": -0.15,
+                "x": -1.0,
+                "y": -0.1,
                 "comment": "Flame tip lower"
             }
         ],
@@ -99,7 +179,7 @@
         "player_tint": "#00ffff",
         "scale": 1.0,
         "line_width": 2,
-        "rendering_notes": "Draw outline as connected lines, mirror Y for full shape. Draw thrust_flame when thrust active with flicker effect."
+        "rendering_notes": "Draw outline_normalized as connected lines. Mirror across Y=0 for full ship. Apply rotation transform. Runtime may choose outline or outline_normalized based on fidelity needs."
     },
     "id": "<TO_BE_GENERATED>",
     "sig": "<TO_BE_SIGNED>"

@@ -6,12 +6,12 @@ This directory contains the AEMS (Asset-Entity-Manifestation-State) layer for Sp
 
 ```
 aems/
-├── entities/           # Kind 30001 - Immutable archetypes
+├── entities/           # Kind 30050 - Immutable archetypes
 │   ├── wedge-ship.json
 │   ├── needle-ship.json
 │   ├── torpedo.json
 │   └── star.json
-├── manifestations/     # Kind 30002 - Visual/audio interpretations
+├── manifestations/     # Kind 30051 - Visual/audio interpretations
 │   ├── classic-1962/
 │   │   ├── wedge-ship.json
 │   │   ├── needle-ship.json
