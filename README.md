@@ -50,9 +50,9 @@ Based on user feedback:
 
 ## References
 
-- **RUNS Protocol**: https://github.com/decentralized-game-standard/runs-standard
-- **RUNS Standard Library**: https://github.com/decentralized-game-standard/runs-standard-library
-- **AEMS Standard**: https://github.com/decentralized-game-standard/aems-standard
+- **RUNS Spec**: https://github.com/enduring-game-standard/runs-spec
+- **RUNS Library**: https://github.com/enduring-game-standard/runs-library
+- **AEMS Schema**: https://github.com/enduring-game-standard/aems-schema
 - **Original Spacewar!**: https://gist.github.com/JonnieCache/4258114
 
 ## License

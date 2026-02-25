@@ -73,5 +73,5 @@ Each Processor and Network is published as a separate Nostr event (kind 30078) w
 
 ## References
 
-- **RUNS Protocol**: https://github.com/decentralized-game-standard/runs-standard
-- **RUNS Standard Library**: https://github.com/decentralized-game-standard/runs-standard-library
+- **RUNS Spec**: https://github.com/enduring-game-standard/runs-spec
+- **RUNS Library**: https://github.com/enduring-game-standard/runs-library

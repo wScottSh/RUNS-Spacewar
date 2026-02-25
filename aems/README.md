@@ -52,6 +52,6 @@ These JSON files are templates. To publish as signed Nostr events:
 
 ## References
 
-- **AEMS Standard**: https://github.com/decentralized-game-standard/aems-standard
-- **AEMS Conventions**: https://github.com/decentralized-game-standard/aems-conventions
+- **AEMS Schema**: https://github.com/enduring-game-standard/aems-schema
+- **AEMS Conventions**: https://github.com/enduring-game-standard/aems-conventions
 - **French-52 Deck Reference**: https://github.com/wScottSh/aems-french-52-deck

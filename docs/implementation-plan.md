@@ -166,7 +166,7 @@ Per RUNS Protocol conventions, the bundle is anchored by a Nostr event manifest:
 
 ## AEMS Integration: Entities as Universal Archetypes
 
-Per the DGS architecture, **AEMS** (Asset-Entity-Manifestation-State) defines game objects as durable Nostr events that outlive individual games. Spacewar! demonstrates this by defining ships and torpedoes as universal entities.
+Per the EGS architecture, **AEMS** (Asset-Entity-Manifestation-State) defines game objects as durable Nostr events that outlive individual games. Spacewar! demonstrates this by defining ships and torpedoes as universal entities.
 
 ### AEMS Layer Structure
 
