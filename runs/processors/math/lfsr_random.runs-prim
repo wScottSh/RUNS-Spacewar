@@ -5,17 +5,27 @@ outputs:
   value: u32
   next_seed: u32
 
-; Linear Feedback Shift Register (LFSR) - classic RNG from original Spacewar!
-; Uses Galois LFSR with polynomial x^32 + x^22 + x^2 + x + 1
-; Matches the spirit of the original PDP-1 implementation
+; Linear Feedback Shift Register - AUTHENTIC PDP-1 algorithm
+; From original spacewar_2b_25mar62.txt source code
+;
+; Original PDP-1 assembly:
+;   lac N
+;   rar 1s          ; rotate right 1
+;   xor (335671     ; XOR with constant (octal)
+;   add (335671     ; ADD same constant
+;   dac N
+;
+; Constant 335671 (octal) = 114617 (decimal) = 0x1BF39 (hex)
 
-; Shift right and apply XOR feedback
+; Rotate right 1 bit
 shifted = seed >> 1
-bit = ((seed >> 0) ^ (seed >> 10) ^ (seed >> 30) ^ (seed >> 31)) & 1
-next_seed = shifted | (bit << 31)
+carry = seed & 1
+rotated = shifted | (carry << 31)
+
+; XOR with constant then ADD constant (authentic algorithm)
+xored = rotated ^ 0x1BF39
+next_seed = xored + 0x1BF39
 
 ; Output value is the current seed
 value = seed
 
-; Note: Runtime should maintain persistent seed across ticks
-; Initial seed can be from timestamp or user-provided

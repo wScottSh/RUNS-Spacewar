@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spacewar! - Authentic PDP-1 Port</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #0f0;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .screen-frame {
+            /* Authentic CRT bezel */
+            background: #222;
+            padding: 30px;
+            border-radius: 50%;
+            box-shadow:
+                0 0 60px rgba(0, 255, 0, 0.1),
+                inset 0 0 30px rgba(0, 0, 0, 0.8);
+        }
+
+        #game-canvas {
+            display: block;
+            border-radius: 50%;
+            box-shadow:
+                0 0 20px rgba(0, 255, 0, 0.3),
+                inset 0 0 50px rgba(0, 255, 0, 0.05);
+        }
+
+        .controls {
+            display: flex;
+            gap: 60px;
+            font-size: 12px;
+        }
+
+        .player {
+            text-align: center;
+        }
+
+        .player h3 {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .player ul {
+            list-style: none;
+            text-align: left;
+        }
+
+        .player li {
+            opacity: 0.7;
+        }
+
+        .source-info {
+            font-size: 10px;
+            opacity: 0.5;
+            text-align: center;
+            max-width: 600px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Spacewar!</h1>
+        <div class="subtitle">Authentic PDP-1 Port • 25 March 1962</div>
+
+        <div class="screen-frame">
+            <canvas id="game-canvas" width="512" height="512"></canvas>
+        </div>
+
+        <div class="controls">
+            <div class="player">
+                <h3>Player 1 (Wedge)</h3>
+                <ul>
+                    <li>A/D - Rotate</li>
+                    <li>W - Thrust</li>
+                    <li>S - Fire</li>
+                    <li>Q - Hyperspace</li>
+                </ul>
+            </div>
+            <div class="player">
+                <h3>Player 2 (Needle)</h3>
+                <ul>
+                    <li>←/→ - Rotate</li>
+                    <li>↑ - Thrust</li>
+                    <li>↓ - Fire</li>
+                    <li>Enter - Hyperspace</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="source-info">
+            Line-by-line translation from spacewar_2b_25mar62.txt<br>
+            Q18 fixed-point arithmetic • Authentic collision (ME1=10000₈) • LFSR random (335671₈)
+        </div>
+    </div>
+
+    <script type="module" src="./src/pdp1-main.js?v=4"></script>
+</body>
+
+</html>

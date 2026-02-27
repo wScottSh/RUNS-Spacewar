@@ -104,22 +104,39 @@ export function fixedCos(angle) {
 
 //=============================================================================
 // LFSR Random Number Generator
-// Classic approach matching original Spacewar!
+// AUTHENTIC PDP-1 algorithm from spacewar_2b_25mar62.txt
 //=============================================================================
 
 /**
- * Linear Feedback Shift Register (Galois LFSR)
- * Polynomial: x^32 + x^22 + x^2 + x + 1
+ * Linear Feedback Shift Register - Authentic PDP-1 algorithm
+ * 
+ * Original PDP-1 assembly:
+ *   lac N
+ *   rar 1s          ; rotate right 1
+ *   xor (335671     ; XOR with constant (octal)
+ *   add (335671     ; ADD same constant
+ *   dac N
+ * 
+ * Constant 335671 (octal) = 114617 (decimal) = 0x1BF39 (hex)
+ * 
  * @param {number} seed - Current seed (32-bit)
  * @returns {Object} { value, nextSeed }
  */
 export function lfsrRandom(seed) {
+    // Constant from original PDP-1 source: 335671 (octal)
+    const LFSR_CONSTANT = 0x1BF39;  // 114617 decimal
+
     // Ensure 32-bit unsigned
     seed = seed >>> 0;
 
-    // Galois LFSR step
-    const bit = ((seed >> 0) ^ (seed >> 10) ^ (seed >> 30) ^ (seed >> 31)) & 1;
-    const nextSeed = ((seed >>> 1) | (bit << 31)) >>> 0;
+    // Rotate right 1 bit (authentic rar 1s)
+    const carry = seed & 1;
+    const shifted = seed >>> 1;
+    const rotated = (shifted | (carry << 31)) >>> 0;
+
+    // XOR with constant, then ADD constant (authentic algorithm)
+    const xored = (rotated ^ LFSR_CONSTANT) >>> 0;
+    const nextSeed = (xored + LFSR_CONSTANT) >>> 0;
 
     return {
         value: seed,

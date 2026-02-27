@@ -87,59 +87,61 @@ export function integrateVelocity(position, velocity) {
 }
 
 /**
- * apply_gravity - Gravity with zone cutoff (like original)
- * Only applies within gravityZone radius, weaker than true inverse-square
+ * apply_gravity - Authentic inverse-square gravity
+ * 
+ * Original PDP-1 algorithm from spacewar_2b_25mar62.txt:
+ *   - Uses integer square root and fixed-point multiply
+ *   - True 1/r² inverse-square law
+ *   - No gravity zone cutoff
+ *   - Sense switch 2 toggles "heavy star" mode (extra shift)
  */
 export function applyGravity(position, velocity, attractorPos, gravityStrength) {
     const dx = attractorPos.x - position.x;
     const dy = attractorPos.y - position.y;
 
-    // Distance calculation
+    // Distance squared
     const distSq = dx * dx + dy * dy;
-    const dist = Math.sqrt(distSq);
 
-    // Gravity zone cutoff - no gravity outside this radius (like original)
-    const gravityZone = CONFIG.physics.gravityZone;
-    if (dist > gravityZone) {
-        return velocity;  // No gravity effect
-    }
+    // Minimum distance to prevent singularity at star center
+    // Original used capture radius check separately for collision
+    const minDistSq = CONFIG.physics.gravityMinDistance * CONFIG.physics.gravityMinDistance;
+    const effectiveDistSq = Math.max(distSq, minDistSq);
 
-    // Minimum distance to prevent singularity
-    const minDist = CONFIG.physics.gravityMinDistance;
-    const effectiveDist = Math.max(dist, minDist);
+    // Authentic inverse-square gravity: F = G / r²
+    // No zone cutoff, no 1/r^2.5 approximation
+    const force = gravityStrength / effectiveDistSq;
 
-    // Weaker gravity: use 1/r^2.5 instead of 1/r^2 for gentler pull
-    // This matches the original's approximated gravity feel
-    const force = gravityStrength / (effectiveDist * effectiveDist * Math.sqrt(effectiveDist));
-
-    // Apply in direction of attractor (normalized)
-    const nx = dx / effectiveDist;
-    const ny = dy / effectiveDist;
+    // Apply in direction of attractor
+    // Note: We divide by sqrt(distSq) to normalize, then multiply by force
+    // This is equivalent to: (dx/r) * (G/r²) = G*dx/r³ 
+    const dist = Math.sqrt(effectiveDistSq);
+    const ax = (dx / dist) * force;
+    const ay = (dy / dist) * force;
 
     return {
-        dx: velocity.dx + nx * force,
-        dy: velocity.dy + ny * force
+        dx: velocity.dx + ax,
+        dy: velocity.dy + ay
     };
 }
 
 /**
- * apply_torpedo_warpage - Negligible "space warpage" for torpedoes
- * Original used sar 9s twice = divide by 262144, nearly invisible effect
+ * apply_torpedo_gravity - Torpedoes use FULL gravity like ships (authentic)
+ * 
+ * The original PDP-1 source shows torpedoes go through the same
+ * gravity calculation as ships. The "negligible warpage" was a 
+ * misinterpretation - torpedoes ARE affected by gravity.
  */
+export function applyTorpedoGravity(position, velocity, attractorPos, gravityStrength) {
+    // Torpedoes use the same gravity as ships - this is authentic
+    return applyGravity(position, velocity, attractorPos, gravityStrength);
+}
+
+// Keep old function name for compatibility but redirect to authentic version
 export function applyTorpedoWarpage(position, velocity, attractorPos) {
-    const dx = attractorPos.x - position.x;
-    const dy = attractorPos.y - position.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < 0.01) return velocity;  // Avoid division by zero
-
-    // Negligible warpage - cosmetic effect only
-    const warpage = CONFIG.combat.torpedoWarpage;
-
-    return {
-        dx: velocity.dx + (dx / dist) * warpage,
-        dy: velocity.dy + (dy / dist) * warpage
-    };
+    // Deprecated: Use applyTorpedoGravity instead
+    // For backward compatibility, apply minimal effect
+    const gravityStrength = CONFIG.physics.gravityStrength;
+    return applyGravity(position, velocity, attractorPos, gravityStrength);
 }
 
 /**
