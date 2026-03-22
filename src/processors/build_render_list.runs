@@ -1,0 +1,102 @@
+# spacewar:build_render_list — Render Projection Construction
+#
+# Reads internal game state and produces outbound render_object[]
+# for the runtime to draw. This is a DATA PROJECTION — no gameplay
+# decisions flow backward from rendering.
+#
+# Source: L1187-1231 (ship display prep), entity dispatch rendering,
+#         plus star/central-star handling
+# Cross-reference: 04_conversion_phases.md Phase 5 Work Item 7
+
+processor spacewar:build_render_list
+  inputs:
+    objects:    spacewar:object[]
+    configs:    spacewar:ship_config[]
+  outputs:
+    render_list: spacewar:render_object[]
+
+  var list: spacewar:render_object[] = []
+
+  # --- Central star (always present) ---
+  list = list + [{
+    object_type = central_star,
+    position_x = 0,
+    position_y = 0,
+    angle = 0,
+    brightness = 0,
+    particle_seed = 0,
+    particle_count = 0,
+    flame_length = 0
+  }]
+
+  # --- Active entities ---
+  for i from 0 to 23:
+    let obj = objects[i]
+
+    match obj.state:
+      case empty:
+        # Not rendered
+        continue
+
+      case ship:
+        # Source: L1187-1216 (display prep for ships)
+        # Emit ship with position, angle, outline, and flame
+        list = list + [{
+          object_type = ship,
+          position_x = obj.position_x,
+          position_y = obj.position_y,
+          angle = obj.angle,
+          outline_data = configs[obj.outline_ref].outline_data,
+          brightness = 0,
+          particle_seed = 0,
+          particle_count = 0,
+          flame_length = 0     # Set by thrust Processor via separate channel
+        }]
+
+      case torpedo:
+        # Source: L1004: dispt i, i my1, 1 (single point at intensity 1)
+        list = list + [{
+          object_type = torpedo,
+          position_x = obj.position_x,
+          position_y = obj.position_y,
+          angle = 0,
+          brightness = 0,
+          particle_seed = 0,
+          particle_count = 0,
+          flame_length = 0
+        }]
+
+      case exploding:
+        # Source: L946-977 (mex routine generates particles)
+        # particle_seed and particle_count come from explosion_tick
+        list = list + [{
+          object_type = explosion,
+          position_x = obj.position_x,
+          position_y = obj.position_y,
+          angle = 0,
+          brightness = 0,
+          particle_seed = 0,      # Populated by explosion_tick outputs
+          particle_count = 0,     # Populated by explosion_tick outputs
+          flame_length = 0
+        }]
+
+      case hyperspace_in:
+        # Source: invisible, non-collidable — NOT rendered
+        continue
+
+      case hyperspace_out:
+        # Source: L1075-1076: dispt i, i my1, 2 (rendered at intensity 2)
+        # Ship is visible during breakout, at reduced brightness
+        list = list + [{
+          object_type = ship,
+          position_x = obj.position_x,
+          position_y = obj.position_y,
+          angle = obj.angle,
+          outline_data = configs[obj.outline_ref].outline_data,
+          brightness = 2,         # Reduced intensity (breakout phase)
+          particle_seed = 0,
+          particle_count = 0,
+          flame_length = 0
+        }]
+
+  render_list = list

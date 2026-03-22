@@ -1,0 +1,28 @@
+# spacewar:prng_state — Pseudo-Random Number Generator State
+#
+# Internal Record holding the PRNG state for Spacewar! 3.1.
+# The PRNG algorithm is defined in the `spacewar:random` Processor
+# (Phase 2). This Record defines only the state container.
+#
+# Source: `ran` at L96 — `ran, 31, 0` (symbol `ran`, address 31,
+# initial value 0).
+
+record spacewar:prng_state
+  scope:     internal
+  instances: 1
+
+  fields:
+
+    state:                        spacewar:fixed18
+      # Current PRNG value. Read and written by spacewar:random.
+      # Initial value: 0 (L96: `ran, 31, 0`)
+      #
+      # The PRNG algorithm (defined in Phase 2, L170-177):
+      #   1. Rotate right 1 bit (rar 1s)
+      #   2. XOR with 355670 (octal) = 121784 (decimal)
+      #   3. Add 355670 (octal) = 121784 (decimal)
+      #   4. Store result as new state
+      #
+      # The algorithm documentation lives on the Processor.
+      # This Record is just the state container.
+      default: 0

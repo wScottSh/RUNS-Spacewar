@@ -1,0 +1,91 @@
+# spacewar:multiply — 18×18-bit Ones-Complement Multiply
+#
+# Multiplies two 18-bit ones-complement values, producing a 34-bit
+# product with 2 sign bits.
+#
+# Source: L257-301 of spacewar3.1_complete.txt
+# Attribution: BBN (Bolt Beranek & Newman) multiply subroutine
+#              (L258 comment: "BBN multiply subroutine")
+
+processor spacewar:multiply
+  inputs:
+    a:        spacewar:fixed18     # First factor
+    b:        spacewar:fixed18     # Second factor
+  outputs:
+    high:     spacewar:fixed18     # High 18 bits of 34-bit product
+    low:      spacewar:fixed18     # Low 18 bits of 34-bit product (with sign)
+
+  # ── Algorithm (L273-301, mpy entry) ────────────────────────────
+  #
+  # PDP-1 source (mpy entry):
+  #   mpy, 0          # L273: entry, return address storage
+  #   dap mp1          # L274: save return address
+  #   lac mpy          # L275: load first factor (stored at mpy address)
+  #   spa              # L276: skip if positive
+  #   cma              # L277: complement negative → work with magnitude
+  #   rcr 9s           # L278: rotate right 9 }
+  #   rcr 9s           # L279: rotate right 9 } move AC to IO
+  #   mp1, xct         # L280: execute next instruction (loads second factor)
+  #   spa              # L281: skip if positive
+  #   cma              # L282: complement negative → work with magnitude
+  #   dac mp2          # L283: store magnitude of second factor
+  #   cla              # L284: clear AC
+  #   repeat 21, mus mp2  # L285: 21 multiply-step instructions
+  #   dac mp2          # L286: store high word of product
+  #   xct mp1          # L287: reload second factor (to check signs)
+  #   xor mpy          # L288: XOR first factor — sign bit = product sign
+  #   sma              # L289: skip if negative (signs differ)
+  #   jmp mp3          # L290: signs same → product positive, done
+  #
+  # Sign correction (L291-298, signs differ → negate product):
+  #   lac mp2          # L291: load high word
+  #   cma              # L292: complement
+  #   rcr 9s           # L293-294: swap AC and IO
+  #   rcr 9s
+  #   cma              # L295: complement low word (now in AC)
+  #   rcr 9s           # L296-297: swap back
+  #   rcr 9s
+  #   dac mp2          # L298: store corrected high word
+  #
+  # Return (L299-301):
+  #   mp3, idx mp1     # L299: advance return address past second factor
+  #   lac mp2          # L300: load high word into AC
+  #   jmp i mp1        # L301: return (high in AC, low in IO)
+  #
+  # ── Sign Handling ──────────────────────────────────────────────
+  #
+  # 1. Both factors are made positive before multiplication.
+  # 2. The `mus` (multiply step) instruction operates on magnitudes.
+  # 3. After multiplication, if XOR of original signs has sign bit
+  #    set (signs differ), the result is negated via ones-complement.
+  # 4. Negation of 34-bit product requires complementing BOTH the
+  #    high and low words, with the rcr 9s pairs for AC↔IO swapping.
+  #
+  # ── imp Variant (L260-269) ─────────────────────────────────────
+  #
+  # The `imp` entry point returns only the low 17 bits + sign:
+  #   imp, 0           # L260: entry
+  #   dap im1          # L261: save return
+  #   xct              # L262: load second factor
+  #   jda mpy          # L263: call full multiply
+  #   lac imp          # L264: load first factor (for sign)
+  #   idx im1          # L265: advance return past second factor
+  #   rir 1s           # L266: } rotate IO right 1
+  #   rcr 9s           # L267: } then rotate combined AC+IO right 18
+  #   rcr 9s           # L268: } effectively: AC = low word of product
+  #   jmp i im1        # L269: return
+  #
+  # This is the variant used by the sin/cos `mult` macro (L195-198).
+  #
+  # ── Edge Cases ─────────────────────────────────────────────────
+  #
+  # - (-0) as a factor: complement of -0 is +0 (cma). The mus
+  #   instruction then multiplies by 0, producing 0. The sign
+  #   correction XOR may produce -0 in the result. PDP-1 hardware
+  #   normalizes on multiply, so result should be +0.
+  #
+  # - Ones-complement multiply is NOT equivalent to twos-complement
+  #   for edge values near -0. A runtime using twos-complement must
+  #   implement explicit -0 handling.
+  #
+  # Body: deferred to Phase 4 (expression language design)

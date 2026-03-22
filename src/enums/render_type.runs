@@ -1,0 +1,11 @@
+# spacewar:render_type — Render Object Type Enum
+#
+# Discriminator for the outbound spacewar:render_object Record.
+# Tells the runtime what kind of thing to draw.
+
+enum spacewar:render_type
+  ship                # Active spaceship with outline, heading, optional exhaust.
+  torpedo             # Single point. Position only.
+  explosion           # Particle scatter. Uses particle_seed and particle_count.
+  star                # Background star from catalog. Uses brightness (1-4).
+  central_star        # Fixed at origin. Random dot burst + flicker.

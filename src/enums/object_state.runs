@@ -1,0 +1,20 @@
+# spacewar:object_state — Entity State Enum
+#
+# Maps the PDP-1's self-modifying dispatch (calc routine address in
+# mtb[i]) to a typed enum. Every `dac i ml1` in the source is a
+# state transition.
+#
+# Source: 01_source_concordance.md § State Machine: Calc Routine → State Enum
+
+enum spacewar:object_state
+  empty             # mtb[i] = 0. Unused entity slot.
+  ship              # mtb[i] = ss1 (L1081) or ss2 (L1086). Active spaceship.
+                    # Collidable: yes.
+  torpedo           # mtb[i] = tcr (L987). Active torpedo.
+                    # Collidable: yes.
+  exploding         # mtb[i] = mex | 400000₈ (L950). Explosion in progress.
+                    # Collidable: no (400000₈ sign bit = non-collidable).
+  hyperspace_in     # mtb[i] = hp1 | 400000₈ (L1012). Ship in hyperspace transit.
+                    # Collidable: no (400000₈ sign bit). Ship is invisible.
+  hyperspace_out    # mtb[i] = hp3 (L1050). Ship in breakout phase.
+                    # Collidable: yes (no 400000₈). Ship IS visible.

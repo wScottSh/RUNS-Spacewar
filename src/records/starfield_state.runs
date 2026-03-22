@@ -1,0 +1,29 @@
+# spacewar:starfield_state — Background Scroll State
+#
+# Outbound boundary Record: game logic produces AFTER each tick.
+# The runtime uses this to render Peter Samson's Expensive Planetarium.
+#
+# Source: 02_record_definitions.md § spacewar:starfield_state
+
+record spacewar:starfield_state
+  scope:     outbound boundary
+  instances: 1
+
+  fields:
+
+    scroll_offset:                int
+      # Current right-margin pointer.
+      # Source: fpr (L653). Initial value: 10000₈ = 4096₁₀.
+      # Advances by 1 every ~40 frames (20 ticks of the bkc timer).
+      # Wraps at 20000₈ = 8192₁₀ (L647: add (20000 when fpr < 0).
+      # The runtime subtracts this from star x-coordinates to compute
+      # the rendered position (L578: sub fpr).
+      default: 4096
+
+    scroll_counter:               int
+      # Countdown timer for scroll advancement.
+      # Source: bkc (L652). Resets to -20₁₀ (L642-643: law i 20).
+      # When reaches 0 via isp: scroll_offset advances by 1.
+      # Combined with the outer bcc timer (fires every 2 frames),
+      # scroll advances every ~40 frames ≈ 2.7 seconds at 15fps.
+      default: 0

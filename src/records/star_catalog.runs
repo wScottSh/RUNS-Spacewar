@@ -1,0 +1,48 @@
+# spacewar:star_catalog + spacewar:star_entry — Expensive Planetarium
+#
+# Peter Samson's star catalog: ~478 real stars from the night sky,
+# organized into 4 brightness tiers.
+#
+# Source: L1371-1870 of spacewar3.1_complete.txt
+# Attribution: "stars by prs for s/w 2b" — Peter R. Samson,
+#              March 13, 1962 (carried forward to 3.1)
+#
+# The star data is in DECIMAL (L1377: `decimal` directive), unlike
+# the rest of the source which is octal.
+#
+# The actual parsed star data is in data/star_catalog.json.
+
+record spacewar:star_catalog
+  scope:     internal
+  instances: 1
+
+  fields:
+    stars:                        spacewar:star_entry[]
+      # 478 entries across 4 brightness tiers (9+10+82+377).
+      # Source: L1385-1866.
+
+record spacewar:star_entry
+  fields:
+    x:                            int
+      # Horizontal position, 0-8191 range.
+      # From `mark` macro (L1379-1383): x = 8192 - X_argument.
+      # The runtime subtracts starfield_state.scroll_offset to get
+      # the rendered position (matching L578: sub fpr).
+
+    y:                            int
+      # Vertical position, raw value from macro.
+      # From `mark` macro: Y_argument (before ×256 display scaling).
+      # The ×256 scaling (L1381: `Y=Y+Y` repeated 8 times) is for the
+      # PDP-1 display register format. The runtime handles equivalent
+      # scaling.
+
+    brightness:                   int
+      # Tier 1-4. Derived from section:
+      #   1j-1q = tier 1 (brightest, 9 stars)
+      #   2j-2q = tier 2 (10 stars)
+      #   3j-3q = tier 3 (82 stars)
+      #   4j-4q = tier 4 (dimmest, 377 stars)
+
+    designation:                  string
+      # Bayer/Flamsteed designation from source comments.
+      # Example: "87 Taur, Aldebaran"

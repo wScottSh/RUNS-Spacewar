@@ -1,0 +1,73 @@
+# spacewar:rotation_update — Ship Rotation, Angle Normalization, Trig Cache
+#
+# Processes rotation inputs, updates angular velocity and heading,
+# normalizes the angle, and computes sin/cos for downstream Processors.
+#
+# Source: L1091-1119 (sr0 routine through sin call)
+
+processor spacewar:rotation_update
+  inputs:
+    object:     spacewar:object
+    controls:   spacewar:player_controls
+    config:     spacewar:game_config
+    consts:     spacewar:game_constants
+  outputs:
+    object:         spacewar:object
+    sin_heading:    spacewar:fixed18    # sin(angle) for downstream use
+    cos_heading:    spacewar:fixed18    # cos(angle) for downstream use
+    thrust_enabled: bool                # Whether thrust should fire this frame
+
+  let pi = 0o311040 as spacewar:fixed18   # π in angle units
+
+  # --- Angular velocity update ---
+  # Source: L1092-1100
+  # lio \scw; spi → test bit 0 (rotate CCW)
+  # ril 1s; spi → test bit 1 (rotate CW)
+  var omega = object.angular_velocity
+
+  if controls.rotate_ccw and not controls.rotate_cw:
+    omega = omega + consts.angular_acceleration       # L1095: add maa
+  else if controls.rotate_cw and not controls.rotate_ccw:
+    omega = omega - consts.angular_acceleration       # L1098: sub maa
+
+  # Note: if BOTH rotate buttons are pressed, that's hyperspace intent.
+  # Handled by spacewar:hyperspace_check, not here. Angular velocity unchanged.
+
+  # --- Angular damping (SW1) ---
+  # Source: L1101-1103: szs 10; jmp sr8; dzm i mom
+  if config.angular_damping:
+    omega = 0
+
+  # --- Thrust flag ---
+  # Source: L1104-1110
+  # ral 7s; ril 1s; spi → test thrust bit
+  # Then check fuel: lio i \mfu; spi i → if fuel >= 0, clear thrust flag
+  var can_thrust = controls.thrust                    # L1105-1107: test bit 2
+  if object.fuel >= 0:
+    can_thrust = false                                # L1108-1110: fuel exhausted
+
+  thrust_enabled = can_thrust
+
+  # --- Angle update + normalization ---
+  # Source: L1112-1117
+  # mth: add . → angle += angular_velocity
+  # sma; sub (311040 → if angle > 0, subtract π if overflowed
+  # spa; add (311040 → if angle < 0, add π if underflowed
+  var angle = object.angle + omega
+
+  if angle > pi:
+    angle = angle - pi
+  if angle < -pi:
+    angle = angle + pi
+
+  # --- Trig computation ---
+  # Source: L1118-1119: jda sin; dac \sn
+  let trig = spacewar:sin(angle)
+  sin_heading = trig.sin
+  cos_heading = trig.cos
+
+  # --- Store updated object ---
+  object = object with {
+    angular_velocity = omega,
+    angle = angle
+  }

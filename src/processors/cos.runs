@@ -1,0 +1,40 @@
+# spacewar:cos — Cosine Function (Wrapper for Sin)
+#
+# Computes the cosine by adding π/2 to the argument and calling sin.
+# This is not a separate computation — the PDP-1 source implements
+# cos as an entry point that falls through to the sin polynomial.
+#
+# Source: L200-205 of spacewar3.1_complete.txt
+# Attribution: Adams Associates sine-cosine subroutine
+
+processor spacewar:cos
+  inputs:
+    angle:    spacewar:fixed18     # Angle with binary point right of bit 3
+  outputs:
+    cos:      spacewar:fixed18     # Cosine result with binary point right of bit 0
+    sin:      spacewar:fixed18     # Sine result (also computed as side effect)
+
+  # ── Algorithm (L200-205) ───────────────────────────────────────
+  #
+  # PDP-1 source:
+  #   cos, 0                  # L200: entry point, return address storage
+  #   dap csx                 # L201: save return address
+  #   lac (62210              # L202: load π/2 (62210₈ = 25736₁₀)
+  #   add cos                 # L203: add to original argument
+  #   dac sin                 # L204: store as sin's argument
+  #   jmp .+4                 # L205: jump into sin's normalization
+  #
+  # This is functionally:
+  #   cos(θ) = sin(θ + π/2)
+  #
+  # The sin subroutine then computes both sin and cos of the
+  # shifted angle. The "cos" output here is the primary result;
+  # the "sin" output is the secondary.
+  #
+  # ── Constant ───────────────────────────────────────────────────
+  #
+  # pi_half = 62210₈ = 25736₁₀
+  #   In angle units (binary point right of bit 3), this represents
+  #   π/2 radians. The full circle is 4 × 62210₈ = 310040₈ ≈ 311040₈.
+  #
+  # Body: deferred to Phase 4 (expression language design)

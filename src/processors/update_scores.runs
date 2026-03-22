@@ -1,0 +1,61 @@
+# spacewar:update_scores — Scoring and Round Transition
+#
+# Counts down the restart timer. When it fires, awards points
+# to surviving ships and triggers reinitialization.
+#
+# Scoring truth table (verified by PDP-1 instruction trace):
+#   Ship 1 alive, Ship 2 alive → both +1 (tie round)
+#   Ship 1 alive, Ship 2 dead  → ship 1 +1
+#   Ship 1 dead,  Ship 2 alive → ship 2 +1
+#   Both dead                   → no points
+#
+# Source: L738-754 (mdn routine)
+
+processor spacewar:update_scores
+  inputs:
+    objects:  spacewar:object[]
+    result:   spacewar:match_result
+  outputs:
+    result:           spacewar:match_result
+    trigger_reinit:   bool                    # Signal to run match_initialize
+
+  trigger_reinit = false
+
+  if result.restart_timer == 0:
+    # No restart pending — nothing to do
+  else:
+    # Count down restart timer
+    # Source: L738: count \ntd, ml1 — isp \ntd; jmp ml1
+    var timer = result.restart_timer + 1
+    if timer < 0:
+      # Still counting down
+      result = result with { restart_timer = timer }
+    else:
+      # Timer fired — SCORE!
+      # Source: L739-754
+
+      # Determine who survived
+      # Source: L741-746 (ship 1 check):
+      # law ss1; xor mtb; sza; clf 1; sza i; idx \1sc
+      # If ship1 alive: XOR = 0, sza skips clf, sza i does NOT skip → idx fires (+1)
+      # If ship1 dead: XOR ≠ 0, sza doesn't skip → clf 1, sza i DOES skip → idx skipped
+      let ship1_alive = objects[0].state == ship
+      let ship2_alive = objects[1].state == ship
+
+      var s1 = result.score_1
+      var s2 = result.score_2
+
+      if ship1_alive:
+        s1 = s1 + 1        # L746: idx \1sc
+      if ship2_alive:
+        s2 = s2 + 1        # L752: idx \2sc
+
+      result = result with {
+        score_1 = s1,
+        score_2 = s2,
+        restart_timer = 0
+      }
+
+      # Trigger reinitialization
+      # Source: L754: jmp a
+      trigger_reinit = true

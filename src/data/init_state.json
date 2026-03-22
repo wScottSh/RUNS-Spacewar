@@ -1,0 +1,94 @@
+{
+  "_comment": "Initialization values for Spacewar! 3.1 match reset (L792-828)",
+  "_source": "spacewar3.1_complete.txt, conversion bible 02_record_definitions.md",
+
+  "entity_table": {
+    "total_slots": 24,
+    "slot_0": {
+      "role": "Ship 1 (Needle)",
+      "state": "ship",
+      "collidable": true,
+      "position_x": "200000₈ = 65536₁₀ (L798: lac (200000; dac nx1)",
+      "position_x_decimal": 65536,
+      "position_y": "200000₈ = 65536₁₀ (L799: dac ny1)",
+      "position_y_decimal": 65536,
+      "velocity_x": 0,
+      "velocity_y": 0,
+      "angle": "144420₈ = 51472₁₀ (L803-804: setup nth, 144420)",
+      "angle_decimal": 51472,
+      "angular_velocity": 0,
+      "fuel": "-20000₈ = -8192₁₀ (L819-821: setup nfu, 20000)",
+      "fuel_decimal": -8192,
+      "torpedoes": "-41₈ = -33₁₀ (L816-818: xct tno; dac ntr)",
+      "torpedoes_decimal": -33,
+      "hyperspace_shots_remaining": "-10₈ = -8₁₀ (L825-827: xct mhs; dac nh2)",
+      "hyperspace_shots_decimal": -8,
+      "hyperspace_recharge_timer": 0,
+      "hyperspace_uncertainty_acc": 0,
+      "outline_ref": "ship_config[0] (Needle, from AEMS spacewar:needle)",
+      "prev_controls": 0,
+      "lifetime": 0,
+      "instruction_budget": "2000₁₀ (L822-824: law i 2000; dac nb1)"
+    },
+    "slot_1": {
+      "role": "Ship 2 (Wedge)",
+      "state": "ship",
+      "collidable": true,
+      "position_x": "complement of 200000₈ (L800-801: cma; dac nx1 1) = 577777₈ = -65536₁₀",
+      "position_x_decimal": -65536,
+      "position_y": "complement of 200000₈ (L802: dac ny1 1) = 577777₈ = -65536₁₀",
+      "position_y_decimal": -65536,
+      "velocity_x": 0,
+      "velocity_y": 0,
+      "angle": "144420₈ = 51472₁₀ (same as ship 1, L803-804)",
+      "angle_decimal": 51472,
+      "angular_velocity": 0,
+      "fuel_decimal": -8192,
+      "torpedoes_decimal": -33,
+      "hyperspace_shots_decimal": -8,
+      "hyperspace_recharge_timer": 0,
+      "hyperspace_uncertainty_acc": 0,
+      "outline_ref": "ship_config[1] (Wedge, from AEMS spacewar:wedge)",
+      "prev_controls": 0,
+      "lifetime": 0,
+      "instruction_budget": "2000₁₀ (L822-824)"
+    },
+    "slots_2_through_23": {
+      "state": "empty",
+      "all_fields": 0,
+      "note": "L792: clear mtb, nnn-1 — zeroes entire entity table before ship placement"
+    }
+  },
+
+  "starfield_state": {
+    "scroll_offset": "10000₈ = 4096₁₀ (L653: fpr, 10000)",
+    "scroll_offset_decimal": 4096,
+    "scroll_counter": 0,
+    "note": "bkc at L652 starts at 0; bcc at L651 starts at 0"
+  },
+
+  "match_result": {
+    "state": "playing",
+    "score_1": 0,
+    "score_2": 0,
+    "rounds_remaining": "from game_config.game_count (L791: dac \\gct)",
+    "restart_timer": 0
+  },
+
+  "prng_state": {
+    "state": "0 (L96: ran, 31, 0)"
+  },
+
+  "ship_config": [
+    {
+      "player_id": 0,
+      "outline_data": "111131 111111 111111 111163 311111 146111 111114 700000",
+      "source": "ot1 (L1338-1345), AEMS Manifestation spacewar:needle"
+    },
+    {
+      "player_id": 1,
+      "outline_data": "013113 113111 116313 131111 161151 111633 365114 700000",
+      "source": "ot2 (L1348-1355), AEMS Manifestation spacewar:wedge"
+    }
+  ]
+}

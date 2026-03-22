@@ -1,0 +1,80 @@
+# spacewar:thrust — Engine Thrust + Gravity Application
+#
+# Applies thrust (if enabled) and gravity to ship velocity.
+# Performs the two diff macro calls that integrate velocity/position.
+#
+# Source: L1167-1186 (bsg through diff calls)
+
+processor spacewar:thrust
+  inputs:
+    object:         spacewar:object
+    sin_heading:    spacewar:fixed18
+    cos_heading:    spacewar:fixed18
+    gravity_x:      spacewar:fixed18
+    gravity_y:      spacewar:fixed18
+    thrust_enabled: bool
+    consts:         spacewar:game_constants
+  outputs:
+    object:         spacewar:object
+    flame_length:   int                   # For render: exhaust length, 0 if not thrusting
+
+  flame_length = 0
+
+  # --- Thrust computation ---
+  # Source: L1167-1186
+  # If thrust_enabled:
+  #   cos_component = cos >> 9 >> sac (sac=4, total >>13)
+  #   sin_component = sin >> 9 >> sac (total >>13), negated
+  #   accel_y = gravity_y + cos_component
+  #   accel_x = gravity_x + (-sin_component)
+  #
+  # L1170-1176:
+  #   lac i mth; jda cos; dac \cs → cos of heading
+  #   sar 9s; xct sac             → cos >> 9 >> 4 = cos >> 13
+  #   szf i 6; cla                → if not thrusting, zero the accel
+  #   add \by                      → add gravity_y
+  #
+  # L1179-1185:
+  #   lac \sn; sar 9s; xct sac    → sin >> 13
+  #   cma                          → negate (thrust is opposite to heading)
+  #   szf i 6; cla                → if not thrusting, zero
+  #   add \bx                      → add gravity_x
+
+  var accel_y = gravity_y
+  var accel_x = gravity_x
+
+  if thrust_enabled:
+    let cos_thrust = cos_heading >> 9 >> consts.thrust_scale_shift  # >>13 total
+    let sin_thrust = -(sin_heading >> 9 >> consts.thrust_scale_shift)
+    accel_y = accel_y + cos_thrust                  # L1177: add \by
+    accel_x = accel_x + sin_thrust                  # L1185: add \bx
+
+    # Decrement fuel
+    # Source: L1225-1226: count i \mfu, st2; dzm i \mfu
+    var fuel = object.fuel + 1
+    if fuel >= 0:
+      fuel = 0                                      # Count-around prevention
+    object = object with { fuel = fuel }
+
+    # Flame length from ranct
+    # Source: L1218: ranct sar 9s, sar 4s, \src
+    # This produces a random exhaust length. In RUNS, the runtime
+    # handles flame rendering; we just set a nonzero flag.
+    flame_length = 4                                 # Semantic: "thrusting"
+
+  # --- Integrate velocity and position ---
+  # Source: L1178: diff \mdy, my1, (sar 3s
+  #         L1186: diff \mdx, mx1, (sar 3s
+  let iy = spacewar:velocity_integrate(
+    object.position_y, object.velocity_y, accel_y, 3
+  )
+  let ix = spacewar:velocity_integrate(
+    object.position_x, object.velocity_x, accel_x, 3
+  )
+
+  object = object with {
+    position_x = ix.position,
+    position_y = iy.position,
+    velocity_x = ix.velocity,
+    velocity_y = iy.velocity
+  }

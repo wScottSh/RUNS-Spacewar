@@ -1,0 +1,59 @@
+# spacewar:check_restart — Round-End Detection
+#
+# Checks if the round should end: either a ship is dead, or
+# both ships are alive but out of torpedoes (stalemate).
+# Sets the restart countdown timer.
+#
+# Source: L717-736
+
+processor spacewar:check_restart
+  inputs:
+    objects:  spacewar:object[]
+    result:   spacewar:match_result
+    consts:   spacewar:game_constants
+  outputs:
+    result:   spacewar:match_result
+
+  let ship1_alive = objects[0].state == ship
+  let ship2_alive = objects[1].state == ship
+
+  # --- Both ships alive? ---
+  # Source: L717-724
+  # law ss1; xor mtb; sza; jmp mdn → if ship1 not alive, go to scoring
+  # law ss2; xor mtb 1; sza; jmp mdn → if ship2 not alive, go to scoring
+  if ship1_alive and ship2_alive:
+    # Both alive — check stalemate (both out of torpedoes)
+    # Source: L725-731
+    # law 1; add ntr; spa; jmp md1 → if ship1 still has torpedoes, skip
+    # law 1; add ntr 1; spa i; jmp mdn → if ship2 still has torpedoes, go to scoring
+    let ship1_has_torps = objects[0].torpedoes < 0
+    let ship2_has_torps = objects[1].torpedoes < 0
+
+    if not ship1_has_torps and not ship2_has_torps:
+      # Stalemate: both alive, both out of torpedoes
+      # BUT: only trigger if NO torpedoes exist in the world either
+      # (we check if any torpedo entities are active)
+      var any_active_torps = false
+      for k from 2 to 23:
+        if objects[k].state == torpedo:
+          any_active_torps = true
+          break
+
+      if not any_active_torps:
+        # Set restart timer = 2 × torpedo_lifetime
+        # Source: L733-735: xct tlf; sal 1s; dac \ntd
+        result = result with {
+          restart_timer = -(consts.torpedo_lifetime * 2)
+        }
+  else:
+    # At least one ship is dead — the round might be over.
+    # But we need to wait for all torpedoes/explosions to clear.
+    # The restart timer is only set once via md1 path.
+    # In the original, any non-alive ship immediately branches to mdn
+    # (the scoring countdown). The timer was already set on a previous frame.
+    #
+    # If restart_timer is not yet set, set it now.
+    if result.restart_timer == 0:
+      result = result with {
+        restart_timer = -(consts.torpedo_lifetime * 2)
+      }

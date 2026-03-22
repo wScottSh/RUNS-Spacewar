@@ -1,0 +1,83 @@
+# spacewar:hyperspace_breakout — Breakout Phase (Visible, Collidable, Risky)
+#
+# The ship is visible and collidable during breakout. Each use
+# of hyperspace accumulates uncertainty — eventually, re-entry kills.
+#
+# Source: L1047-1077 (hp3 routine)
+
+processor spacewar:hyperspace_breakout
+  inputs:
+    object:   spacewar:object
+    prng:     spacewar:prng_state
+    consts:   spacewar:game_constants
+  outputs:
+    object:   spacewar:object
+    prng:     spacewar:prng_state
+
+  # --- Count down breakout timer ---
+  # Source: L1051: count i ma1, hp6
+  var life = object.lifetime + 1
+  if life < 0:
+    # Still in breakout — ship is visible and collidable but
+    # no other action until timer expires.
+    # Source: L1075-1076: lac i mx1; dispt i, i my1, 2 (render at intensity 2)
+    object = object with { lifetime = life }
+  else:
+    # --- Breakout complete: finalize hyperspace ---
+
+    # Restore saved state
+    # Source: L1052-1053: lac i \mh1; dac i ml1
+    var obj = object with {
+      state = object.hyperspace_saved_state
+    }
+
+    # --- Decrement shots remaining ---
+    # Source: L1056-1057: count i \mh2, hp7; dzm i \mh2
+    var shots = obj.hyperspace_shots_remaining + 1
+    if shots >= 0:
+      shots = 0                          # Count-around prevention (L1057)
+    obj = obj with { hyperspace_shots_remaining = shots }
+
+    # --- Start recharge timer ---
+    # Source: L1059-1060: xct hd3; dac i \mh3
+    obj = obj with {
+      hyperspace_recharge_timer = -consts.hyperspace_recharge_time   # hd3 = law i 200₈ = -128
+    }
+
+    # --- Accumulate uncertainty ---
+    # Source: L1061-1063: lac i \mh4; add hur; dac i \mh4
+    let uncertainty = obj.hyperspace_uncertainty_acc + consts.hyperspace_uncertainty  # hur = 0o40000 = 16384
+
+    # --- Random death check ---
+    # Source: L1064-1068
+    # random; ior (400000 → set sign bit (bias random toward negative)
+    # add i \mh4       → add accumulated uncertainty
+    # spa              → if result >= 0: DEATH
+    # jmp hp5          → survived (result < 0)
+    var rng = spacewar:random(prng.state)
+    let death_roll = (rng.value | 0o400000) + uncertainty
+    # 400000₈ sets MSB, making the random value negative.
+    # Adding positive uncertainty pushes it toward >= 0.
+    # After enough uses, uncertainty overwhelms the random bias.
+
+    if death_roll >= 0:
+      # --- Ship explodes during re-entry ---
+      # Source: L1069-1074
+      # lac (mex 400000; dac i ml1 → exploding + non-collidable
+      # law i 10; dac i ma1 → 8 frames
+      # law 2000; dac i mb1 → budget
+      obj = obj with {
+        state = exploding,
+        collidable = false,
+        lifetime = -8,                   # law i 10 = octal 10 = decimal 8
+        hyperspace_uncertainty_acc = uncertainty
+      }
+    else:
+      # --- Survived ---
+      obj = obj with {
+        hyperspace_uncertainty_acc = uncertainty,
+        collidable = true               # hp3 has no 400000₈ → collidable
+      }
+
+    object = obj
+    prng = rng with { state = rng.state }

@@ -1,0 +1,2829 @@
+{
+  "_comment": "Peter Samson's Expensive Planetarium — star catalog for Spacewar! 3.1",
+  "_source": "spacewar3.1_complete.txt L1385-1866 (decimal number base)",
+  "_attribution": "stars by prs for s/w 2b — Peter R. Samson, 3/13/62",
+  "_coordinate_convention": "x = 8192 - X_argument. y = Y_argument (raw, before x256 display scaling).",
+  "total": 469,
+  "tier_counts": {
+    "1": 9,
+    "2": 9,
+    "3": 81,
+    "4": 370
+  },
+  "stars": [
+    {
+      "x": 6655,
+      "y": 371,
+      "brightness": 1,
+      "designation": "87 Taur, Aldebaran"
+    },
+    {
+      "x": 6430,
+      "y": -189,
+      "brightness": 1,
+      "designation": "19 Orio, Rigel"
+    },
+    {
+      "x": 6202,
+      "y": 168,
+      "brightness": 1,
+      "designation": "58 Orio, Betelgeuze"
+    },
+    {
+      "x": 5912,
+      "y": -377,
+      "brightness": 1,
+      "designation": "9 CMaj, Sirius"
+    },
+    {
+      "x": 5609,
+      "y": 125,
+      "brightness": 1,
+      "designation": "10 CMin, Procyon"
+    },
+    {
+      "x": 4761,
+      "y": 283,
+      "brightness": 1,
+      "designation": "32 Leon, Regulus"
+    },
+    {
+      "x": 3641,
+      "y": -242,
+      "brightness": 1,
+      "designation": "67 Virg, Spica"
+    },
+    {
+      "x": 3350,
+      "y": 448,
+      "brightness": 1,
+      "designation": "16 Boot, Arcturus"
+    },
+    {
+      "x": 1445,
+      "y": 196,
+      "brightness": 1,
+      "designation": "53 Aqil, Altair"
+    },
+    {
+      "x": 6373,
+      "y": 143,
+      "brightness": 2,
+      "designation": "24 Orio, Bellatrix"
+    },
+    {
+      "x": 6308,
+      "y": -29,
+      "brightness": 2,
+      "designation": "46 Orio"
+    },
+    {
+      "x": 6282,
+      "y": -46,
+      "brightness": 2,
+      "designation": "50 Orio"
+    },
+    {
+      "x": 6241,
+      "y": -221,
+      "brightness": 2,
+      "designation": "53 Orio"
+    },
+    {
+      "x": 6040,
+      "y": -407,
+      "brightness": 2,
+      "designation": "2 CMaj"
+    },
+    {
+      "x": 5962,
+      "y": 375,
+      "brightness": 2,
+      "designation": "24 Gemi"
+    },
+    {
+      "x": 4991,
+      "y": -187,
+      "brightness": 2,
+      "designation": "30 Hyda, Alphard"
+    },
+    {
+      "x": 4187,
+      "y": 344,
+      "brightness": 2,
+      "designation": "94 Leon, Denebola"
+    },
+    {
+      "x": 2217,
+      "y": 288,
+      "brightness": 2,
+      "designation": "55 Ophi"
+    },
+    {
+      "x": 8146,
+      "y": 333,
+      "brightness": 3,
+      "designation": "88 Pegs, Algenib"
+    },
+    {
+      "x": 7830,
+      "y": -244,
+      "brightness": 3,
+      "designation": "31 Ceti"
+    },
+    {
+      "x": 7702,
+      "y": 338,
+      "brightness": 3,
+      "designation": "99 Pisc"
+    },
+    {
+      "x": 7626,
+      "y": -375,
+      "brightness": 3,
+      "designation": "52 Ceti"
+    },
+    {
+      "x": 7571,
+      "y": 462,
+      "brightness": 3,
+      "designation": "6 Arie"
+    },
+    {
+      "x": 7428,
+      "y": -78,
+      "brightness": 3,
+      "designation": "68 Ceti, Mira"
+    },
+    {
+      "x": 7292,
+      "y": 64,
+      "brightness": 3,
+      "designation": "86 Ceti"
+    },
+    {
+      "x": 7185,
+      "y": 84,
+      "brightness": 3,
+      "designation": "92 Ceti"
+    },
+    {
+      "x": 6949,
+      "y": -230,
+      "brightness": 3,
+      "designation": "23 Erid"
+    },
+    {
+      "x": 6864,
+      "y": -314,
+      "brightness": 3,
+      "designation": "34 Erid"
+    },
+    {
+      "x": 6697,
+      "y": 432,
+      "brightness": 3,
+      "designation": "74 Taur"
+    },
+    {
+      "x": 6696,
+      "y": 356,
+      "brightness": 3,
+      "designation": "78 Taur"
+    },
+    {
+      "x": 6574,
+      "y": 154,
+      "brightness": 3,
+      "designation": "1 Orio"
+    },
+    {
+      "x": 6548,
+      "y": 52,
+      "brightness": 3,
+      "designation": "8 Orio"
+    },
+    {
+      "x": 6469,
+      "y": -119,
+      "brightness": 3,
+      "designation": "67 Erid"
+    },
+    {
+      "x": 6437,
+      "y": -371,
+      "brightness": 3,
+      "designation": "5 Leps"
+    },
+    {
+      "x": 6413,
+      "y": -158,
+      "brightness": 3,
+      "designation": "20 Orio"
+    },
+    {
+      "x": 6375,
+      "y": -57,
+      "brightness": 3,
+      "designation": "28 Orio"
+    },
+    {
+      "x": 6349,
+      "y": -474,
+      "brightness": 3,
+      "designation": "9 Leps"
+    },
+    {
+      "x": 6332,
+      "y": -8,
+      "brightness": 3,
+      "designation": "34 Orio"
+    },
+    {
+      "x": 6324,
+      "y": -407,
+      "brightness": 3,
+      "designation": "11 Leps"
+    },
+    {
+      "x": 6317,
+      "y": 225,
+      "brightness": 3,
+      "designation": "39 Orio"
+    },
+    {
+      "x": 6312,
+      "y": -136,
+      "brightness": 3,
+      "designation": "44 Orio"
+    },
+    {
+      "x": 6305,
+      "y": 480,
+      "brightness": 3,
+      "designation": "123 Taur"
+    },
+    {
+      "x": 6244,
+      "y": -338,
+      "brightness": 3,
+      "designation": "14 Leps"
+    },
+    {
+      "x": 5918,
+      "y": 296,
+      "brightness": 3,
+      "designation": "31 Gemi"
+    },
+    {
+      "x": 5732,
+      "y": 380,
+      "brightness": 3,
+      "designation": "54 Gemi"
+    },
+    {
+      "x": 5722,
+      "y": 504,
+      "brightness": 3,
+      "designation": "55 Gemi"
+    },
+    {
+      "x": 5679,
+      "y": 193,
+      "brightness": 3,
+      "designation": "3 CMin"
+    },
+    {
+      "x": 5225,
+      "y": 154,
+      "brightness": 3,
+      "designation": "11 Hyda"
+    },
+    {
+      "x": 5176,
+      "y": 144,
+      "brightness": 3,
+      "designation": "16 Hyda"
+    },
+    {
+      "x": 4768,
+      "y": 393,
+      "brightness": 3,
+      "designation": "30 Leon"
+    },
+    {
+      "x": 4696,
+      "y": 463,
+      "brightness": 3,
+      "designation": "41 Leon, Algieba"
+    },
+    {
+      "x": 4524,
+      "y": -357,
+      "brightness": 3,
+      "designation": "nu Hyda"
+    },
+    {
+      "x": 4387,
+      "y": 479,
+      "brightness": 3,
+      "designation": "68 Leon"
+    },
+    {
+      "x": 4386,
+      "y": 364,
+      "brightness": 3,
+      "designation": "10 Leon"
+    },
+    {
+      "x": 4068,
+      "y": -502,
+      "brightness": 3,
+      "designation": "2 Corv"
+    },
+    {
+      "x": 4035,
+      "y": -387,
+      "brightness": 3,
+      "designation": "4 Corv"
+    },
+    {
+      "x": 3956,
+      "y": -363,
+      "brightness": 3,
+      "designation": "7 Corv"
+    },
+    {
+      "x": 3888,
+      "y": -21,
+      "brightness": 3,
+      "designation": "29 Virg"
+    },
+    {
+      "x": 3808,
+      "y": 90,
+      "brightness": 3,
+      "designation": "43 Virg"
+    },
+    {
+      "x": 3771,
+      "y": 262,
+      "brightness": 3,
+      "designation": "47 Virg"
+    },
+    {
+      "x": 3586,
+      "y": -2,
+      "brightness": 3,
+      "designation": "79 Virg"
+    },
+    {
+      "x": 3471,
+      "y": 430,
+      "brightness": 3,
+      "designation": "8 Boot"
+    },
+    {
+      "x": 3155,
+      "y": -356,
+      "brightness": 3,
+      "designation": "9 Libr"
+    },
+    {
+      "x": 3006,
+      "y": -205,
+      "brightness": 3,
+      "designation": "27 Libr"
+    },
+    {
+      "x": 2848,
+      "y": 153,
+      "brightness": 3,
+      "designation": "24 Serp"
+    },
+    {
+      "x": 2835,
+      "y": 358,
+      "brightness": 3,
+      "designation": "28 Serp"
+    },
+    {
+      "x": 2819,
+      "y": -71,
+      "brightness": 3,
+      "designation": "32 Serp"
+    },
+    {
+      "x": 2762,
+      "y": -508,
+      "brightness": 3,
+      "designation": "7 Scor"
+    },
+    {
+      "x": 2733,
+      "y": -445,
+      "brightness": 3,
+      "designation": "8 Scor"
+    },
+    {
+      "x": 2679,
+      "y": -78,
+      "brightness": 3,
+      "designation": "1 Ophi"
+    },
+    {
+      "x": 2656,
+      "y": -101,
+      "brightness": 3,
+      "designation": "2 Ophi"
+    },
+    {
+      "x": 2583,
+      "y": 494,
+      "brightness": 3,
+      "designation": "27 Herc"
+    },
+    {
+      "x": 2551,
+      "y": -236,
+      "brightness": 3,
+      "designation": "13 Ophi"
+    },
+    {
+      "x": 2364,
+      "y": -355,
+      "brightness": 3,
+      "designation": "35 Ophi"
+    },
+    {
+      "x": 2332,
+      "y": 330,
+      "brightness": 3,
+      "designation": "64 Herc"
+    },
+    {
+      "x": 2208,
+      "y": -349,
+      "brightness": 3,
+      "designation": "55 Serp"
+    },
+    {
+      "x": 2145,
+      "y": 63,
+      "brightness": 3,
+      "designation": "62 Ophi"
+    },
+    {
+      "x": 2085,
+      "y": -222,
+      "brightness": 3,
+      "designation": "64 Ophi"
+    },
+    {
+      "x": 2033,
+      "y": 217,
+      "brightness": 3,
+      "designation": "72 Ophi"
+    },
+    {
+      "x": 1956,
+      "y": -66,
+      "brightness": 3,
+      "designation": "58 Serp"
+    },
+    {
+      "x": 1753,
+      "y": -483,
+      "brightness": 3,
+      "designation": "37 Sgtr"
+    },
+    {
+      "x": 1702,
+      "y": 312,
+      "brightness": 3,
+      "designation": "17 Aqil"
+    },
+    {
+      "x": 1701,
+      "y": -115,
+      "brightness": 3,
+      "designation": "16 Aqil"
+    },
+    {
+      "x": 1685,
+      "y": -482,
+      "brightness": 3,
+      "designation": "41 Sgtr"
+    },
+    {
+      "x": 1590,
+      "y": 66,
+      "brightness": 3,
+      "designation": "30 Aqil"
+    },
+    {
+      "x": 1471,
+      "y": 236,
+      "brightness": 3,
+      "designation": "50 Aqil"
+    },
+    {
+      "x": 1398,
+      "y": 437,
+      "brightness": 3,
+      "designation": "12 Sgte"
+    },
+    {
+      "x": 1330,
+      "y": -25,
+      "brightness": 3,
+      "designation": "65 Aqil"
+    },
+    {
+      "x": 1278,
+      "y": -344,
+      "brightness": 3,
+      "designation": "9 Capr"
+    },
+    {
+      "x": 1178,
+      "y": 324,
+      "brightness": 3,
+      "designation": "6 Dlph"
+    },
+    {
+      "x": 874,
+      "y": -137,
+      "brightness": 3,
+      "designation": "22 Aqar"
+    },
+    {
+      "x": 801,
+      "y": 214,
+      "brightness": 3,
+      "designation": "8 Pegs"
+    },
+    {
+      "x": 788,
+      "y": -377,
+      "brightness": 3,
+      "designation": "49 Capr"
+    },
+    {
+      "x": 679,
+      "y": -18,
+      "brightness": 3,
+      "designation": "34 Aqar"
+    },
+    {
+      "x": 653,
+      "y": 130,
+      "brightness": 3,
+      "designation": "26 Pegs"
+    },
+    {
+      "x": 548,
+      "y": -12,
+      "brightness": 3,
+      "designation": "55 Aqar"
+    },
+    {
+      "x": 475,
+      "y": 235,
+      "brightness": 3,
+      "designation": "42 Pegs"
+    },
+    {
+      "x": 402,
+      "y": -372,
+      "brightness": 3,
+      "designation": "76 Aqar"
+    },
+    {
+      "x": 343,
+      "y": 334,
+      "brightness": 3,
+      "designation": "54 Pegs, Markab"
+    },
+    {
+      "x": 8191,
+      "y": -143,
+      "brightness": 4,
+      "designation": "33 Pisc"
+    },
+    {
+      "x": 8138,
+      "y": 447,
+      "brightness": 4,
+      "designation": "89 Pegs"
+    },
+    {
+      "x": 8138,
+      "y": -443,
+      "brightness": 4,
+      "designation": "7 Ceti"
+    },
+    {
+      "x": 8110,
+      "y": -214,
+      "brightness": 4,
+      "designation": "8 Ceti"
+    },
+    {
+      "x": 7969,
+      "y": -254,
+      "brightness": 4,
+      "designation": "17 Ceti"
+    },
+    {
+      "x": 7944,
+      "y": 160,
+      "brightness": 4,
+      "designation": "63 Pisc"
+    },
+    {
+      "x": 7919,
+      "y": -38,
+      "brightness": 4,
+      "designation": "20 Ceti"
+    },
+    {
+      "x": 7863,
+      "y": 167,
+      "brightness": 4,
+      "designation": "71 Pisc"
+    },
+    {
+      "x": 7816,
+      "y": 467,
+      "brightness": 4,
+      "designation": "84 Pisc"
+    },
+    {
+      "x": 7742,
+      "y": -198,
+      "brightness": 4,
+      "designation": "45 Ceti"
+    },
+    {
+      "x": 7644,
+      "y": 113,
+      "brightness": 4,
+      "designation": "106 Pisc"
+    },
+    {
+      "x": 7622,
+      "y": 197,
+      "brightness": 4,
+      "designation": "110 Pisc"
+    },
+    {
+      "x": 7597,
+      "y": -255,
+      "brightness": 4,
+      "designation": "53 Ceti"
+    },
+    {
+      "x": 7586,
+      "y": -247,
+      "brightness": 4,
+      "designation": "55 Ceti"
+    },
+    {
+      "x": 7577,
+      "y": 428,
+      "brightness": 4,
+      "designation": "5 Arie"
+    },
+    {
+      "x": 7575,
+      "y": 61,
+      "brightness": 4,
+      "designation": "14 Pisc"
+    },
+    {
+      "x": 7536,
+      "y": -491,
+      "brightness": 4,
+      "designation": "59 Ceti"
+    },
+    {
+      "x": 7527,
+      "y": 52,
+      "brightness": 4,
+      "designation": "113 Pisc"
+    },
+    {
+      "x": 7465,
+      "y": 191,
+      "brightness": 4,
+      "designation": "65 Ceti"
+    },
+    {
+      "x": 7389,
+      "y": -290,
+      "brightness": 4,
+      "designation": "72 Ceti"
+    },
+    {
+      "x": 7379,
+      "y": 182,
+      "brightness": 4,
+      "designation": "73 Ceti"
+    },
+    {
+      "x": 7354,
+      "y": -357,
+      "brightness": 4,
+      "designation": "76 Ceti"
+    },
+    {
+      "x": 7314,
+      "y": -2,
+      "brightness": 4,
+      "designation": "82 Ceti"
+    },
+    {
+      "x": 7285,
+      "y": -340,
+      "brightness": 4,
+      "designation": "89 Ceti"
+    },
+    {
+      "x": 7284,
+      "y": 221,
+      "brightness": 4,
+      "designation": "87 Ceti"
+    },
+    {
+      "x": 7279,
+      "y": -432,
+      "brightness": 4,
+      "designation": "1 Erid"
+    },
+    {
+      "x": 7245,
+      "y": -487,
+      "brightness": 4,
+      "designation": "2 Erid"
+    },
+    {
+      "x": 7216,
+      "y": -212,
+      "brightness": 4,
+      "designation": "3 Erid"
+    },
+    {
+      "x": 7200,
+      "y": 194,
+      "brightness": 4,
+      "designation": "91 Ceti"
+    },
+    {
+      "x": 7134,
+      "y": 440,
+      "brightness": 4,
+      "designation": "57 Arie"
+    },
+    {
+      "x": 7116,
+      "y": 470,
+      "brightness": 4,
+      "designation": "58 Arie"
+    },
+    {
+      "x": 7105,
+      "y": -209,
+      "brightness": 4,
+      "designation": "13 Erid"
+    },
+    {
+      "x": 7088,
+      "y": 68,
+      "brightness": 4,
+      "designation": "96 Ceti"
+    },
+    {
+      "x": 7082,
+      "y": -503,
+      "brightness": 4,
+      "designation": "16 Erid"
+    },
+    {
+      "x": 7057,
+      "y": 198,
+      "brightness": 4,
+      "designation": "1 Taur"
+    },
+    {
+      "x": 7044,
+      "y": 214,
+      "brightness": 4,
+      "designation": "2 Taur"
+    },
+    {
+      "x": 7024,
+      "y": 287,
+      "brightness": 4,
+      "designation": "5 Taur"
+    },
+    {
+      "x": 7022,
+      "y": -123,
+      "brightness": 4,
+      "designation": "17 Erid"
+    },
+    {
+      "x": 7007,
+      "y": -223,
+      "brightness": 4,
+      "designation": "18 Erid"
+    },
+    {
+      "x": 7001,
+      "y": -500,
+      "brightness": 4,
+      "designation": "19 Erid"
+    },
+    {
+      "x": 6987,
+      "y": 2,
+      "brightness": 4,
+      "designation": "10 Taur"
+    },
+    {
+      "x": 6932,
+      "y": -283,
+      "brightness": 4,
+      "designation": "26 Erid"
+    },
+    {
+      "x": 6888,
+      "y": -74,
+      "brightness": 4,
+      "designation": "32 Erid"
+    },
+    {
+      "x": 6854,
+      "y": 278,
+      "brightness": 4,
+      "designation": "35 Taur"
+    },
+    {
+      "x": 6839,
+      "y": 130,
+      "brightness": 4,
+      "designation": "38 Taur"
+    },
+    {
+      "x": 6834,
+      "y": 497,
+      "brightness": 4,
+      "designation": "37 Taur"
+    },
+    {
+      "x": 6787,
+      "y": -162,
+      "brightness": 4,
+      "designation": "38 Erid"
+    },
+    {
+      "x": 6778,
+      "y": 205,
+      "brightness": 4,
+      "designation": "47 Taur"
+    },
+    {
+      "x": 6769,
+      "y": 197,
+      "brightness": 4,
+      "designation": "49 Taur"
+    },
+    {
+      "x": 6766,
+      "y": -178,
+      "brightness": 4,
+      "designation": "40 Erid"
+    },
+    {
+      "x": 6762,
+      "y": 463,
+      "brightness": 4,
+      "designation": "50 Taur"
+    },
+    {
+      "x": 6746,
+      "y": 350,
+      "brightness": 4,
+      "designation": "54 Taur"
+    },
+    {
+      "x": 6729,
+      "y": 394,
+      "brightness": 4,
+      "designation": "61 Taur"
+    },
+    {
+      "x": 6722,
+      "y": 392,
+      "brightness": 4,
+      "designation": "64 Taur"
+    },
+    {
+      "x": 6716,
+      "y": 502,
+      "brightness": 4,
+      "designation": "65 Taur"
+    },
+    {
+      "x": 6715,
+      "y": 403,
+      "brightness": 4,
+      "designation": "68 Taur"
+    },
+    {
+      "x": 6709,
+      "y": 350,
+      "brightness": 4,
+      "designation": "71 Taur"
+    },
+    {
+      "x": 6707,
+      "y": 330,
+      "brightness": 4,
+      "designation": "73 Taur"
+    },
+    {
+      "x": 6697,
+      "y": 358,
+      "brightness": 4,
+      "designation": "77 Taur"
+    },
+    {
+      "x": 6685,
+      "y": 364,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 6674,
+      "y": -6,
+      "brightness": 4,
+      "designation": "45 Erid"
+    },
+    {
+      "x": 6666,
+      "y": 333,
+      "brightness": 4,
+      "designation": "86 Taur"
+    },
+    {
+      "x": 6655,
+      "y": 226,
+      "brightness": 4,
+      "designation": "88 Taur"
+    },
+    {
+      "x": 6648,
+      "y": -81,
+      "brightness": 4,
+      "designation": "48 Erid"
+    },
+    {
+      "x": 6641,
+      "y": 280,
+      "brightness": 4,
+      "designation": "90 Taur"
+    },
+    {
+      "x": 6636,
+      "y": 358,
+      "brightness": 4,
+      "designation": "92 Taur"
+    },
+    {
+      "x": 6635,
+      "y": -330,
+      "brightness": 4,
+      "designation": "53 Erid"
+    },
+    {
+      "x": 6621,
+      "y": -452,
+      "brightness": 4,
+      "designation": "54 Erid"
+    },
+    {
+      "x": 6596,
+      "y": -78,
+      "brightness": 4,
+      "designation": "57 Erid"
+    },
+    {
+      "x": 6570,
+      "y": 199,
+      "brightness": 4,
+      "designation": "2 Orio"
+    },
+    {
+      "x": 6566,
+      "y": 124,
+      "brightness": 4,
+      "designation": "3 Orio"
+    },
+    {
+      "x": 6554,
+      "y": -128,
+      "brightness": 4,
+      "designation": "61 Erid"
+    },
+    {
+      "x": 6546,
+      "y": 228,
+      "brightness": 4,
+      "designation": "7 Orio"
+    },
+    {
+      "x": 6538,
+      "y": 304,
+      "brightness": 4,
+      "designation": "9 Orio"
+    },
+    {
+      "x": 6523,
+      "y": 36,
+      "brightness": 4,
+      "designation": "10 Orio"
+    },
+    {
+      "x": 6512,
+      "y": -289,
+      "brightness": 4,
+      "designation": "64 Erid"
+    },
+    {
+      "x": 6505,
+      "y": -167,
+      "brightness": 4,
+      "designation": "65 Erid"
+    },
+    {
+      "x": 6502,
+      "y": -460,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 6502,
+      "y": 488,
+      "brightness": 4,
+      "designation": "102 Taur"
+    },
+    {
+      "x": 6492,
+      "y": 347,
+      "brightness": 4,
+      "designation": "11 Orio"
+    },
+    {
+      "x": 6463,
+      "y": 352,
+      "brightness": 4,
+      "designation": "15 Orio"
+    },
+    {
+      "x": 6460,
+      "y": -202,
+      "brightness": 4,
+      "designation": "69 Erid"
+    },
+    {
+      "x": 6442,
+      "y": -273,
+      "brightness": 4,
+      "designation": "3 Leps"
+    },
+    {
+      "x": 6439,
+      "y": 63,
+      "brightness": 4,
+      "designation": "17 Orio"
+    },
+    {
+      "x": 6436,
+      "y": -297,
+      "brightness": 4,
+      "designation": "4 Leps"
+    },
+    {
+      "x": 6400,
+      "y": -302,
+      "brightness": 4,
+      "designation": "6 Leps"
+    },
+    {
+      "x": 6393,
+      "y": -486,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 6391,
+      "y": -11,
+      "brightness": 4,
+      "designation": "22 Orio"
+    },
+    {
+      "x": 6385,
+      "y": 79,
+      "brightness": 4,
+      "designation": "23 Orio"
+    },
+    {
+      "x": 6376,
+      "y": -180,
+      "brightness": 4,
+      "designation": "29 Orio"
+    },
+    {
+      "x": 6374,
+      "y": 40,
+      "brightness": 4,
+      "designation": "25 Orio"
+    },
+    {
+      "x": 6362,
+      "y": 497,
+      "brightness": 4,
+      "designation": "114 Taur"
+    },
+    {
+      "x": 6362,
+      "y": 69,
+      "brightness": 4,
+      "designation": "30 Orio"
+    },
+    {
+      "x": 6341,
+      "y": 134,
+      "brightness": 4,
+      "designation": "32 Orio"
+    },
+    {
+      "x": 6335,
+      "y": 421,
+      "brightness": 4,
+      "designation": "119 Taur"
+    },
+    {
+      "x": 6331,
+      "y": -168,
+      "brightness": 4,
+      "designation": "36 Orio"
+    },
+    {
+      "x": 6318,
+      "y": 214,
+      "brightness": 4,
+      "designation": "37 Orio"
+    },
+    {
+      "x": 6314,
+      "y": -138,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 6312,
+      "y": -112,
+      "brightness": 4,
+      "designation": "42 Orio"
+    },
+    {
+      "x": 6307,
+      "y": 210,
+      "brightness": 4,
+      "designation": "40 Orio"
+    },
+    {
+      "x": 6293,
+      "y": -60,
+      "brightness": 4,
+      "designation": "48 Orio"
+    },
+    {
+      "x": 6292,
+      "y": 93,
+      "brightness": 4,
+      "designation": "47 Orio"
+    },
+    {
+      "x": 6292,
+      "y": -165,
+      "brightness": 4,
+      "designation": "49 Orio"
+    },
+    {
+      "x": 6283,
+      "y": 375,
+      "brightness": 4,
+      "designation": "126 Taur"
+    },
+    {
+      "x": 6256,
+      "y": -511,
+      "brightness": 4,
+      "designation": "13 Leps"
+    },
+    {
+      "x": 6235,
+      "y": 287,
+      "brightness": 4,
+      "designation": "134 Taur"
+    },
+    {
+      "x": 6218,
+      "y": -475,
+      "brightness": 4,
+      "designation": "15 Leps"
+    },
+    {
+      "x": 6210,
+      "y": 461,
+      "brightness": 4,
+      "designation": "54 Orio"
+    },
+    {
+      "x": 6190,
+      "y": -323,
+      "brightness": 4,
+      "designation": "16 Leps"
+    },
+    {
+      "x": 6172,
+      "y": -70,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 6162,
+      "y": 220,
+      "brightness": 4,
+      "designation": "61 Orio"
+    },
+    {
+      "x": 6160,
+      "y": -241,
+      "brightness": 4,
+      "designation": "3 Mono"
+    },
+    {
+      "x": 6155,
+      "y": 458,
+      "brightness": 4,
+      "designation": "62 Orio"
+    },
+    {
+      "x": 6135,
+      "y": -340,
+      "brightness": 4,
+      "designation": "18 Leps"
+    },
+    {
+      "x": 6133,
+      "y": 336,
+      "brightness": 4,
+      "designation": "67 Orio"
+    },
+    {
+      "x": 6108,
+      "y": 368,
+      "brightness": 4,
+      "designation": "69 Orio"
+    },
+    {
+      "x": 6108,
+      "y": 324,
+      "brightness": 4,
+      "designation": "70 Orio"
+    },
+    {
+      "x": 6087,
+      "y": -142,
+      "brightness": 4,
+      "designation": "5 Mono"
+    },
+    {
+      "x": 6080,
+      "y": -311,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 6039,
+      "y": 106,
+      "brightness": 4,
+      "designation": "8 Mono"
+    },
+    {
+      "x": 6013,
+      "y": 462,
+      "brightness": 4,
+      "designation": "18 Gemi"
+    },
+    {
+      "x": 6013,
+      "y": -107,
+      "brightness": 4,
+      "designation": "10 Mono"
+    },
+    {
+      "x": 6008,
+      "y": -159,
+      "brightness": 4,
+      "designation": "11 Mono"
+    },
+    {
+      "x": 5988,
+      "y": 168,
+      "brightness": 4,
+      "designation": "13 Mono"
+    },
+    {
+      "x": 5960,
+      "y": -436,
+      "brightness": 4,
+      "designation": "7 CMaj"
+    },
+    {
+      "x": 5953,
+      "y": -413,
+      "brightness": 4,
+      "designation": "8 CMaj"
+    },
+    {
+      "x": 5947,
+      "y": -320,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 5942,
+      "y": 227,
+      "brightness": 4,
+      "designation": "15 Mono"
+    },
+    {
+      "x": 5926,
+      "y": 303,
+      "brightness": 4,
+      "designation": "30 Gemi"
+    },
+    {
+      "x": 5901,
+      "y": 57,
+      "brightness": 4,
+      "designation": "18 Mono"
+    },
+    {
+      "x": 5865,
+      "y": 303,
+      "brightness": 4,
+      "designation": "38 Gemi"
+    },
+    {
+      "x": 5864,
+      "y": -457,
+      "brightness": 4,
+      "designation": "15 CMaj"
+    },
+    {
+      "x": 5862,
+      "y": -271,
+      "brightness": 4,
+      "designation": "14 CMaj"
+    },
+    {
+      "x": 5852,
+      "y": -456,
+      "brightness": 4,
+      "designation": "19 CMaj"
+    },
+    {
+      "x": 5850,
+      "y": -385,
+      "brightness": 4,
+      "designation": "20 CMaj"
+    },
+    {
+      "x": 5814,
+      "y": -93,
+      "brightness": 4,
+      "designation": "19 Mono"
+    },
+    {
+      "x": 5813,
+      "y": 471,
+      "brightness": 4,
+      "designation": "43 Gemi"
+    },
+    {
+      "x": 5807,
+      "y": -352,
+      "brightness": 4,
+      "designation": "23 CMaj"
+    },
+    {
+      "x": 5764,
+      "y": -8,
+      "brightness": 4,
+      "designation": "22 Mono"
+    },
+    {
+      "x": 5701,
+      "y": -429,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 5673,
+      "y": 208,
+      "brightness": 4,
+      "designation": "4 CMin"
+    },
+    {
+      "x": 5665,
+      "y": 278,
+      "brightness": 4,
+      "designation": "6 CMin"
+    },
+    {
+      "x": 5633,
+      "y": -503,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 5595,
+      "y": -212,
+      "brightness": 4,
+      "designation": "26 Mono"
+    },
+    {
+      "x": 5488,
+      "y": -412,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 5483,
+      "y": -25,
+      "brightness": 4,
+      "designation": "28 Mono"
+    },
+    {
+      "x": 5478,
+      "y": 60,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 5441,
+      "y": -61,
+      "brightness": 4,
+      "designation": "29 Mono"
+    },
+    {
+      "x": 5435,
+      "y": -431,
+      "brightness": 4,
+      "designation": "16 Pupp"
+    },
+    {
+      "x": 5424,
+      "y": -288,
+      "brightness": 4,
+      "designation": "19 Pupp"
+    },
+    {
+      "x": 5398,
+      "y": 216,
+      "brightness": 4,
+      "designation": "17 Canc"
+    },
+    {
+      "x": 5344,
+      "y": -82,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 5277,
+      "y": 138,
+      "brightness": 4,
+      "designation": "4 Hyda"
+    },
+    {
+      "x": 5271,
+      "y": 84,
+      "brightness": 4,
+      "designation": "5 Hyda"
+    },
+    {
+      "x": 5250,
+      "y": -355,
+      "brightness": 4,
+      "designation": "9 Hyda"
+    },
+    {
+      "x": 5248,
+      "y": 497,
+      "brightness": 4,
+      "designation": "43 Canc"
+    },
+    {
+      "x": 5245,
+      "y": 85,
+      "brightness": 4,
+      "designation": "7 Hyda"
+    },
+    {
+      "x": 5241,
+      "y": -156,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 5239,
+      "y": 421,
+      "brightness": 4,
+      "designation": "47 Canc"
+    },
+    {
+      "x": 5224,
+      "y": -300,
+      "brightness": 4,
+      "designation": "12 Hyda"
+    },
+    {
+      "x": 5216,
+      "y": 141,
+      "brightness": 4,
+      "designation": "13 Hyda"
+    },
+    {
+      "x": 5160,
+      "y": 279,
+      "brightness": 4,
+      "designation": "65 Canc"
+    },
+    {
+      "x": 5068,
+      "y": 62,
+      "brightness": 4,
+      "designation": "22 Hyda"
+    },
+    {
+      "x": 5035,
+      "y": -263,
+      "brightness": 4,
+      "designation": "26 Hyda"
+    },
+    {
+      "x": 5031,
+      "y": -208,
+      "brightness": 4,
+      "designation": "27 Hyda"
+    },
+    {
+      "x": 4983,
+      "y": -53,
+      "brightness": 4,
+      "designation": "31 Hyda"
+    },
+    {
+      "x": 4967,
+      "y": -17,
+      "brightness": 4,
+      "designation": "32 Hyda"
+    },
+    {
+      "x": 4931,
+      "y": 116,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 4922,
+      "y": -16,
+      "brightness": 4,
+      "designation": "35 Hyda"
+    },
+    {
+      "x": 4918,
+      "y": -316,
+      "brightness": 4,
+      "designation": "38 Hyda"
+    },
+    {
+      "x": 4916,
+      "y": 236,
+      "brightness": 4,
+      "designation": "14 Leon"
+    },
+    {
+      "x": 4854,
+      "y": -327,
+      "brightness": 4,
+      "designation": "39 Hyda"
+    },
+    {
+      "x": 4807,
+      "y": 194,
+      "brightness": 4,
+      "designation": "29 Leon"
+    },
+    {
+      "x": 4777,
+      "y": -286,
+      "brightness": 4,
+      "designation": "40 Hyda"
+    },
+    {
+      "x": 4764,
+      "y": 239,
+      "brightness": 4,
+      "designation": "31 Leon"
+    },
+    {
+      "x": 4763,
+      "y": 3,
+      "brightness": 4,
+      "designation": "15 Sext"
+    },
+    {
+      "x": 4746,
+      "y": -270,
+      "brightness": 4,
+      "designation": "41 Hyda"
+    },
+    {
+      "x": 4697,
+      "y": 455,
+      "brightness": 4,
+      "designation": "40 Leon"
+    },
+    {
+      "x": 4658,
+      "y": -372,
+      "brightness": 4,
+      "designation": "42 Hyda"
+    },
+    {
+      "x": 4635,
+      "y": -3,
+      "brightness": 4,
+      "designation": "30 Sext"
+    },
+    {
+      "x": 4622,
+      "y": 223,
+      "brightness": 4,
+      "designation": "47 Leon"
+    },
+    {
+      "x": 4466,
+      "y": -404,
+      "brightness": 4,
+      "designation": "al Crat"
+    },
+    {
+      "x": 4456,
+      "y": -44,
+      "brightness": 4,
+      "designation": "61 Leon"
+    },
+    {
+      "x": 4454,
+      "y": 471,
+      "brightness": 4,
+      "designation": "60 Leon"
+    },
+    {
+      "x": 4438,
+      "y": 179,
+      "brightness": 4,
+      "designation": "63 Leon"
+    },
+    {
+      "x": 4399,
+      "y": -507,
+      "brightness": 4,
+      "designation": "11 Crat"
+    },
+    {
+      "x": 4371,
+      "y": -71,
+      "brightness": 4,
+      "designation": "74 Leon"
+    },
+    {
+      "x": 4356,
+      "y": -324,
+      "brightness": 4,
+      "designation": "12 Crat"
+    },
+    {
+      "x": 4346,
+      "y": 150,
+      "brightness": 4,
+      "designation": "77 Leon"
+    },
+    {
+      "x": 4331,
+      "y": 252,
+      "brightness": 4,
+      "designation": "78 Leon"
+    },
+    {
+      "x": 4324,
+      "y": -390,
+      "brightness": 4,
+      "designation": "15 Crat"
+    },
+    {
+      "x": 4257,
+      "y": -211,
+      "brightness": 4,
+      "designation": "21 Crat"
+    },
+    {
+      "x": 4256,
+      "y": -6,
+      "brightness": 4,
+      "designation": "91 Leon"
+    },
+    {
+      "x": 4211,
+      "y": -405,
+      "brightness": 4,
+      "designation": "27 Crat"
+    },
+    {
+      "x": 4206,
+      "y": 161,
+      "brightness": 4,
+      "designation": "3 Virg"
+    },
+    {
+      "x": 4194,
+      "y": 473,
+      "brightness": 4,
+      "designation": "93 Leon"
+    },
+    {
+      "x": 4179,
+      "y": 53,
+      "brightness": 4,
+      "designation": "5 Virg"
+    },
+    {
+      "x": 4120,
+      "y": 163,
+      "brightness": 4,
+      "designation": "8 Virg"
+    },
+    {
+      "x": 4095,
+      "y": 211,
+      "brightness": 4,
+      "designation": "9 Virg"
+    },
+    {
+      "x": 4012,
+      "y": -3,
+      "brightness": 4,
+      "designation": "15 Virg"
+    },
+    {
+      "x": 4007,
+      "y": 418,
+      "brightness": 4,
+      "designation": "11 Coma"
+    },
+    {
+      "x": 3943,
+      "y": -356,
+      "brightness": 4,
+      "designation": "8 Corv"
+    },
+    {
+      "x": 3902,
+      "y": -170,
+      "brightness": 4,
+      "designation": "26 Virg"
+    },
+    {
+      "x": 3887,
+      "y": 245,
+      "brightness": 4,
+      "designation": "30 Virg"
+    },
+    {
+      "x": 3816,
+      "y": -205,
+      "brightness": 4,
+      "designation": "40 Virg"
+    },
+    {
+      "x": 3789,
+      "y": 409,
+      "brightness": 4,
+      "designation": "36 Coma"
+    },
+    {
+      "x": 3727,
+      "y": -114,
+      "brightness": 4,
+      "designation": "51 Virg"
+    },
+    {
+      "x": 3726,
+      "y": 411,
+      "brightness": 4,
+      "designation": "42 Coma"
+    },
+    {
+      "x": 3680,
+      "y": -404,
+      "brightness": 4,
+      "designation": "61 Virg"
+    },
+    {
+      "x": 3629,
+      "y": -352,
+      "brightness": 4,
+      "designation": "69 Virg"
+    },
+    {
+      "x": 3602,
+      "y": -131,
+      "brightness": 4,
+      "designation": "74 Virg"
+    },
+    {
+      "x": 3589,
+      "y": 95,
+      "brightness": 4,
+      "designation": "78 Virg"
+    },
+    {
+      "x": 3513,
+      "y": 409,
+      "brightness": 4,
+      "designation": "4 Boot"
+    },
+    {
+      "x": 3501,
+      "y": 371,
+      "brightness": 4,
+      "designation": "5 Boot"
+    },
+    {
+      "x": 3433,
+      "y": 46,
+      "brightness": 4,
+      "designation": "93 Virg"
+    },
+    {
+      "x": 3372,
+      "y": 66,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 3370,
+      "y": -223,
+      "brightness": 4,
+      "designation": "98 Virg"
+    },
+    {
+      "x": 3352,
+      "y": -126,
+      "brightness": 4,
+      "designation": "99 Virg"
+    },
+    {
+      "x": 3335,
+      "y": -294,
+      "brightness": 4,
+      "designation": "100 Virg"
+    },
+    {
+      "x": 3328,
+      "y": 382,
+      "brightness": 4,
+      "designation": "20 Boot"
+    },
+    {
+      "x": 3282,
+      "y": -41,
+      "brightness": 4,
+      "designation": "105 Virg"
+    },
+    {
+      "x": 3208,
+      "y": 383,
+      "brightness": 4,
+      "designation": "29 Boot"
+    },
+    {
+      "x": 3206,
+      "y": 322,
+      "brightness": 4,
+      "designation": "30 Boot"
+    },
+    {
+      "x": 3198,
+      "y": -119,
+      "brightness": 4,
+      "designation": "107 Virg"
+    },
+    {
+      "x": 3183,
+      "y": 396,
+      "brightness": 4,
+      "designation": "35 Boot"
+    },
+    {
+      "x": 3179,
+      "y": 53,
+      "brightness": 4,
+      "designation": "109 Virg"
+    },
+    {
+      "x": 3147,
+      "y": 444,
+      "brightness": 4,
+      "designation": "37 Boot"
+    },
+    {
+      "x": 3118,
+      "y": -90,
+      "brightness": 4,
+      "designation": "16 Libr"
+    },
+    {
+      "x": 3084,
+      "y": 57,
+      "brightness": 4,
+      "designation": "110 Virg"
+    },
+    {
+      "x": 3035,
+      "y": -442,
+      "brightness": 4,
+      "designation": "24 Libr"
+    },
+    {
+      "x": 2909,
+      "y": -221,
+      "brightness": 4,
+      "designation": "37 Libr"
+    },
+    {
+      "x": 2902,
+      "y": -329,
+      "brightness": 4,
+      "designation": "38 Libr"
+    },
+    {
+      "x": 2901,
+      "y": 247,
+      "brightness": 4,
+      "designation": "13 Serp"
+    },
+    {
+      "x": 2866,
+      "y": -440,
+      "brightness": 4,
+      "designation": "43 Libr"
+    },
+    {
+      "x": 2861,
+      "y": 455,
+      "brightness": 4,
+      "designation": "21 Serp"
+    },
+    {
+      "x": 2835,
+      "y": 175,
+      "brightness": 4,
+      "designation": "27 Serp"
+    },
+    {
+      "x": 2820,
+      "y": 420,
+      "brightness": 4,
+      "designation": "35 Serp"
+    },
+    {
+      "x": 2811,
+      "y": 109,
+      "brightness": 4,
+      "designation": "37 Serp"
+    },
+    {
+      "x": 2805,
+      "y": 484,
+      "brightness": 4,
+      "designation": "38 Serp"
+    },
+    {
+      "x": 2798,
+      "y": -374,
+      "brightness": 4,
+      "designation": "46 Libr"
+    },
+    {
+      "x": 2777,
+      "y": 364,
+      "brightness": 4,
+      "designation": "41 Serp"
+    },
+    {
+      "x": 2773,
+      "y": -318,
+      "brightness": 4,
+      "designation": "48 Libr"
+    },
+    {
+      "x": 2737,
+      "y": -253,
+      "brightness": 4,
+      "designation": "xi Scor"
+    },
+    {
+      "x": 2725,
+      "y": -464,
+      "brightness": 4,
+      "designation": "9 Scor"
+    },
+    {
+      "x": 2722,
+      "y": -469,
+      "brightness": 4,
+      "designation": "10 Scor"
+    },
+    {
+      "x": 2695,
+      "y": -437,
+      "brightness": 4,
+      "designation": "14 Scor"
+    },
+    {
+      "x": 2693,
+      "y": -223,
+      "brightness": 4,
+      "designation": "15 Scor"
+    },
+    {
+      "x": 2634,
+      "y": 29,
+      "brightness": 4,
+      "designation": "50 Serp"
+    },
+    {
+      "x": 2631,
+      "y": 441,
+      "brightness": 4,
+      "designation": "20 Herc"
+    },
+    {
+      "x": 2627,
+      "y": -451,
+      "brightness": 4,
+      "designation": "4 Ophi"
+    },
+    {
+      "x": 2612,
+      "y": 325,
+      "brightness": 4,
+      "designation": "24 Herc"
+    },
+    {
+      "x": 2610,
+      "y": -415,
+      "brightness": 4,
+      "designation": "7 Ophi"
+    },
+    {
+      "x": 2603,
+      "y": -186,
+      "brightness": 4,
+      "designation": "3 Ophi"
+    },
+    {
+      "x": 2586,
+      "y": -373,
+      "brightness": 4,
+      "designation": "8 Ophi"
+    },
+    {
+      "x": 2583,
+      "y": 50,
+      "brightness": 4,
+      "designation": "10 Ophi"
+    },
+    {
+      "x": 2582,
+      "y": -484,
+      "brightness": 4,
+      "designation": "9 Ophi"
+    },
+    {
+      "x": 2572,
+      "y": 266,
+      "brightness": 4,
+      "designation": "29 Herc"
+    },
+    {
+      "x": 2479,
+      "y": -241,
+      "brightness": 4,
+      "designation": "20 Ophi"
+    },
+    {
+      "x": 2450,
+      "y": 235,
+      "brightness": 4,
+      "designation": "25 Ophi"
+    },
+    {
+      "x": 2429,
+      "y": 217,
+      "brightness": 4,
+      "designation": "27 Ophi"
+    },
+    {
+      "x": 2385,
+      "y": 293,
+      "brightness": 4,
+      "designation": "60 Herc"
+    },
+    {
+      "x": 2324,
+      "y": -8,
+      "brightness": 4,
+      "designation": "41 Ophi"
+    },
+    {
+      "x": 2304,
+      "y": -478,
+      "brightness": 4,
+      "designation": "40 Ophi"
+    },
+    {
+      "x": 2303,
+      "y": -290,
+      "brightness": 4,
+      "designation": "53 Serp"
+    },
+    {
+      "x": 2268,
+      "y": -114,
+      "brightness": 4,
+      "designation": ""
+    },
+    {
+      "x": 2267,
+      "y": 96,
+      "brightness": 4,
+      "designation": "49 Ophi"
+    },
+    {
+      "x": 2205,
+      "y": -183,
+      "brightness": 4,
+      "designation": "57 Ophi"
+    },
+    {
+      "x": 2186,
+      "y": -292,
+      "brightness": 4,
+      "designation": "56 Serp"
+    },
+    {
+      "x": 2176,
+      "y": -492,
+      "brightness": 4,
+      "designation": "58 Ophi"
+    },
+    {
+      "x": 2075,
+      "y": -84,
+      "brightness": 4,
+      "designation": "57 Serp"
+    },
+    {
+      "x": 2075,
+      "y": 99,
+      "brightness": 4,
+      "designation": "66 Ophi"
+    },
+    {
+      "x": 2073,
+      "y": 381,
+      "brightness": 4,
+      "designation": "93 Herc"
+    },
+    {
+      "x": 2073,
+      "y": 67,
+      "brightness": 4,
+      "designation": "67 Ophi"
+    },
+    {
+      "x": 2067,
+      "y": 30,
+      "brightness": 4,
+      "designation": "68 Ophi"
+    },
+    {
+      "x": 2046,
+      "y": 57,
+      "brightness": 4,
+      "designation": "70 Ophi"
+    },
+    {
+      "x": 2034,
+      "y": 198,
+      "brightness": 4,
+      "designation": "71 Ophi"
+    },
+    {
+      "x": 2022,
+      "y": 473,
+      "brightness": 4,
+      "designation": "102 Herc"
+    },
+    {
+      "x": 2004,
+      "y": -480,
+      "brightness": 4,
+      "designation": "13 Sgtr"
+    },
+    {
+      "x": 1958,
+      "y": 76,
+      "brightness": 4,
+      "designation": "74 Ophi"
+    },
+    {
+      "x": 1957,
+      "y": 499,
+      "brightness": 4,
+      "designation": "106 Herc"
+    },
+    {
+      "x": 1945,
+      "y": -204,
+      "brightness": 4,
+      "designation": "xi Scut"
+    },
+    {
+      "x": 1938,
+      "y": -469,
+      "brightness": 4,
+      "designation": "21 Sgtr"
+    },
+    {
+      "x": 1937,
+      "y": 494,
+      "brightness": 4,
+      "designation": "109 Herc"
+    },
+    {
+      "x": 1914,
+      "y": -333,
+      "brightness": 4,
+      "designation": "ga Scut"
+    },
+    {
+      "x": 1879,
+      "y": -189,
+      "brightness": 4,
+      "designation": "al Scut"
+    },
+    {
+      "x": 1813,
+      "y": 465,
+      "brightness": 4,
+      "designation": "110 Herc"
+    },
+    {
+      "x": 1810,
+      "y": -110,
+      "brightness": 4,
+      "designation": "be Scut"
+    },
+    {
+      "x": 1806,
+      "y": 411,
+      "brightness": 4,
+      "designation": "111 Herc"
+    },
+    {
+      "x": 1756,
+      "y": 93,
+      "brightness": 4,
+      "designation": "63 Serp"
+    },
+    {
+      "x": 1735,
+      "y": 340,
+      "brightness": 4,
+      "designation": "13 Aqil"
+    },
+    {
+      "x": 1727,
+      "y": -134,
+      "brightness": 4,
+      "designation": "12 Aqil"
+    },
+    {
+      "x": 1714,
+      "y": -498,
+      "brightness": 4,
+      "designation": "39 Sgtr"
+    },
+    {
+      "x": 1639,
+      "y": 483,
+      "brightness": 4,
+      "designation": "1 Vulp"
+    },
+    {
+      "x": 1616,
+      "y": -410,
+      "brightness": 4,
+      "designation": "44 Sgtr"
+    },
+    {
+      "x": 1616,
+      "y": -368,
+      "brightness": 4,
+      "designation": "46 Sgtr"
+    },
+    {
+      "x": 1585,
+      "y": 3,
+      "brightness": 4,
+      "designation": "32 Aqil"
+    },
+    {
+      "x": 1541,
+      "y": 163,
+      "brightness": 4,
+      "designation": "38 Aqil"
+    },
+    {
+      "x": 1535,
+      "y": 445,
+      "brightness": 4,
+      "designation": "9 Vulp"
+    },
+    {
+      "x": 1527,
+      "y": -35,
+      "brightness": 4,
+      "designation": "41 Aqil"
+    },
+    {
+      "x": 1504,
+      "y": 405,
+      "brightness": 4,
+      "designation": "5 Sgte"
+    },
+    {
+      "x": 1499,
+      "y": 393,
+      "brightness": 4,
+      "designation": "6 Sgte"
+    },
+    {
+      "x": 1462,
+      "y": 416,
+      "brightness": 4,
+      "designation": "7 Sgte"
+    },
+    {
+      "x": 1453,
+      "y": 430,
+      "brightness": 4,
+      "designation": "8 Sgte"
+    },
+    {
+      "x": 1437,
+      "y": 17,
+      "brightness": 4,
+      "designation": "55 Aqil"
+    },
+    {
+      "x": 1426,
+      "y": 187,
+      "brightness": 4,
+      "designation": "59 Aqil"
+    },
+    {
+      "x": 1420,
+      "y": 140,
+      "brightness": 4,
+      "designation": "60 Aqil"
+    },
+    {
+      "x": 1310,
+      "y": 339,
+      "brightness": 4,
+      "designation": "67 Aqil"
+    },
+    {
+      "x": 1296,
+      "y": -292,
+      "brightness": 4,
+      "designation": "5 Capr"
+    },
+    {
+      "x": 1294,
+      "y": -292,
+      "brightness": 4,
+      "designation": "6 Capr"
+    },
+    {
+      "x": 1279,
+      "y": -297,
+      "brightness": 4,
+      "designation": "8 Capr"
+    },
+    {
+      "x": 1234,
+      "y": -413,
+      "brightness": 4,
+      "designation": "11 Capr"
+    },
+    {
+      "x": 1204,
+      "y": 250,
+      "brightness": 4,
+      "designation": "2 Dlph"
+    },
+    {
+      "x": 1191,
+      "y": 326,
+      "brightness": 4,
+      "designation": "4 Dlph"
+    },
+    {
+      "x": 1177,
+      "y": -33,
+      "brightness": 4,
+      "designation": "71 Aqil"
+    },
+    {
+      "x": 1172,
+      "y": 475,
+      "brightness": 4,
+      "designation": "29 Vulp"
+    },
+    {
+      "x": 1166,
+      "y": 354,
+      "brightness": 4,
+      "designation": "9 Dlph"
+    },
+    {
+      "x": 1145,
+      "y": 335,
+      "brightness": 4,
+      "designation": "11 Dlph"
+    },
+    {
+      "x": 1126,
+      "y": 359,
+      "brightness": 4,
+      "designation": "12 Dlph"
+    },
+    {
+      "x": 1125,
+      "y": -225,
+      "brightness": 4,
+      "designation": "2 Aqar"
+    },
+    {
+      "x": 1124,
+      "y": -123,
+      "brightness": 4,
+      "designation": "3 Aqar"
+    },
+    {
+      "x": 1096,
+      "y": -213,
+      "brightness": 4,
+      "designation": "6 Aqar"
+    },
+    {
+      "x": 1031,
+      "y": -461,
+      "brightness": 4,
+      "designation": "22 Capr"
+    },
+    {
+      "x": 1022,
+      "y": -401,
+      "brightness": 4,
+      "designation": "23 Capr"
+    },
+    {
+      "x": 1000,
+      "y": -268,
+      "brightness": 4,
+      "designation": "13 Aqar"
+    },
+    {
+      "x": 993,
+      "y": 222,
+      "brightness": 4,
+      "designation": "5 Equl"
+    },
+    {
+      "x": 969,
+      "y": 219,
+      "brightness": 4,
+      "designation": "7 Equl"
+    },
+    {
+      "x": 962,
+      "y": 110,
+      "brightness": 4,
+      "designation": "8 Equl"
+    },
+    {
+      "x": 929,
+      "y": -393,
+      "brightness": 4,
+      "designation": "32 Capr"
+    },
+    {
+      "x": 925,
+      "y": 441,
+      "brightness": 4,
+      "designation": "1 Pegs"
+    },
+    {
+      "x": 893,
+      "y": -506,
+      "brightness": 4,
+      "designation": "36 Capr"
+    },
+    {
+      "x": 845,
+      "y": -453,
+      "brightness": 4,
+      "designation": "39 Capr"
+    },
+    {
+      "x": 839,
+      "y": -189,
+      "brightness": 4,
+      "designation": "23 Aqar"
+    },
+    {
+      "x": 827,
+      "y": -390,
+      "brightness": 4,
+      "designation": "40 Capr"
+    },
+    {
+      "x": 813,
+      "y": -440,
+      "brightness": 4,
+      "designation": "43 Capr"
+    },
+    {
+      "x": 798,
+      "y": 384,
+      "brightness": 4,
+      "designation": "9 Pegs"
+    },
+    {
+      "x": 693,
+      "y": -60,
+      "brightness": 4,
+      "designation": "31 Aqar"
+    },
+    {
+      "x": 679,
+      "y": 104,
+      "brightness": 4,
+      "designation": "22 Pegs"
+    },
+    {
+      "x": 677,
+      "y": -327,
+      "brightness": 4,
+      "designation": "33 Aqar"
+    },
+    {
+      "x": 617,
+      "y": -189,
+      "brightness": 4,
+      "designation": "43 Aqar"
+    },
+    {
+      "x": 589,
+      "y": -43,
+      "brightness": 4,
+      "designation": "48 Aqar"
+    },
+    {
+      "x": 588,
+      "y": 266,
+      "brightness": 4,
+      "designation": "31 Pegs"
+    },
+    {
+      "x": 568,
+      "y": 20,
+      "brightness": 4,
+      "designation": "52 Aqar"
+    },
+    {
+      "x": 553,
+      "y": 96,
+      "brightness": 4,
+      "designation": "35 Pegs"
+    },
+    {
+      "x": 538,
+      "y": -255,
+      "brightness": 4,
+      "designation": "57 Aqar"
+    },
+    {
+      "x": 511,
+      "y": -14,
+      "brightness": 4,
+      "designation": "62 Aqar"
+    },
+    {
+      "x": 465,
+      "y": -440,
+      "brightness": 4,
+      "designation": "66 Aqar"
+    },
+    {
+      "x": 445,
+      "y": 266,
+      "brightness": 4,
+      "designation": "46 Pegs"
+    },
+    {
+      "x": 431,
+      "y": -321,
+      "brightness": 4,
+      "designation": "71 Aqar"
+    },
+    {
+      "x": 413,
+      "y": -185,
+      "brightness": 4,
+      "designation": "73 Aqar"
+    },
+    {
+      "x": 397,
+      "y": 189,
+      "brightness": 4,
+      "designation": "50 Pegs"
+    },
+    {
+      "x": 348,
+      "y": 75,
+      "brightness": 4,
+      "designation": "4 Pisc"
+    },
+    {
+      "x": 330,
+      "y": 202,
+      "brightness": 4,
+      "designation": "55 Pegs"
+    },
+    {
+      "x": 318,
+      "y": -494,
+      "brightness": 4,
+      "designation": "88 Aqar"
+    },
+    {
+      "x": 289,
+      "y": -150,
+      "brightness": 4,
+      "designation": "90 Aqar"
+    },
+    {
+      "x": 281,
+      "y": -219,
+      "brightness": 4,
+      "designation": "91 Aqar"
+    },
+    {
+      "x": 273,
+      "y": 62,
+      "brightness": 4,
+      "designation": "6 Pisc"
+    },
+    {
+      "x": 269,
+      "y": -222,
+      "brightness": 4,
+      "designation": "93 Aqar"
+    },
+    {
+      "x": 240,
+      "y": -470,
+      "brightness": 4,
+      "designation": "98 Aqar"
+    },
+    {
+      "x": 223,
+      "y": -482,
+      "brightness": 4,
+      "designation": "99 Aqar"
+    },
+    {
+      "x": 217,
+      "y": 16,
+      "brightness": 4,
+      "designation": "8 Pisc"
+    },
+    {
+      "x": 211,
+      "y": 133,
+      "brightness": 4,
+      "designation": "10 Pisc"
+    },
+    {
+      "x": 204,
+      "y": 278,
+      "brightness": 4,
+      "designation": "70 Pegs"
+    },
+    {
+      "x": 182,
+      "y": -489,
+      "brightness": 4,
+      "designation": "101 Aqar"
+    },
+    {
+      "x": 143,
+      "y": 116,
+      "brightness": 4,
+      "designation": "17 Pisc"
+    },
+    {
+      "x": 133,
+      "y": -418,
+      "brightness": 4,
+      "designation": "104 Aqar"
+    },
+    {
+      "x": 131,
+      "y": 28,
+      "brightness": 4,
+      "designation": "18 Pisc"
+    },
+    {
+      "x": 128,
+      "y": -344,
+      "brightness": 4,
+      "designation": "105 Aqar"
+    },
+    {
+      "x": 33,
+      "y": 144,
+      "brightness": 4,
+      "designation": "28 Pisc"
+    },
+    {
+      "x": 18,
+      "y": -149,
+      "brightness": 4,
+      "designation": "30 Pisc"
+    },
+    {
+      "x": 4,
+      "y": -407,
+      "brightness": 4,
+      "designation": "2 Ceti"
+    }
+  ]
+}

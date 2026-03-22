@@ -1,0 +1,27 @@
+# spacewar:display_config — Playfield Dimensions
+#
+# Inbound boundary Record: runtime provides at initialization.
+#
+# Source: 02_record_definitions.md § spacewar:display_config
+#
+# The PDP-1's Type 30 CRT uses 10-bit display registers (1024×1024).
+# Toroidal wrapping is free on PDP-1 (register overflow wraps
+# automatically). In RUNS, the spacewar:wrap_position Processor
+# (Phase 4) needs explicit boundaries from this Record.
+
+record spacewar:display_config
+  scope:     inbound boundary
+  instances: 1
+
+  fields:
+
+    width:                        int
+      # Playfield width in game units.
+      # For faithful reproduction: 1024 (10-bit PDP-1 display register).
+      # The runtime maps game units to screen pixels.
+      default: 1024
+
+    height:                       int
+      # Playfield height in game units.
+      # For faithful reproduction: 1024.
+      default: 1024

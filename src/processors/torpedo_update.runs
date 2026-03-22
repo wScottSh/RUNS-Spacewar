@@ -1,0 +1,61 @@
+# spacewar:torpedo_update — Torpedo Lifecycle and Warped Gravity
+#
+# Counts down torpedo lifetime, applies position-dependent gravity
+# warpage (first-order approximation, NOT full sqrt-based gravity),
+# and transitions to explosion on timeout.
+#
+# Source: L985-1005 (tcr routine)
+
+processor spacewar:torpedo_update
+  inputs:
+    object:   spacewar:object
+    consts:   spacewar:game_constants
+  outputs:
+    object:   spacewar:object
+
+  # Count down lifetime
+  # Source: L988: count i ma1, tc1 — if lifetime reaches 0, explode
+  var life = object.lifetime + 1
+  if life >= 0:
+    # Torpedo expired — transition to explosion
+    # Source: L989-992: lac (mex 400000; dac i ml1; law i 2; dac i ma1
+    object = object with {
+      state = exploding,
+      collidable = false,
+      lifetime = -2            # Short explosion (law i 2 = -2)
+    }
+  else:
+    # Torpedo still alive — apply gravity warpage
+    # Source: L997-1003
+    # Gravity warpage is a first-order position-dependent acceleration:
+    #   accel_y = (position_x >> 9) >> torpedo_gravity_warpage_shift
+    #   accel_x = (position_y >> 9) >> torpedo_gravity_warpage_shift
+    # Note: x-position drives y-acceleration and vice versa (cross-coupling
+    # toward the origin, simulating gravitational attraction).
+    #
+    # L997:  lac i mx1; sar 9s; xct the     → x >> 9, then >> 9 more (the=sar 9s)
+    # L1000: diff \mdy, my1, (sar 3s        → integrate y velocity/position
+    # L1001: sar 9s; xct the                → y >> 9, then >> the
+    # L1003: diff \mdx, mx1, (sar 3s        → integrate x velocity/position
+
+    let grav_shift = consts.torpedo_gravity_warpage_shift   # 9
+
+    # Cross-axis gravity: x-position drives y-acceleration
+    let accel_y = (object.position_x >> 9) >> grav_shift
+    let iy = spacewar:velocity_integrate(
+      object.position_y, object.velocity_y, accel_y, 3
+    )
+
+    # Cross-axis gravity: y-position drives x-acceleration
+    let accel_x = (object.position_y >> 9) >> grav_shift
+    let ix = spacewar:velocity_integrate(
+      object.position_x, object.velocity_x, accel_x, 3
+    )
+
+    object = object with {
+      position_x = ix.position,
+      position_y = iy.position,
+      velocity_x = ix.velocity,
+      velocity_y = iy.velocity,
+      lifetime = life
+    }

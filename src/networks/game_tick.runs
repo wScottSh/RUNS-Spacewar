@@ -1,0 +1,148 @@
+# spacewar:game_tick — Top-Level Game Tick Network
+#
+# The complete Spacewar! 3.1 game logic executed once per frame.
+# This is the root Network — the runtime calls it with inbound
+# boundary Records and reads outbound boundary Records.
+#
+# Architecture: Ordered phases. Entity dispatch first (slot order),
+# then sequential system Processors.
+#
+# Source: L843-941 (main loop structure)
+
+network spacewar:game_tick
+
+  # ──────────────────────────────────────────────────
+  # Runtime Interface: Inbound (provided by runtime each tick)
+  # ──────────────────────────────────────────────────
+
+  requires:
+    tick:         spacewar:tick_input          # Frame number, delta_time
+    controls_1:   spacewar:player_controls     # Player 1 input (5 booleans)
+    controls_2:   spacewar:player_controls     # Player 2 input (5 booleans)
+    display:      spacewar:display_config      # Playfield dimensions
+
+  # ──────────────────────────────────────────────────
+  # Runtime Interface: Outbound (read by runtime after tick)
+  # ──────────────────────────────────────────────────
+
+  produces:
+    render_list:  spacewar:render_object[]     # Visual projection for rendering
+    match:        spacewar:match_result        # Scores, lifecycle, restart timer
+    starfield:    spacewar:starfield_state     # Scroll state for star background
+
+  # ──────────────────────────────────────────────────
+  # Persistent State (carried between ticks)
+  # ──────────────────────────────────────────────────
+
+  state:
+    objects:      spacewar:object[24]          # All entity slots (ships, torpedoes, etc.)
+    prng:         spacewar:prng_state          # Pseudo-random number generator
+    result:       spacewar:match_result        # Scores and match lifecycle
+    starfield:    spacewar:starfield_state     # Starfield scroll counters
+    configs:      spacewar:ship_config[2]      # Ship outlines (Needle + Wedge)
+    consts:       spacewar:game_constants      # Gameplay constants (read-only)
+    config:       spacewar:game_config         # Sense switch configuration
+
+  # ──────────────────────────────────────────────────
+  # Execution Phases (strictly ordered)
+  # ──────────────────────────────────────────────────
+
+  phases:
+
+    # ── Phase 1: Per-Entity Dispatch ─────────────────
+    #
+    # Iterate entities in slot order (0 → 23).
+    # Ship 1 (slot 0) ALWAYS updates before Ship 2 (slot 1).
+    # This is observable behavior — a torpedo fired by ship 1
+    # exists in the world before ship 2's update runs.
+    #
+    # Source: L843-929 (main loop iterates mtb array)
+
+    - dispatch: objects
+      order: slot                             # Iterate 0, 1, 2, ..., 23
+      arcs:
+
+        # Ships (slots 0-1): full ship pipeline
+        - guard: .state == ship and slot == 0
+          network: spacewar:ship_update(., controls_1, config, consts, prng)
+
+        - guard: .state == ship and slot == 1
+          network: spacewar:ship_update(., controls_2, config, consts, prng)
+
+        # Torpedoes: gravity warpage + lifetime countdown
+        - guard: .state == torpedo
+          processor: spacewar:torpedo_update(., consts)
+
+        # Explosions: drift + particle generation + lifetime
+        - guard: .state == exploding
+          processor: spacewar:explosion_tick(., prng)
+
+        # Hyperspace transit: invisible, timer countdown
+        - guard: .state == hyperspace_in
+          processor: spacewar:hyperspace_transit(., prng, consts)
+
+        # Hyperspace breakout: visible, collidable, death risk
+        - guard: .state == hyperspace_out
+          processor: spacewar:hyperspace_breakout(., prng, consts)
+
+        # Empty slots: skip (no computation)
+        - guard: .state == empty
+          skip: true
+
+    # ── Phase 2: Spawn Processing ────────────────────
+    #
+    # Collect torpedo spawn requests from ship_update pipelines.
+    # Allocate empty entity slots. Must run AFTER entity dispatch
+    # so that spawn requests exist and slot states are current.
+
+    - processor: spacewar:process_spawns(objects, spawn_requests, consts)
+
+    # ── Phase 3: Collision Detection ─────────────────
+    #
+    # Pairwise diamond-hitbox check on all collidable entities.
+    # Must run AFTER spawns so newly spawned torpedoes participate.
+    #
+    # Source: L868-904 (collision within the original entity loop —
+    # in RUNS, separated for clarity; semantically equivalent because
+    # the original collision check only fires against LATER entities,
+    # and new torpedoes occupy later slots.)
+
+    - processor: spacewar:collision_detect(objects, consts)
+
+    # ── Phase 4: Match Logic ─────────────────────────
+    #
+    # Restart detection → scoring → reinitialization trigger.
+    # Sequential — check_restart may set the timer that
+    # update_scores counts down.
+
+    - processor: spacewar:check_restart(objects, result, consts)
+    - processor: spacewar:update_scores(objects, result)
+
+    # ── Phase 5: World State ─────────────────────────
+
+    - processor: spacewar:advance_starfield_scroll(starfield, config)
+
+    # ── Phase 6: Output Projection ───────────────────
+    #
+    # Pure data projection — reads game state, writes render_object[].
+    # No gameplay decisions flow backward.
+
+    - processor: spacewar:build_render_list(objects, configs)
+
+  # ──────────────────────────────────────────────────
+  # Match Lifecycle (runtime-driven, NOT a Network)
+  # ──────────────────────────────────────────────────
+  #
+  # The runtime drives the match lifecycle:
+  #
+  #   1. On launch:  runtime calls spacewar:match_initialize(state:)
+  #   2. Each frame: runtime calls spacewar:game_tick (this Network)
+  #   3. On reinit:  if update_scores sets trigger_reinit = true,
+  #                  runtime calls spacewar:match_initialize(state:)
+  #                  before the next game_tick
+  #   4. On match end: result.state == match_over → runtime stops
+  #                  calling game_tick, displays final scores
+  #
+  # This is a lifecycle contract between the Network and the runtime,
+  # not game logic. The runtime decides when to call match_initialize;
+  # the Network decides IF it should be called (via trigger_reinit).

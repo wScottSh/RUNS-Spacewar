@@ -1,0 +1,50 @@
+[
+    {
+        "kind": 30050,
+        "tags": [
+            [
+                "d",
+                "spacecraft"
+            ],
+            [
+                "name",
+                "Spacecraft"
+            ]
+        ],
+        "content": {
+            "description": "A player-controlled vehicle capable of thrust, rotation, and weapon fire in a space environment."
+        }
+    },
+    {
+        "kind": 30050,
+        "tags": [
+            [
+                "d",
+                "projectile"
+            ],
+            [
+                "name",
+                "Projectile"
+            ]
+        ],
+        "content": {
+            "description": "A launched object that travels through space and damages targets on impact."
+        }
+    },
+    {
+        "kind": 30050,
+        "tags": [
+            [
+                "d",
+                "gravity-source"
+            ],
+            [
+                "name",
+                "Gravity Source"
+            ]
+        ],
+        "content": {
+            "description": "A fixed or mobile object that exerts gravitational attraction on nearby entities."
+        }
+    }
+]

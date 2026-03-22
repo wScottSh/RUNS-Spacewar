@@ -1,0 +1,164 @@
+# spacewar:game_constants — All Gameplay-Defining Constants
+#
+# Read-only during gameplay; set at initialization.
+# Every value derived from L72-96 of spacewar3.1_complete.txt.
+#
+# Encoding note: PDP-1 `law i N` loads the ones-complement negative
+# of N. The game uses these as countdown timers via `isp` (increment
+# and skip if positive). Values stored here are the MAGNITUDES used
+# for initialization, not the raw PDP-1 instruction encodings.
+#
+# Shift-encoded constants (tvl, sac, the, hr1, hr2) were stored in
+# the PDP-1 source as executable shift instructions and `xct`-ed
+# inline. Here they are stored as shift counts; Processors apply
+# the shift in their logic.
+
+record spacewar:game_constants
+  scope:     internal
+  instances: 1
+
+  fields:
+
+    # ── Torpedoes ──────────────────────────────────────────────────
+
+    max_torpedoes:                  int
+      # Source: tno (L77), `law i 41`
+      # Octal 41 = decimal 33. This is torpedoes + 1.
+      # Actual usable torpedoes per ship per round = 32.
+      # Stored as countdown initial: -33 in ones-complement.
+      # Value: 33
+      default: 33
+
+    torpedo_velocity_shift:         int
+      # Source: tvl (L78), `sar 4s`
+      # Arithmetic shift right 4 = divide by 16.
+      # Torpedo velocity = (heading_component >> this_value).
+      # Value: 4
+      default: 4
+
+    torpedo_reload_time:            int
+      # Source: rlt (L79), `law i 20`
+      # Octal 20 = decimal 16 frames before torpedo tube reloads.
+      # Stored as countdown initial: -16 in ones-complement.
+      # Value: 16
+      default: 16
+
+    torpedo_lifetime:               int
+      # Source: tlf (L80), `law i 140`
+      # Octal 140 = decimal 96 frames before torpedo auto-detonates.
+      # Stored as countdown initial: -96 in ones-complement.
+      # Value: 96
+      default: 96
+
+    torpedo_gravity_warpage_shift:  int
+      # Source: the (L88), `sar 9s`
+      # Arithmetic shift right 9 = divide by 512.
+      # Scale of gravity effect on torpedoes (first-order approximation,
+      # simpler than the ship's full sqrt-based gravity).
+      # Value: 9
+      default: 9
+
+    # ── Ship Movement ──────────────────────────────────────────────
+
+    max_fuel:                       int
+      # Source: foo (L81), `-20000` (octal literal, NOT `law i`)
+      # Octal 20000 = decimal 8192. Stored as negative ones-complement
+      # value. Fuel counts UP toward 0 via `isp`; when it reaches 0,
+      # fuel is exhausted.
+      # Value: -8192
+      default: -8192
+
+    angular_acceleration:           int
+      # Source: maa (L82), `10` (octal)
+      # Octal 10 = decimal 8.
+      # Added to angular velocity per frame when rotate input is active.
+      # Value: 8
+      default: 8
+
+    thrust_scale_shift:             int
+      # Source: sac (L83), `sar 4s`
+      # Arithmetic shift right 4 = divide by 16.
+      # Thrust force = (cos_heading >> this_value).
+      # Value: 4
+      default: 4
+
+    # ── Central Star ───────────────────────────────────────────────
+
+    star_capture_radius:            int
+      # Source: str (L84), `1`
+      # Distance threshold for star capture (destroy or teleport).
+      # Compared against r² after scaling: (x>>11)² + (y>>11)² - str.
+      # Value: 1
+      default: 1
+
+    # ── Collision ──────────────────────────────────────────────────
+
+    collision_radius:               int
+      # Source: me1 (L85), `6000` (octal)
+      # Octal 6000 = decimal 3072.
+      # Primary collision epsilon — per-axis Manhattan distance check.
+      # If |dx| >= me1 OR |dy| >= me1: no collision (skip).
+      # Value: 3072
+      default: 3072
+
+    collision_radius_half:          int
+      # Source: me2 (L86), `3000` (octal)
+      # Octal 3000 = decimal 1536 (= me1 / 2).
+      # Secondary collision check: if |dx| + |dy| >= me2: no collision.
+      # Together with me1, these form a diamond-shaped hitbox.
+      # Value: 1536
+      default: 1536
+
+    # ── Hyperspace ─────────────────────────────────────────────────
+
+    hyperspace_max_shots:           int
+      # Source: mhs (L89), `law i 10`
+      # Octal 10 = decimal 8 hyperspace uses per match.
+      # Stored as countdown initial: -8 in ones-complement.
+      # Value: 8
+      default: 8
+
+    hyperspace_entry_delay:         int
+      # Source: hd1 (L90), `law i 40`
+      # Octal 40 = decimal 32 frames invisible in hyperspace.
+      # Stored as countdown initial: -32 in ones-complement.
+      # Value: 32
+      default: 32
+
+    hyperspace_breakout_duration:   int
+      # Source: hd2 (L91), `law i 100`
+      # Octal 100 = decimal 64 frames in breakout phase.
+      # Ship is visible and collidable during breakout.
+      # Stored as countdown initial: -64 in ones-complement.
+      # Value: 64
+      default: 64
+
+    hyperspace_recharge_time:       int
+      # Source: hd3 (L92), `law i 200`
+      # Octal 200 = decimal 128 frames before hyperspace recharges.
+      # Stored as countdown initial: -128 in ones-complement.
+      # Value: 128
+      default: 128
+
+    hyperspace_displacement_scale:  int
+      # Source: hr1 (L93), `scl 9s`
+      # Shift count left 9 = multiply by 512.
+      # Scale of random position displacement on hyperspace exit.
+      # Value: 9
+      default: 9
+
+    hyperspace_velocity_scale:      int
+      # Source: hr2 (L94), `scl 4s`
+      # Shift count left 4 = multiply by 16.
+      # Scale of random velocity imparted on hyperspace exit.
+      # Value: 4
+      default: 4
+
+    hyperspace_uncertainty:         int
+      # Source: hur (L95), `40000` (octal)
+      # Octal 40000 = decimal 16384.
+      # Added to uncertainty accumulator each hyperspace use.
+      # Higher accumulator = more likely explosion on exit.
+      # After ~4 uses (4 × 16384 = 65536 > 2^17-1), death is certain.
+      # Value: 16384
+      default: 16384

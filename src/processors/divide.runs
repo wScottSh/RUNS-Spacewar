@@ -1,0 +1,117 @@
+# spacewar:divide — Integer Divide with Remainder
+#
+# Divides a 34-bit ones-complement dividend by an 18-bit divisor,
+# producing quotient and remainder.
+#
+# Source: L346-396 of spacewar3.1_complete.txt
+# Attribution: BBN (Bolt Beranek & Newman) divide subroutine
+#              (L346 comment: "BBN Divide subroutine")
+#
+# Full divide (dvd entry):
+#   Dividend: 34-bit (high word in AC, low word in IO)
+#   Divisor:  18-bit (from next instruction after jda dvd)
+# Integer divide (idv entry):
+#   Dividend: 18-bit (in AC), sign-extended to 34-bit
+#   Divisor:  18-bit (from next instruction after jda idv)
+# Returns: quotient in AC, remainder in IO.
+
+processor spacewar:divide
+  inputs:
+    dividend_high:  spacewar:fixed18   # High word of 34-bit dividend
+    dividend_low:   spacewar:fixed18   # Low word of 34-bit dividend
+    divisor:        spacewar:fixed18   # 18-bit divisor
+  outputs:
+    quotient:       spacewar:fixed18   # Result of division
+    remainder:      spacewar:fixed18   # Remainder after division
+
+  # ── idv Entry Point (L351-357) — Integer Divide ────────────────
+  #
+  # For single-word dividend (the common case in Spacewar!):
+  #   idv, 0           # L351: entry
+  #   dap dv1          # L352: save return address
+  #   lac idv          # L353: load single-word dividend
+  #   scr 9s           # L354: } sign-extend into AC+IO pair
+  #   scr 8s           # L355: } (shift combined right 17, filling with sign)
+  #   dac dvd          # L356: store extended dividend high word
+  #   jmp dv1          # L357: jump into main divide
+  #
+  # This converts an 18-bit value into a 34-bit signed value by
+  # replicating the sign bit across the high word + upper IO bits.
+
+  # ── dvd Entry Point (L359-396) — Full Divide ───────────────────
+  #
+  # PDP-1 source:
+  #   dvd, 0           # L359: entry, stores dividend high word
+  #   dap dv1          # L360: save return address
+  #   dv1, xct         # L361: execute next instruction (loads divisor)
+  #   spa              # L362: skip if positive
+  #   cma              # L363: complement negative → work with magnitude
+  #   dac idv          # L364: store divisor magnitude
+  #   lac dvd          # L365: load dividend high word
+  #   sma              # L366: skip if negative
+  #   jmp dv2          # L367: dividend positive, skip to subtract
+  #   cma              # L368: } complement negative dividend
+  #   rcr 9s           # L369: } swap AC↔IO to complement both words
+  #   rcr 9s           # L370: }
+  #   cma              # L371: }
+  #   rcr 9s           # L372: }
+  #   rcr 9s           # L373: }
+  #
+  # Trial subtraction:
+  #   dv2, sub idv     # L374: AC = dividend - divisor
+  #   sma              # L375: skip if negative
+  #   jmp dve          # L376: if non-negative → overflow, error exit
+  #
+  # Division loop:
+  #   repeat 22, dis idv  # L377: 22 divide-step instructions
+  #   add idv          # L378: final correction add
+  #   dio idv          # L379: store remainder in idv (through IO)
+  #   cli              # L380: clear IO
+  #   rcr 1s           # L381: shift last quotient bit into place
+  #
+  # Sign correction:
+  #   lio dvd          # L382: load original dividend (for sign check)
+  #   spi              # L383: skip if IO positive (dividend was positive)
+  #   cma              # L384: complement quotient (dividend was negative)
+  #   dac dvd          # L385: store quotient
+  #   xct dv1          # L386: reload divisor (for sign check)
+  #   xor dvd          # L387: XOR quotient with divisor sign
+  #   rcr 9s           # L388-389: swap signs for final correction
+  #   rcr 9s
+  #   idx dv1          # L390: advance return past divisor
+  #
+  # Return (or error):
+  #   dve, idx dv1     # L391: advance return (error also lands here)
+  #   lac idv          # L392: load remainder into AC
+  #   spi              # L393: skip if IO positive
+  #   cma              # L394: complement remainder if needed
+  #   lio dvd          # L395: load quotient into IO
+  #   jmp i dv1        # L396: return (quotient in IO, remainder in AC)
+  #                    # NOTE: the calling convention here may differ
+  #                    # from the L349 comment — trace carefully.
+  #
+  # ── Sign Handling ──────────────────────────────────────────────
+  #
+  # Same pattern as multiply:
+  # 1. Both operands made positive before division.
+  # 2. The `dis` (divide step) instruction operates on magnitudes.
+  # 3. After division, check if signs of dividend and divisor differ.
+  # 4. If signs differ, negate quotient.
+  # 5. Remainder sign matches dividend sign.
+  #
+  # ── Edge Cases ─────────────────────────────────────────────────
+  #
+  # - Division by zero: the `dis` instruction produces undefined
+  #   results. The source never divides by zero — gravity computation
+  #   skips when distance ≤ capture radius at L1141-1142.
+  #   Precondition: divisor ≠ 0 and divisor ≠ -0.
+  #
+  # - Overflow (L376): if initial dividend ≥ divisor (meaning the
+  #   quotient would overflow 18 bits), the subroutine exits via
+  #   dve without performing division. The quotient is undefined.
+  #   The source avoids this by construction.
+  #
+  # - (-0) as divisor: complement of -0 is +0. Division by +0 is
+  #   undefined (same as division by zero).
+  #
+  # Body: deferred to Phase 4 (expression language design)

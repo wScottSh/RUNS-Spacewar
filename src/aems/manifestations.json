@@ -1,0 +1,118 @@
+[
+    {
+        "kind": 30051,
+        "tags": [
+            [
+                "d",
+                "spacewar:needle"
+            ],
+            [
+                "entity",
+                "<spacecraft_id>",
+                "spacecraft"
+            ],
+            [
+                "game",
+                "spacewar"
+            ],
+            [
+                "property",
+                "outline_data",
+                "111131 111111 111111 111163 311111 146111 111114 700000",
+                "spacewar:outline"
+            ],
+            [
+                "property",
+                "design_inspiration",
+                "Redstone rocket / Buck Rogers",
+                "string"
+            ]
+        ],
+        "content": {
+            "game": "Spacewar! 3.1 (24 Sep 1962)",
+            "name": "The Needle",
+            "description": "One of the two original Spacewar! spaceships, designed to evoke the PGM-11 Redstone missile. Stored as octal-encoded drawing instructions for the PDP-1 outline compiler."
+        }
+    },
+    {
+        "kind": 30051,
+        "tags": [
+            [
+                "d",
+                "spacewar:wedge"
+            ],
+            [
+                "entity",
+                "<spacecraft_id>",
+                "spacecraft"
+            ],
+            [
+                "game",
+                "spacewar"
+            ],
+            [
+                "property",
+                "outline_data",
+                "013113 113111 116313 131111 161151 111633 365114 700000",
+                "spacewar:outline"
+            ],
+            [
+                "property",
+                "design_inspiration",
+                "Buck Rogers spaceship",
+                "string"
+            ]
+        ],
+        "content": {
+            "game": "Spacewar! 3.1 (24 Sep 1962)",
+            "name": "The Wedge",
+            "description": "One of the two original Spacewar! spaceships, designed to evoke classic science fiction aesthetics."
+        }
+    },
+    {
+        "kind": 30051,
+        "tags": [
+            [
+                "d",
+                "spacewar:torpedo"
+            ],
+            [
+                "entity",
+                "<projectile_id>",
+                "projectile"
+            ],
+            [
+                "game",
+                "spacewar"
+            ]
+        ],
+        "content": {
+            "game": "Spacewar! 3.1",
+            "name": "Torpedo",
+            "description": "A single-shot projectile rendered as a point on the PDP-1 CRT display."
+        }
+    },
+    {
+        "kind": 30051,
+        "tags": [
+            [
+                "d",
+                "spacewar:central-star"
+            ],
+            [
+                "entity",
+                "<gravity_source_id>",
+                "gravity-source"
+            ],
+            [
+                "game",
+                "spacewar"
+            ]
+        ],
+        "content": {
+            "game": "Spacewar! 3.1",
+            "name": "Central Star",
+            "description": "A fixed gravitational source at the center of the playing field, rendered as a dotted circle on the PDP-1 CRT display."
+        }
+    }
+]

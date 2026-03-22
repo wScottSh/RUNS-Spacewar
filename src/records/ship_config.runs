@@ -1,0 +1,40 @@
+# spacewar:ship_config — Ship Identity Data
+#
+# Internal Record populated at build time from AEMS Manifestations.
+# Contains identity-defining properties (visual appearance) compiled
+# from the Manifestation layer into RUNS Record initial values.
+#
+# Source: 02_record_definitions.md § spacewar:ship_config
+# AEMS source: 03_aems_layer.md §§ Needle, Wedge Manifestations
+
+record spacewar:ship_config
+  scope:     internal
+  instances: 2
+
+  fields:
+
+    outline_data:                 spacewar:outline_word[]
+      # Ship outline drawing instructions.
+      #
+      # Ship 1 (Needle), from ot1 (L1338-1345):
+      #   111131 111111 111111 111163 311111 146111 111114 700000
+      #
+      # Ship 2 (Wedge), from ot2 (L1348-1355):
+      #   013113 113111 116313 131111 161151 111633 365114 700000
+      #
+      # Each word is 6 three-bit direction codes read right-to-left:
+      #   0 = draw NE    3 = draw SE    6 = store checkpoint
+      #   1 = draw NW    4 = draw SW    7 = return to checkpoint
+      #   2 = draw N     5 = draw S
+      # 700000₈ = terminator.
+      #
+      # The runtime implements an outline renderer that interprets
+      # these codes relative to the ship's current heading (using
+      # rotation matrix components derived from sin/cos of the angle).
+      #
+      # See 04_conversion_phases.md Phase 7 for full outline format
+      # documentation.
+
+    player_id:                    int
+      # 0 = ship 1 (Needle), 1 = ship 2 (Wedge).
+      default: 0

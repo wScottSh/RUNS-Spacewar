@@ -1,0 +1,68 @@
+# spacewar:render_object — Outbound Render Projection
+#
+# Outbound boundary Record: game logic produces AFTER each tick.
+# The runtime reads these to draw the frame.
+#
+# This is a data projection, NOT raw entity state. The
+# build_render_list Processor (Phase 5) reads internal state and
+# produces this minimal rendering instruction set. Rendering
+# decisions never flow back into game state.
+#
+# Source: 02_record_definitions.md § spacewar:render_object
+# Library analogue: extends runs:render_transform
+
+record spacewar:render_object
+  scope:            outbound boundary
+  instances:        variable        # up to 24 entities + 478 stars + 1 central star
+  library_analogue: extends runs:render_transform
+
+  fields:
+
+    object_type:                  spacewar:render_type
+      # Enum: ship, torpedo, explosion, star, central_star.
+      # Determines which other fields are meaningful.
+      default: ship
+
+    position_x:                   spacewar:fixed18
+      # Game coordinates. Origin center, Y-up, ±512 range.
+      # For entities: from nx1[i]. For stars: from mark X macro.
+      default: 0
+
+    position_y:                   spacewar:fixed18
+      # For entities: from ny1[i]. For stars: from mark Y macro.
+      default: 0
+
+    angle:                        spacewar:fixed18
+      # Ship heading. Only meaningful when object_type == ship.
+      # From nth[i]. Used by runtime for outline rotation.
+      default: 0
+
+    outline_data:                 spacewar:outline_word[]
+      # Ship shape data. Only meaningful when object_type == ship.
+      # Array of octal words; 700000₈ = terminator.
+      # From ship_config via AEMS Manifestation.
+
+    brightness:                   int
+      # Star brightness tier. Only meaningful when object_type == star.
+      # 1 = brightest (9 stars), 4 = dimmest (377 stars).
+      # 0 for non-star types.
+      default: 0
+
+    particle_seed:                spacewar:fixed18
+      # PRNG state at start of particle generation.
+      # Only meaningful when object_type == explosion.
+      # The runtime reproduces exact particle positions by running
+      # the PRNG from this seed.
+      default: 0
+
+    particle_count:               int
+      # Number of explosion particles.
+      # Only meaningful when object_type == explosion.
+      # From the scale loop at L961: sub (140.
+      default: 0
+
+    flame_length:                 int
+      # Exhaust flame length. Only meaningful when object_type == ship.
+      # 0 if not thrusting.
+      # From \src random count (L1218) when thrust is active.
+      default: 0

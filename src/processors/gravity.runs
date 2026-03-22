@@ -1,0 +1,96 @@
+# spacewar:gravity — Central Star Gravity + Star Capture
+#
+# Computes gravitational acceleration toward origin.
+# Also handles star capture: if r² ≤ capture_radius, the ship
+# either explodes or teleports (depending on SW5).
+#
+# Source: L1120-1166 (gravity computation)
+#         L1312-1333 (pof — star capture handling)
+
+processor spacewar:gravity
+  inputs:
+    object:   spacewar:object
+    config:   spacewar:game_config
+    consts:   spacewar:game_constants
+  outputs:
+    object:       spacewar:object
+    gravity_x:    spacewar:fixed18    # Gravity acceleration (x-axis)
+    gravity_y:    spacewar:fixed18    # Gravity acceleration (y-axis)
+    captured:     bool                # Whether the ship was captured by star
+
+  captured = false
+
+  # --- SW6: disable gravity ---
+  # Source: L1122-1123: szs 60; jmp bsg
+  if config.disable_gravity:
+    gravity_x = 0
+    gravity_y = 0
+  else:
+    # --- Compute r² ---
+    # Source: L1124-1139
+    # lac i mx1; sar 9s; sar 2s; dac \t1  → x >> 11
+    # jda imp; lac \t1 → (x>>11)² (imp = low-word multiply)
+    # Same for y. Then add, subtract str.
+    let xn = object.position_x >> 11      # L1125-1126: sar 9s; sar 2s
+    let yn = object.position_y >> 11      # L1134-1135: sar 9s; sar 2s
+
+    let x_sq = xn * xn                    # L1128-1129: jda imp; lac \t1
+    let y_sq = yn * yn                    # L1137-1138: jda imp; lac \t1
+    let r_sq = x_sq + y_sq - consts.star_capture_radius  # L1139-1140: add; sub str
+
+    if r_sq <= 0:
+      # --- Star capture (pof, L1312-1333) ---
+      # Source: L1317-1318: dzm i \mdx; dzm i \mdy → zero velocity
+      captured = true
+      object = object with { velocity_x = 0, velocity_y = 0 }
+
+      # SW5: teleport vs explode
+      # Source: L1319-1320: szs 50; jmp po1
+      if config.star_teleport:
+        # Teleport to far corner: (377777₈, 377777₈) = (131071, 131071)
+        # Source: L1321-1323: lac (377777; dac i mx1; dac i my1
+        let far = 0o377777 as spacewar:fixed18
+        object = object with { position_x = far, position_y = far }
+      else:
+        # Explode
+        # Source: L1329-1332: lac (mex 400000; dac i ml1; law i 10; dac i ma1
+        object = object with {
+          state = exploding,
+          collidable = false,
+          lifetime = -8            # law i 10 = octal 10 = decimal 8
+        }
+      gravity_x = 0
+      gravity_y = 0
+    else:
+      # --- Compute gravity magnitude ---
+      # Source: L1143-1153
+      # add str; dac \t1  → restore r² (add back str for sqrt)
+      # jda sqt            → sqrt(r²)
+      # sar 9s             → scale sqrt result
+      # jda mpy; lac \t1   → sqrt(r²) × r² (product is the divisor)
+      # scr 2s             → divide divisor by 4
+      # szs i 20; scr 2s   → SW2 heavy star: divide by another 4
+      let r_sq_full = r_sq + consts.star_capture_radius   # Restore full r²
+      let r = spacewar:sqrt(r_sq_full).root               # sqrt(r²)
+
+      let r_scaled = r >> 9                                # L1146: sar 9s
+      let divisor_raw = spacewar:multiply(r_scaled, r_sq_full)  # L1147-1148
+      var divisor = divisor_raw.low >> 2                   # L1149: scr 2s (div by 4)
+
+      # SW2: heavy star doubles gravity (halves divisor)
+      # Source: L1150-1151: szs i 20; scr 2s
+      if config.heavy_star:
+        divisor = divisor >> 2                              # Another >>2 = x4 gravity
+
+      # Check for zero divisor (would be star capture, already handled)
+      if divisor == 0:
+        gravity_x = 0
+        gravity_y = 0
+      else:
+        # --- Compute gravity vector ---
+        # Source: L1155-1166
+        # Gravity = -position / divisor (attraction toward origin)
+        # lac i mx1; cma; jda idv; lac \t1 → gravity_x = -x / divisor
+        # lac i my1; cma; jda idv; lac \t1 → gravity_y = -y / divisor
+        gravity_x = spacewar:divide(-object.position_x, 0, divisor).quotient
+        gravity_y = spacewar:divide(-object.position_y, 0, divisor).quotient

@@ -1,0 +1,90 @@
+# spacewar:hyperspace_transit — Invisible Transit Phase
+#
+# Ship is invisible and non-collidable during this phase.
+# Counts down timer; on expiry, randomizes position / velocity /
+# angle and transitions to hyperspace_out (breakout phase).
+#
+# Source: L1007-1045 (hp1 routine)
+
+processor spacewar:hyperspace_transit
+  inputs:
+    object:   spacewar:object
+    prng:     spacewar:prng_state
+    consts:   spacewar:game_constants
+  outputs:
+    object:   spacewar:object
+    prng:     spacewar:prng_state
+
+  let pi = 0o311040 as spacewar:fixed18
+
+  # --- Count down transit timer ---
+  # Source: L1013: count i ma1, hp2
+  var life = object.lifetime + 1
+  if life < 0:
+    # Still in transit — no changes except timer
+    object = object with { lifetime = life }
+  else:
+    # --- Transit complete: randomize and transition ---
+    # Source: L1014-1044
+
+    # Transition to breakout phase
+    # Source: L1014-1015: law hp3; dac i ml1
+    var obj = object with { state = hyperspace_out, collidable = true }
+
+    var rng = prng
+
+    # --- Random displacement ---
+    # Source: L1018-1026
+    # random; scr 9s; sir 9s → swap AC↔IO (gives both halves of random)
+    # xct hr1 → shift by hr1 (sar 9s = >>9, so scaled by ±512)
+    # add i mx1; dac i mx1 → add to position_x
+    # swap → IO value
+    # add i my1; dac i my1 → add to position_y
+    let rng1 = spacewar:random(rng.state)
+    rng = rng1 with { state = rng1.state }
+    let disp_x = rng1.value >> consts.hyperspace_displacement_shift  # hr1: sar 9s (>>9)
+    let disp_y = (rng1.value <<< 9) >> consts.hyperspace_displacement_shift  # IO half
+
+    obj = obj with {
+      position_x = obj.position_x + disp_x,
+      position_y = obj.position_y + disp_y
+    }
+
+    # --- Random velocity ---
+    # Source: L1027-1032
+    # random; scr 9s; sir 9s → same AC↔IO split
+    # xct hr2 → sar 4s (>>4, scaled by ±16)
+    # Set as new velocity (replaces, not adds)
+    let rng2 = spacewar:random(rng.state)
+    rng = rng2 with { state = rng2.state }
+    let vel_x = rng2.value >> consts.hyperspace_velocity_shift        # hr2: sar 4s
+    let vel_y = (rng2.value <<< 9) >> consts.hyperspace_velocity_shift
+
+    obj = obj with {
+      velocity_x = vel_x,                         # L1031: dac i \mdy
+      velocity_y = vel_y                           # L1032: dio i \mdx
+    }
+
+    # --- Random angle ---
+    # Source: L1034-1035: lac ran; dac i mth
+    let rng3 = spacewar:random(rng.state)
+    rng = rng3 with { state = rng3.state }
+    var angle = rng3.value
+
+    # --- Normalize angle (3 passes) ---
+    # Source: L1033: setup \hpt,3 → repeat 3 times
+    # L1036-1042: lap i mth; sma; sub (311040; spa; add (311040; dac i mth; count \hpt,hp4
+    repeat 3:
+      if angle > pi:
+        angle = angle - pi
+      if angle < -pi:
+        angle = angle + pi
+
+    obj = obj with { angle = angle }
+
+    # --- Set breakout timer ---
+    # Source: L1043-1044: xct hd2; dac i ma1
+    obj = obj with { lifetime = -consts.hyperspace_breakout_duration }  # hd2 = law i 100₈ = -64
+
+    object = obj
+    prng = rng

@@ -1,0 +1,103 @@
+# spacewar:match_initialize — Full Table Reset and Ship Placement
+#
+# Resets the entire entity table and places ships with full resources.
+# Handles game count logic (finite matches, tie-breaking).
+#
+# Source: L764-828 (label `a` through `jmp ml0`)
+
+processor spacewar:match_initialize
+  inputs:
+    objects:  spacewar:object[]
+    result:   spacewar:match_result
+    config:   spacewar:game_config
+    consts:   spacewar:game_constants
+  outputs:
+    objects:  spacewar:object[]
+    result:   spacewar:match_result
+
+  # --- Game count logic ---
+  # Source: L764-772
+  # lac \gct; sma; jmp a5  → if game_count <= 0, skip (infinite play)
+  # count \gct, a5         → decrement, if still > 0 continue
+  # lac \1sc; sas \2sc; jmp a4 → if scores differ, game over
+  # law i 1; dac \gct      → if tied, force one more round
+  var rounds = result.rounds_remaining
+  var game_over = false
+
+  if rounds > 0:
+    rounds = rounds - 1
+    if rounds == 0:
+      # Rounds exhausted — check for tie
+      if result.score_1 == result.score_2:
+        rounds = 1                           # Tie-breaker round
+      else:
+        game_over = true
+
+  if game_over:
+    result = result with {
+      state = match_over,
+      rounds_remaining = 0
+    }
+  else:
+    result = result with {
+      state = playing,
+      rounds_remaining = rounds,
+      restart_timer = 0
+    }
+
+    # --- Clear entity table ---
+    # Source: L792: clear mtb, nnn-1
+    var objs = objects
+    for i from 0 to 23:
+      objs[i] = objs[i] with {
+        state = empty,
+        collidable = false,
+        position_x = 0,
+        position_y = 0,
+        velocity_x = 0,
+        velocity_y = 0,
+        angular_velocity = 0,
+        angle = 0,
+        lifetime = 0,
+        fuel = 0,
+        torpedoes = 0,
+        outline_ref = 0,
+        prev_controls = 0,
+        hyperspace_saved_state = empty,
+        hyperspace_shots_remaining = 0,
+        hyperspace_recharge_timer = 0,
+        hyperspace_uncertainty_acc = 0
+      }
+
+    # --- Place Ship 1 (Needle) ---
+    # Source: L793-804
+    let init_pos = 0o200000 as spacewar:fixed18     # 65536
+    let init_angle = 0o144420 as spacewar:fixed18   # 51472
+
+    objs[0] = objs[0] with {
+      state = ship,
+      collidable = true,
+      position_x = init_pos,                        # L798: dac nx1
+      position_y = init_pos,                        # L799: dac ny1
+      angle = init_angle,                           # L803-804: lac (144420; dac nth
+      outline_ref = 0,                              # Ship config index 0 (Needle)
+      torpedoes = -consts.max_torpedoes,             # L816-818: xct tno; dac ntr
+      fuel = -consts.max_fuel,                       # L819-821: lac foo; dac nfu
+      hyperspace_shots_remaining = -consts.max_hyperspace_shots  # L825-827: xct mhs; dac nh2
+    }
+
+    # --- Place Ship 2 (Wedge) ---
+    # Source: L800-804, same resources
+    objs[1] = objs[1] with {
+      state = ship,
+      collidable = true,
+      position_x = -init_pos,                       # L800-801: cma; dac nx1 1
+      position_y = -init_pos,                       # L802: dac ny1 1
+      angle = init_angle,                           # Same angle as ship 1
+      outline_ref = 1,                              # Ship config index 1 (Wedge)
+      torpedoes = -consts.max_torpedoes,
+      fuel = -consts.max_fuel,
+      hyperspace_shots_remaining = -consts.max_hyperspace_shots
+    }
+
+    objects = objs

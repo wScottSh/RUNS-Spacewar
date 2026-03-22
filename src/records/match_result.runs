@@ -1,0 +1,40 @@
+# spacewar:match_result — Match State and Scores
+#
+# Outbound boundary Record: game logic produces AFTER each tick.
+#
+# Source: 02_record_definitions.md § spacewar:match_result
+
+record spacewar:match_result
+  scope:     outbound boundary
+  instances: 1
+
+  fields:
+
+    state:                        spacewar:match_lifecycle
+      # Current lifecycle state.
+      # Source: derived from L717-791 state machine.
+      default: playing
+
+    score_1:                      int
+      # Player 1 score.
+      # Source: \1sc (L746, L768, L777, L784).
+      # Incremented when ship 1 survives a round.
+      default: 0
+
+    score_2:                      int
+      # Player 2 score.
+      # Source: \2sc (L752, L769, L778, L785).
+      default: 0
+
+    rounds_remaining:             int
+      # Games left in match.
+      # Source: \gct (L764, L767, L772, L791).
+      # Initialized from game_config.game_count.
+      # 0 = infinite play.
+      default: 0
+
+    restart_timer:                int
+      # Frames until next round begins. 0 if not in countdown.
+      # Source: \ntd (L735, L738).
+      # Set to 2 × torpedo_lifetime on round end.
+      default: 0

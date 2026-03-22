@@ -1,0 +1,157 @@
+# spacewar:object — Core Entity Record
+#
+# The central data structure of Spacewar! 3.1. Represents every
+# game entity: ships, torpedoes, and explosions.
+#
+# Derived from the parallel-array entity table at L665-715.
+# The PDP-1 source uses parallel arrays starting at `mtb` (L1365),
+# with 24 slots (nob = 30 octal = 24 decimal) per array.
+#
+# Source: 02_record_definitions.md § spacewar:object
+# Cross-reference: 01_source_concordance.md § Entity Table Memory Layout
+
+record spacewar:object
+  scope:     internal
+  instances: 24
+
+  fields:
+
+    # ── Core State (all 24 slots) ────────────────────────────────
+
+    state:                        spacewar:object_state
+      # Source: mtb[i] — calc routine address determines state.
+      # See enums/object_state.runs for the mapping.
+      # Default: empty
+      default: empty
+
+    collidable:                   bool
+      # Derived from state: true for ship, torpedo, hyperspace_out.
+      # False for exploding, hyperspace_in, empty.
+      # Source: sign bit (400000₈) on calc routine address.
+      #   400000₈ set = non-collidable.
+      # Default: false
+      default: false
+
+    position_x:                   spacewar:fixed18
+      # Source: nx1[i] (L668-669). Binary point right of bit 17 (integer).
+      # PDP-1 display coordinates: origin center, toroidal wrap at ±512.
+      # Init ship 1: 200000₈ = 65536₁₀ (L798)
+      # Init ship 2: complement of 200000₈ (L800-801)
+      default: 0
+
+    position_y:                   spacewar:fixed18
+      # Source: ny1[i] (L670-672). Same scale as position_x.
+      # Init ship 1: 200000₈ (L799)
+      # Init ship 2: complement of 200000₈ (L802)
+      default: 0
+
+    velocity_x:                   spacewar:fixed18
+      # Source: ndx[i] (L680-681). Same integer scale as position.
+      # Added to position_x each frame via diff macro.
+      default: 0
+
+    velocity_y:                   spacewar:fixed18
+      # Source: ndy[i] (L682-684). Same integer scale as position.
+      default: 0
+
+    lifetime:                     int
+      # Source: na1[i] (L674-675).
+      # Multi-purpose countdown timer:
+      #   Torpedoes:   initialized from tlf (96 frames), counts to 0.
+      #   Explosions:  computed from mb1 instruction budget sum.
+      #   Ships:       re-used as torpedo reload timer.
+      #   Hyperspace:  entry delay (hd1) then breakout duration (hd2).
+      # Counts via `count i ma1` macro (isp: increment, skip if positive).
+      default: 0
+
+    # ── Ship-Only Fields (2-wide arrays, slots 0-1 only) ─────────
+    #
+    # In the PDP-1 source, these arrays are only 2 elements wide
+    # (L686-714 use `add (2` instead of `add (nob`). Only ship 1
+    # (slot 0) and ship 2 (slot 1) use these fields meaningfully.
+    # For non-ship entities, these fields are undefined in the
+    # original. In RUNS, they exist on all 24 slots but are only
+    # read/written by Processors when state == ship.
+
+    angular_velocity:             spacewar:fixed18
+      # Source: nom[i] (L686-687). Binary point right of bit 3.
+      # Added to angle each frame. Modified by rotation input.
+      # SW1 (angular_damping) zeroes this each frame when set.
+      default: 0
+
+    angle:                        spacewar:fixed18
+      # Source: nth[i] (L689-690). Binary point right of bit 3.
+      # Ship heading in angle units. ±π range via normalization
+      # (±311040₈ = ±102944₁₀).
+      # Init: 144420₈ = 51472₁₀ (L803-804) for both ships.
+      default: 0
+
+    fuel:                         int
+      # Source: nfu[i] (L692-693).
+      # Counts UP from max_fuel (-8192) toward 0 via `count i \mfu`.
+      # When fuel >= 0 (ones-complement): exhausted, thrust disabled.
+      # Init: foo = -8192 (L819-821).
+      #
+      # EDGE CASE: count-around prevention. After the count macro
+      # fires (fuel just became >= 0), the code does NOT zero fuel.
+      # But thrust checks `sad i \mfu` (L1170) which catches fuel = 0.
+      default: 0
+
+    torpedoes:                    int
+      # Source: ntr[i] (L695-696).
+      # Counts UP from -max_torpedoes (-33) toward 0.
+      # When torpedoes >= 0: exhausted, can't fire.
+      # Init: tno value = -33 (L816-818).
+      #
+      # EDGE CASE: count-around prevention via `dzm i \mtr` at L1243.
+      # After the count fires (torpedoes just became >= 0), the counter
+      # is immediately zeroed to prevent it from incrementing further.
+      default: 0
+
+    outline_ref:                  int
+      # Source: not[i] (L698-699).
+      # In PDP-1: pointer to compiled outline display code.
+      # In RUNS: reference to spacewar:ship_config Record (0 or 1).
+      # Populated during initialization from AEMS Manifestation data.
+      default: 0
+
+    prev_controls:                int
+      # Source: nco[i] (L701-702).
+      # Previous frame's control word. Used for edge detection:
+      #   Torpedo fire: XOR current with prev, test fire bit (L1238-1240).
+      #   Hyperspace:   XOR current with prev, test both rotate bits (L1294-1298).
+      # Only meaningful for ships.
+      default: 0
+
+    hyperspace_saved_state:       spacewar:object_state
+      # Source: nh1[i] (L704-705).
+      # The ship's state before entering hyperspace. Restored on breakout
+      # (L1052: `lac i \mh1; dac i ml1`).
+      # Only meaningful for ships.
+      default: empty
+
+    hyperspace_shots_remaining:   int
+      # Source: nh2[i] (L706-708).
+      # Decremented each hyperspace use. When 0: no more hyperspace.
+      # Init: mhs = 8 (L825-827).
+      #
+      # EDGE CASE: count-around prevention via `dzm i \mh2` at L1057.
+      default: 0
+
+    hyperspace_recharge_timer:    int
+      # Source: nh3[i] (L710-711).
+      # Frames until hyperspace can be used again.
+      # Set to hd3 = 128 on each hyperspace use (L1059-1060).
+      # Counts toward 0 via `count i \mh3` at L1289.
+      #
+      # EDGE CASE: count-around prevention via `dzm i \mh3` at L1290.
+      default: 0
+
+    hyperspace_uncertainty_acc:   int
+      # Source: nh4[i] (L712-714).
+      # Accumulates uncertainty each hyperspace use.
+      # Incremented by hur = 16384 (L1061-1063).
+      # Used in death check: `random | 400000 + \mh4` — if result >= 0,
+      # the ship explodes instead of returning (L1064-1068).
+      # Higher accumulator = more likely death. After ~4 uses, certain death.
+      default: 0

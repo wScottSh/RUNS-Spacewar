@@ -1,0 +1,53 @@
+# spacewar:player_controls — Player Input Intent
+#
+# Inbound boundary Record: runtime provides BEFORE each game tick.
+# Two instances: one per player.
+#
+# Source: 02_record_definitions.md § spacewar:player_controls
+# Library analogue: extends runs:input_intent (spacewar-specific shape)
+#
+# The original PDP-1 reads a 4-bit control word per player via
+# `iot 11` (L834) or `lat` test word (L838). The hyperspace input
+# is chord-detected (both rotate bits) in the original; here it
+# is a separate boolean — the runtime maps the chord or a dedicated
+# button to this field.
+
+record spacewar:player_controls
+  scope:            inbound boundary
+  instances:        2
+  library_analogue: extends runs:input_intent
+
+  fields:
+
+    rotate_ccw:                   bool
+      # Turning left (counterclockwise).
+      # PDP-1: bit 0 of control word (high-order 4 bits).
+      default: false
+
+    rotate_cw:                    bool
+      # Turning right (clockwise).
+      # PDP-1: bit 1 of control word.
+      default: false
+
+    thrust:                       bool
+      # Engine firing.
+      # PDP-1: bit 2 of control word (L100: "fire rocket").
+      default: false
+
+    fire:                         bool
+      # Torpedo launch (edge-detected: fires on press, not hold).
+      # PDP-1: bit 3 of control word (L101: "fire torpedo").
+      default: false
+
+    hyperspace:                   bool
+      # Hyperspace entry intent.
+      # PDP-1: both rotate bits set simultaneously (chord at L1294-1298).
+      # In RUNS: a dedicated boolean. The runtime maps the chord
+      # (or a dedicated button like N64 Z-trigger) to this field.
+      # Game logic reads intent, not buttons.
+      #
+      # Platform implementations:
+      #   PDP-1:  both rotate bits in control word
+      #   Web:    dedicated key (e.g., Shift) or both rotate keys
+      #   N64:    Z-trigger
+      default: false

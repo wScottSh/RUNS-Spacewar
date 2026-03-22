@@ -1,0 +1,81 @@
+# spacewar:game_config — Runtime Configuration (Sense Switches)
+#
+# Inbound boundary Record: runtime provides BEFORE each game tick.
+# Maps the PDP-1's six sense switches to named boolean Fields.
+#
+# PDP-1 sense switch semantics:
+#   `szs A`   = skip if switch A IS set
+#   `szs i A` = skip if switch A is NOT set (inverted sense)
+#
+# Boolean polarity convention: `true` means the gameplay effect
+# described in the Field name is ACTIVE.
+
+record spacewar:game_config
+  scope:     inbound boundary
+  instances: 1
+
+  fields:
+
+    angular_damping:              bool
+      # PDP-1: SW1 — `szs 10` at L1101 (in sr0 rotation calc)
+      # Effect when true: zeroes angular velocity each frame.
+      # Ships stop rotating immediately upon releasing the button
+      # instead of drifting.
+      # Polarity: SW1 set → angular_damping = true
+      default: false
+
+    heavy_star:                   bool
+      # PDP-1: SW2 — `szs i 20` at L1150 (in gravity calc)
+      # NOTE: inverted sense instruction! `szs i 20` = skip if NOT set.
+      # Effect when true: doubles gravity effect by applying extra
+      # `scr 2s` (shift count right 2) to the gravity divisor.
+      # Polarity: SW2 set → heavy_star = true
+      default: false
+
+    rapid_fire:                   bool
+      # PDP-1: SW3 — `szs i 30` at L1236 (in torpedo launch)
+      # NOTE: inverted sense instruction!
+      # Effect when true: allows re-firing before the reload timer
+      # expires. Achieved by complementing the AND mask (`clc`),
+      # which inverts the "not yet reloaded" check.
+      # Polarity: SW3 set → rapid_fire = true
+      default: false
+
+    disable_background:           bool
+      # PDP-1: SW4 — `szs 40` at L630 (in bck background routine)
+      # Effect when true: disables the Expensive Planetarium display
+      # entirely. Stars are not rendered. Does NOT affect gravity.
+      # Polarity: SW4 set → disable_background = true
+      default: false
+
+    star_teleport:                bool
+      # PDP-1: SW5 — `szs 50` at L1319 (in pof star capture)
+      # Effect when true: ships dragged into the central star are
+      # teleported to far corner (377777, 377777) instead of exploding.
+      # Velocity is zeroed on teleport.
+      # Polarity: SW5 set → star_teleport = true
+      default: false
+
+    disable_gravity:              bool
+      # PDP-1: SW6 — `szs 60` at L523 (blp star display) and
+      #                         L1122 (gravity calc)
+      # Effect when true: disables BOTH the central star's gravity
+      # AND the background starfield display entirely.
+      # Polarity: SW6 set → disable_gravity = true
+      default: false
+
+    game_count:                   int
+      # Source: operator panel test word, extracted at L786-791:
+      #   lat          — load test word into AC
+      #   rar 6s       — rotate right 6 (isolate bits 6-11)
+      #   and (37      — mask to 5 bits (octal 37 = decimal 31)
+      #   sza          — if zero, skip complement
+      #   cma          — complement: store as negative for countdown
+      #   dac \gct     — store in game count register
+      #
+      # Resulting valid range: 0 (infinite play) or 1-31 (match length).
+      # When non-zero, the value is stored as its ones-complement
+      # negative and counted UP toward 0 via `isp`. Each round
+      # decrements the count. When it reaches 0 and scores are tied,
+      # one extra round is forced (L771-772: `law i 1; dac \gct`).
+      default: 0

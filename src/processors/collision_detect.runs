@@ -1,0 +1,84 @@
+# spacewar:collision_detect — Diamond-Shaped Collision Detection
+#
+# Pairwise Manhattan-distance collision check between all collidable
+# entities. Uses a DIAMOND hitbox, NOT circular — this is original
+# Spacewar! behavior and must be preserved.
+#
+# Source: L868-904 (collision loop within main dispatch)
+
+processor spacewar:collision_detect
+  inputs:
+    objects:  spacewar:object[]          # All 24 entity slots
+    consts:   spacewar:game_constants
+  outputs:
+    objects:  spacewar:object[]          # Updated with collision state transitions
+
+  let collision_radius = consts.collision_radius        # me1 = 3072
+  let collision_radius_half = consts.collision_radius_half  # me2 = 1536
+
+  var objs = objects
+
+  # Pairwise comparison: for each pair (i, j) where i < j
+  # Source: L843-903 — the outer loop iterates entity i, inner loop
+  # iterates j > i via the index macro.
+  for i from 0 to 23:
+    if objs[i].collidable:
+      for j from i + 1 to 23:
+        if objs[j].collidable:
+          # --- Diamond hitbox check ---
+          # Source: L870-888
+
+          # Check 1: |dx| < me1
+          # Source: L870-877: lac mx1; sub mx2; spa; cma; dac \mt1; sub me1; sma; jmp mq2
+          let dx = objs[i].position_x - objs[j].position_x
+          let adx = abs(dx)
+          if adx < collision_radius:
+
+            # Check 2: |dy| < me1
+            # Source: L878-884: lac my1; sub my2; spa; cma; sub me1; sma; jmp mq2
+            let dy = objs[i].position_y - objs[j].position_y
+            let ady = abs(dy)
+            if ady < collision_radius:
+
+              # Check 3: |dx| + |dy| < me2 (Manhattan distance, diamond)
+              # Source: L885-888: add \mt1; sub me2; sma; jmp mq2
+              # NOTE: the add at L885 adds \mt1 (which is |dx|) to what's
+              # left in AC. AC = ady - me1 (from check 2). So:
+              # AC = (ady - me1) + adx. Then sub me2.
+              # This is: adx + ady - me1 - me2. If < 0: collision.
+              # Equivalent to: adx + ady < me1 + me2 = 3072 + 1536 = 4608.
+              #
+              # Wait — re-reading: after L882 (sub me1), AC = ady - me1.
+              # L884 skips if AC >= 0. If we're here, ady - me1 < 0.
+              # L885: add \mt1 → AC = (ady - me1) + adx
+              # L886: sub me2 → AC = adx + ady - me1 - me2
+              # L887: sma → skip if AC < 0 (meaning collision)
+              #
+              # So the full condition is:
+              # adx < me1 AND ady < me1 AND (adx + ady) < (me1 + me2)
+              # = adx < 3072 AND ady < 3072 AND adx + ady < 4608
+              #
+              # This is a diamond (rhombus) inscribed in the square.
+              if adx + ady < collision_radius + collision_radius_half:
+
+                # --- COLLISION! ---
+                # Source: L889-898
+                # Both entities explode.
+                # lac (mex 400000; dac i ml1; dac i ml2 → both → exploding + non-collidable
+                # Explosion duration: -(mb1[i] + mb1[j]) >> 8 + 1
+                # In RUNS: mb1 is the instruction budget (PDP-1 timing artifact).
+                # Use a fixed explosion duration.
+                let explosion_life = -12   # ~12 frames, reasonable default
+
+                objs[i] = objs[i] with {
+                  state = exploding,
+                  collidable = false,
+                  lifetime = explosion_life
+                }
+                objs[j] = objs[j] with {
+                  state = exploding,
+                  collidable = false,
+                  lifetime = explosion_life
+                }
+
+  objects = objs

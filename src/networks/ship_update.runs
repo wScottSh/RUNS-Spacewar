@@ -1,0 +1,50 @@
+# spacewar:ship_update — Ship Per-Frame Update Pipeline
+#
+# Sub-Network bundling the sequential ship update chain.
+# Each Processor's output feeds the next. This pipeline runs
+# once per ship per frame (slot 0 then slot 1).
+#
+# Source: L1079-1309 (ss1/ss2 → sr0 → ... → srt)
+
+network spacewar:ship_update
+  inputs:
+    object:     spacewar:object
+    controls:   spacewar:player_controls
+    config:     spacewar:game_config
+    consts:     spacewar:game_constants
+    prng:       spacewar:prng_state
+  outputs:
+    object:       spacewar:object
+    prng:         spacewar:prng_state
+    spawn_request: spacewar:spawn_request     # Torpedo spawn intent (if any)
+    flame_length:  int                        # For render: exhaust length
+
+  phases:
+    # 1. Rotation: read controls → update angular_velocity, angle, trig cache
+    - processor: spacewar:rotation_update(object, controls, config, consts)
+      binds:
+        sin_heading: .sin_heading
+        cos_heading: .cos_heading
+        thrust_enabled: .thrust_enabled
+
+    # 2. Gravity: compute gravitational pull toward origin (or handle star capture)
+    - processor: spacewar:gravity(object, config, consts)
+      binds:
+        gravity_x: .gravity_x
+        gravity_y: .gravity_y
+
+    # 3. Thrust + integration: apply engine thrust + gravity → velocity → position
+    - processor: spacewar:thrust(object, sin_heading, cos_heading, gravity_x, gravity_y, thrust_enabled, consts)
+      binds:
+        flame_length: .flame_length
+
+    # 4. Wrap: toroidal position wrapping (explicit PDP-1 overflow)
+    - processor: spacewar:wrap_position(object.position_x, object.position_y)
+
+    # 5. Torpedo: check fire intent, edge-detect, ammo, spawn request
+    - processor: spacewar:torpedo_launch(object, controls, config, consts, sin_heading, cos_heading)
+      binds:
+        spawn_request: .spawn_torpedo ? spawn_request : null
+
+    # 6. Hyperspace: check entry intent (chord / dedicated button)
+    - processor: spacewar:hyperspace_check(object, controls)

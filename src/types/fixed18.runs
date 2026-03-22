@@ -1,0 +1,95 @@
+# spacewar:fixed18 — 18-bit Ones-Complement Fixed-Point Type
+#
+# The PDP-1 uses 18-bit ones-complement arithmetic. All position, velocity,
+# angle, and scale values in Spacewar! 3.1 use this representation.
+# This type captures the exact semantics that any compliant runtime must
+# reproduce.
+
+type spacewar:fixed18
+  width:    18
+  encoding: ones-complement
+  range:    -131071 to +131071    # -(2^17 - 1) to +(2^17 - 1)
+
+  # Two zero representations:
+  #   +0 = 000000 (octal)
+  #   -0 = 777777 (octal)
+
+
+# ── Negative-Zero Rules ──────────────────────────────────────────────
+#
+# The PDP-1 handles negative zero (-0 = 777777) differently across
+# operations. Every RUNS runtime implementing spacewar:fixed18 must
+# reproduce these semantics exactly.
+
+  negative_zero_rules:
+
+    cma:    # complement accumulator
+      # +0 → -0 (bitwise NOT of 000000 = 777777)
+      # -0 → +0
+
+    sma:    # skip if minus (sign bit set)
+      # -0 SKIPS — sign bit (bit 0) is set in -0
+
+    spa:    # skip if positive (sign bit clear)
+      # -0 does NOT skip — sign bit is set
+
+    add:    # addition
+      # Result normalized: -0 + X = X
+      # PDP-1 hardware normalizes -0 on add
+
+    sub:    # subtraction
+      # NOT normalized: (-0) - (+0) = -0
+      # PDP-1 subtract does not normalize
+
+    mpy_dvd:  # multiply and divide
+      # Result normalized
+      # PDP-1 hardware normalizes on multiply/divide
+
+    sza:    # skip if zero
+      # Skips for BOTH +0 and -0
+      # Tests magnitude bits only
+
+  # Sentinel note: the constant `ddd` (L87, value -0) is used at
+  # L808-809 as: `lio ddd; spi i` — tests if IO register is negative
+  # zero to control outline compiler branching.
+
+
+# ── Binary Point Convention ──────────────────────────────────────────
+#
+# The binary point position is context-dependent. The PDP-1 has no
+# floating-point unit; programmers use shift instructions to position
+# the binary point as needed for each operation.
+
+  binary_point_conventions:
+
+    sin_cos_argument:
+      position: right of bit 3
+      source:   "L192 comment: binary point to right of bit 3"
+
+    sin_cos_result:
+      position: right of bit 0
+      source:   "L193 comment: binary point to right of bit 0"
+
+    position_xy:
+      position: right of bit 17 (integer)
+      source:   "coordinates are 10-bit integers in ±512 range"
+
+    velocity_dxdy:
+      position: right of bit 17
+      source:   "same integer scale as position (added directly)"
+
+    angle_theta:
+      position: right of bit 3
+      source:   "same scale as sin/cos argument"
+
+    angular_velocity:
+      position: right of bit 3
+      source:   "added directly to angle"
+
+    sqrt_input:
+      position: right of bit 17
+      source:   "L305 comment: binary point to right of bit 17"
+
+    sqrt_result:
+      position: between bits 8 and 9
+      source:   "L306 comment: binary point between bits 8 and 9"

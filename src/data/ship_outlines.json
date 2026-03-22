@@ -1,0 +1,30 @@
+{
+    "needle": {
+        "source": "ot1 (L1338-1345)",
+        "words": [
+            "111131",
+            "111111",
+            "111111",
+            "111163",
+            "311111",
+            "146111",
+            "111114",
+            "700000"
+        ],
+        "notes": "Each word is octal. 700000 terminates. Designed by Steve Russell to evoke the PGM-11 Redstone missile."
+    },
+    "wedge": {
+        "source": "ot2 (L1348-1355)",
+        "words": [
+            "013113",
+            "113111",
+            "116313",
+            "131111",
+            "161151",
+            "111633",
+            "365114",
+            "700000"
+        ],
+        "notes": "Each word is octal. 700000 terminates. Designed by Steve Russell, inspired by Buck Rogers spaceship designs."
+    }
+}

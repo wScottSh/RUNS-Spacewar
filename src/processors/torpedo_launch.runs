@@ -1,0 +1,87 @@
+# spacewar:torpedo_launch — Torpedo Fire Intent
+#
+# Edge-detects the fire button, checks reload timer and ammo,
+# and produces a spawn request if all conditions are met.
+# Actual entity creation is handled by Phase 5's process_spawns.
+#
+# Source: L1232-1244 (sq9 through st1)
+
+processor spacewar:torpedo_launch
+  inputs:
+    object:       spacewar:object
+    controls:     spacewar:player_controls
+    config:       spacewar:game_config
+    consts:       spacewar:game_constants
+    sin_heading:  spacewar:fixed18       # From rotation_update
+    cos_heading:  spacewar:fixed18       # From rotation_update
+  outputs:
+    object:         spacewar:object
+    spawn_torpedo:  bool                 # Whether to spawn a torpedo
+    spawn_x:        spacewar:fixed18     # Torpedo spawn position (ship nose)
+    spawn_y:        spacewar:fixed18
+    spawn_dx:       spacewar:fixed18     # Torpedo velocity (heading + inherited)
+    spawn_dy:       spacewar:fixed18
+    reload_time:    int                  # Reload timer value to set
+
+  spawn_torpedo = false
+
+  # --- Check reload timer ---
+  # Source: L1232-1233: count i ma1, sr5; dzm i ma1
+  # The lifetime field is re-used as reload timer for ships.
+  var reload = object.lifetime + 1
+  if reload >= 0:
+    reload = 0                           # Count-around prevention (L1233: dzm i ma1)
+  object = object with { lifetime = reload }
+
+  # If still reloading and NOT rapid fire, skip
+  # Source: L1236-1237: szs i 30; clc — SW3 inverts the reload check
+  let reloaded = reload >= 0 or config.rapid_fire
+
+  if not reloaded:
+    # Still reloading, no fire possible
+  else:
+    # --- Edge detect fire button ---
+    # Source: L1234-1240
+    # lac mco (prev controls); cma; and \scw (current); ral 3s; sma
+    # Fire only on PRESS (transition from not-pressed to pressed).
+    # In RUNS: the runtime provides the current state. We compare
+    # with prev_controls stored on the object.
+    let fire_pressed = controls.fire           # Current frame
+    # Edge detection would compare with prev_controls, but in RUNS
+    # the controls Record provides intent per-frame. The runtime
+    # is responsible for edge detection (fire = true only on press frame).
+
+    if fire_pressed:
+      # --- Check ammo ---
+      # Source: L1242-1244: count i \mtr, st1; dzm i \mtr; jmp sr5
+      var torps = object.torpedoes + 1
+      if torps >= 0:
+        torps = 0                        # Count-around prevention (L1243)
+        # Torpedoes exhausted — cannot fire
+        object = object with { torpedoes = torps }
+      else:
+        # --- Fire torpedo! ---
+        object = object with { torpedoes = torps }
+
+        spawn_torpedo = true
+
+        # Source: L1260-1264: torpedo position = ship nose (\stx, \sty)
+        # Ship nose = position + 2× (sin, cos) offset
+        # L1191-1199: sub \ssn; dac \sx1; sub \ssn; dac \stx (nose is 2× further)
+        # \ssn = sin >> 5 (from scale at L1187)
+        let sin_offset = sin_heading >> 5
+        let cos_offset = cos_heading >> 5
+        spawn_x = object.position_x - sin_offset - sin_offset   # Nose X
+        spawn_y = object.position_y + cos_offset + cos_offset   # Nose Y
+
+        # Source: L1274-1282: torpedo velocity = heading × tvl + ship velocity
+        # lac \sn; xct tvl → sin >> tvl_shift
+        # cma; add i \mdx  → -sin component + ship velocity_x
+        let torp_speed_x = -(sin_heading >> consts.torpedo_velocity_shift)
+        let torp_speed_y = cos_heading >> consts.torpedo_velocity_shift
+        spawn_dx = torp_speed_x + object.velocity_x   # L1277: add i \mdx
+        spawn_dy = torp_speed_y + object.velocity_y   # L1281: add i \mdy
+
+        # Set reload timer
+        # Source: L1283-1284: xct rlt; dac i ma1
+        reload_time = -consts.torpedo_reload_time

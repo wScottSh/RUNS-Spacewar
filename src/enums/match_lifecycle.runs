@@ -1,0 +1,10 @@
+# spacewar:match_lifecycle — Match State Enum
+#
+# The game lifecycle state machine derived from L717-791.
+
+enum spacewar:match_lifecycle
+  playing               # Normal gameplay. Ships active, torpedoes flying.
+  restart_countdown     # Round ended. Counting down restart_timer (L735: \ntd).
+                        # Timer = 2 × torpedo_lifetime.
+  round_over            # Restart timer expired. Scoring in progress (L738-754).
+  match_over            # All rounds played. Scores displayed (L777-779: hlt).

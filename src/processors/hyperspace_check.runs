@@ -1,0 +1,46 @@
+# spacewar:hyperspace_check — Hyperspace Entry Intent Detection
+#
+# Detects hyperspace entry (both rotate buttons simultaneously),
+# checks recharge and ammo, transitions to hyperspace_in state.
+#
+# Source: L1289-1309 (sr5 through st3)
+# In original: chord detection via both rotate bits in control word.
+# In RUNS: the runtime maps chord/dedicated button to controls.hyperspace.
+
+processor spacewar:hyperspace_check
+  inputs:
+    object:     spacewar:object
+    controls:   spacewar:player_controls
+  outputs:
+    object:     spacewar:object
+
+  # --- Check recharge timer ---
+  # Source: L1289-1290: count i \mh3, st3; dzm i \mh3
+  var recharge = object.hyperspace_recharge_timer + 1
+  if recharge >= 0:
+    recharge = 0                         # Count-around prevention (L1290)
+  object = object with { hyperspace_recharge_timer = recharge }
+
+  # If still cooling down, no hyperspace entry
+  if recharge < 0:
+    # Still recharging — exit
+  else:
+    # --- Check shots remaining ---
+    # Source: L1291-1293: lac i \mh2; sza i; jmp st3
+    if object.hyperspace_shots_remaining == 0:
+      # No shots left — exit
+    else:
+      # --- Detect hyperspace intent ---
+      # Source: L1294-1298 (original uses chord detection):
+      #   lac \scw; cma; ior i mco; and (600000; sza; jmp st3
+      # In RUNS: the controls.hyperspace boolean handles this.
+      if controls.hyperspace:
+        # --- Enter hyperspace! ---
+        # Source: L1300-1307
+        # Save current state, transition to hyperspace_in
+        object = object with {
+          hyperspace_saved_state = object.state,   # L1300-1301: lac i ml1; dac i \mh1
+          state = hyperspace_in,                   # L1302-1303: lac (hp1 400000; dac i ml1
+          collidable = false,                      # 400000₈ = non-collidable flag
+          lifetime = -32                           # L1304-1305: xct hd1; dac i ma1 (hd1 = law i 40₈ = -32)
+        }

@@ -1,0 +1,31 @@
+# spacewar:tick_input — Frame Timing Input
+#
+# Inbound boundary Record: runtime provides BEFORE each game tick.
+#
+# Source: 02_record_definitions.md § spacewar:tick_input
+# Library analogue: extends runs:delta_time
+
+record spacewar:tick_input
+  scope:            inbound boundary
+  instances:        1
+  library_analogue: extends runs:delta_time
+
+  fields:
+
+    delta_time:                   spacewar:fixed18
+      # Time elapsed since last tick, in game time units.
+      #
+      # For faithful reproduction: use a fixed timestep of 1 game-tick.
+      # The runtime accumulates wall-clock time and fires ticks at the
+      # original PDP-1 cadence.
+      #
+      # PDP-1 timing: L665 sets \mtc = -4000₈ = -2048₁₀ instructions.
+      # At 5µs per instruction = ~10.2ms base. The busy-wait at L940
+      # fills remaining time. Actual frame rate depends on entity count
+      # but is approximately 15 fps (~66ms per frame).
+      #
+      # Platform implementations:
+      #   PDP-1:  implicit — one tick per main loop iteration
+      #   Web:    requestAnimationFrame delta accumulated; fire at fixed intervals
+      #   N64:    V-blank interrupt; count V-blanks, fire at fixed intervals
+      default: 1

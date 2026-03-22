@@ -1,0 +1,100 @@
+# spacewar:sin — Sine Function (Adams Associates Polynomial)
+#
+# Computes the sine of an 18-bit ones-complement angle.
+# 4th-degree Chebyshev polynomial approximation.
+#
+# Source: L190-254 of spacewar3.1_complete.txt
+# Attribution: Adams Associates sine-cosine subroutine (L190 comment)
+#
+# Argument: binary point to right of bit 3 (angle in ±2π range)
+# Result:   binary point to right of bit 0 (value in ±1.0 range)
+# Time on PDP-1: 2.35ms (L193 comment)
+
+processor spacewar:sin
+  inputs:
+    angle:    spacewar:fixed18     # Angle with binary point right of bit 3
+  outputs:
+    sin:      spacewar:fixed18     # Sine result with binary point right of bit 0
+    cos:      spacewar:fixed18     # Cosine result (also computed; see cos entry)
+
+  # ── Constants ──────────────────────────────────────────────────
+  #
+  # pi_half  = 62210₈  = 25736₁₀   (π/2 in angle units)
+  # pi       = 144420₈ = 51472₁₀   (π in angle units, used for normalization)  [EDIT: 311040₈ = 102944₁₀ is 2*pi_half*2 used at L211/L244/L247/L250/L253]
+  # two_pi   = 311040₈ = 102944₁₀  (2π — but actually this is ~π in the full range)
+  #
+  # Polynomial coefficients (Chebyshev approximation):
+  #   c0 = 242763₈ = 83443₁₀
+  #   c1 = 756103₈ = 252995₁₀ (stored as negative in ones-complement context)  
+  #   c2 = 121312₈ = 41674₁₀
+  #   c3 = 532511₈ = 177481₁₀ (stored as negative in ones-complement context)
+  #   c4 = 144417₈ = 51471₁₀
+  #
+  # Max result clamp = 377777₈ = 131071₁₀ (max positive 18-bit value)
+
+  # ── Algorithm (L207-254) ───────────────────────────────────────
+  #
+  # Entry at `sin` (L207):
+  #   1. Save return address (L208: dap csx)
+  #   2. Load argument (L209: lac sin — the argument was stored at sin's address)
+  #
+  # Argument normalization — reduce to first quadrant:
+  #   3. If negative (L210: spa), add 311040₈ (L211: add (311040)
+  #      — shifts from [-2π, 0) to [0, 2π)
+  #   4. Subtract π/2 (L212: sub (62210)
+  #   5. If result < 0 (L213: sma), we're in first quadrant already:
+  #      add back π/2 (L215: add (62210), goto polynomial (si3)
+  #   6. If result ≥ 0: we're past first quadrant.
+  #      Jump to si2 (L214) for further reduction:
+  #        si2 (L243): complement, add π/2, test sign.
+  #        Handles second/third/fourth quadrant mapping with
+  #        sign corrections.
+  #
+  # Polynomial evaluation at si3 (L217):
+  #   7. Scale argument: shift left 2 (L217: ral 2s)
+  #   8. Evaluate 4th-degree Chebyshev polynomial:
+  #      result = ((((c0 × x) × x + c1) × x + c2) × x + c3) × x + c4
+  #      Using the `mult` macro (which calls the BBN multiply):
+  #        L218: mult (242763    — c0 × x
+  #        L219: dac sin         — save intermediate
+  #        L220: mult sin        — × x again (x²)
+  #        L221: dac cos         — save (reusing cos as scratch)
+  #        L222: mult (756103    — × c1
+  #        L223: add (121312     — + c2
+  #        L224: mult cos        — × x²
+  #        L225: add (532511     — + c3
+  #        L226: mult cos        — × x²
+  #        L227: add (144417     — + c4
+  #        L228: mult sin        — × x
+  #        L229: scl 3s          — shift left 3 (scale result)
+  #        L230: dac cos         — store result in cos (scratch)
+  #
+  # Sign correction (L231-238):
+  #   9. XOR result with original argument sign (L231: xor sin)
+  #  10. If sign mismatch (L232: sma), result should be negative.
+  #  11. Clamp to max positive: L234: lac (377777 — prevents overflow
+  #      from polynomial approximation slightly exceeding 1.0.
+  #  12. Check original argument sign (L235: lio sin; L236: spi):
+  #      if argument was negative, complement result (L237: cma).
+  #
+  # Return (L238-241):
+  #  13. Jump to csx (return address stored at L208/L201).
+  #  14. L240: lac cos — loads the cosine value (computed as side effect)
+  #      before returning.
+  #
+  # ── Critical Notes ─────────────────────────────────────────────
+  #
+  # - The subroutine computes BOTH sin and cos simultaneously.
+  #   The cos entry point (see spacewar:cos) adds π/2 to the argument
+  #   and falls through to sin, giving cos as the primary result
+  #   and sin as the secondary.
+  #
+  # - Binary point CHANGES between input and output:
+  #   Input:  right of bit 3 (angle units)
+  #   Output: right of bit 0 (unit interval)
+  #   The ral 2s at L217 and scl 3s at L229 handle this scaling.
+  #
+  # - Max clamp at 377777₈ prevents the polynomial from producing
+  #   values > 1.0 due to approximation error at quadrant boundaries.
+  #
+  # Body: deferred to Phase 4 (expression language design)
