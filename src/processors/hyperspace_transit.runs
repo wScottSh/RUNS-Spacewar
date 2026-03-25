@@ -1,3 +1,5 @@
+#! runs-prim 1.0
+
 # spacewar:hyperspace_transit — Invisible Transit Phase
 #
 # Ship is invisible and non-collidable during this phase.
@@ -5,6 +7,30 @@
 # angle and transitions to hyperspace_out (breakout phase).
 #
 # Source: L1007-1045 (hp1 routine)
+# Masswerk: Part 8 — Hyperspace! — "The Thrills of Hyperspace"
+#
+# Algorithm summary (from PDP-1 source + Masswerk):
+#   1. Count up the transit timer (lifetime / ma1). While still
+#      counting (lifetime <= 0), return with no changes.
+#      (L1012-1013: dap hp2 / count i ma1, hp2)
+#   2. When transit completes (lifetime > 0):
+#      a. Set state to hyperspace_out with collidable = true
+#         (L1014-1015: law hp3; dac i ml1 — no 400000₈ sign bit)
+#      b. Split first random number into two 9-bit signed halves,
+#         scale by hr1 (scl 9s = left shift 9), add to position
+#         (L1018-1026)
+#      c. Split second random number into two 9-bit signed halves,
+#         scale by hr2 (scl 4s = left shift 4), SET as velocity
+#         (L1027-1032 — dac/dio, not add)
+#      d. Store the last random value (from `ran`) as the raw angle
+#         (L1034-1035: lac ran; dac i mth)
+#      e. Normalize angle to ±2π range by a 3-pass adjustment loop
+#         (L1033-1042: setup \hpt,3; then sub/add 311040₈)
+#      f. Set breakout timer: lifetime = -hd2 = -64₁₀
+#         (L1043-1044: xct hd2; dac i ma1)
+#
+# PDP-1 field mb1 (instruction budget) is a frame-timing concern,
+# not game logic. Omitted from DIGS (L1016-1017).
 
 processor spacewar:hyperspace_transit
   inputs:
@@ -14,77 +40,123 @@ processor spacewar:hyperspace_transit
   outputs:
     object:   spacewar:object
     prng:     spacewar:prng_state
+  preconditions:
+    object.state == spacewar:hyperspace_in
 
-  let pi = 0o311040 as spacewar:fixed18
+  # ── Transit timer ────────────────────────────────────────────────
+  # L1012-1013: dap hp2 / count i ma1, hp2
+  # Expands to: isp i ma1 / jmp hp2
+  # isp increments, then skips if result > 0.
+  # While result <= 0: jump to return (still in transit).
+  # When result > 0: transit complete, fall through.
+  let life = object.lifetime + 1
 
-  # --- Count down transit timer ---
-  # Source: L1013: count i ma1, hp2
-  var life = object.lifetime + 1
-  if life < 0:
-    # Still in transit — no changes except timer
-    object = object with { lifetime = life }
+  if life <= 0:
+    # Still in transit — invisible, no changes except timer
+    output object = object with { lifetime = life }
+    output prng = prng
   else:
-    # --- Transit complete: randomize and transition ---
-    # Source: L1014-1044
+    # ── Transit complete: randomize and transition ───────────────
 
-    # Transition to breakout phase
-    # Source: L1014-1015: law hp3; dac i ml1
-    var obj = object with { state = hyperspace_out, collidable = true }
+    # L1014-1015: law hp3; dac i ml1
+    # Set state to breakout phase. No 400000₈ sign bit →
+    # collidable = true during breakout.
+    let obj = object with {
+      state = spacewar:hyperspace_out,
+      collidable = true,
+      lifetime = life
+    }
 
-    var rng = prng
-
-    # --- Random displacement ---
-    # Source: L1018-1026
-    # random; scr 9s; sir 9s → swap AC↔IO (gives both halves of random)
-    # xct hr1 → shift by hr1 (sar 9s = >>9, so scaled by ±512)
-    # add i mx1; dac i mx1 → add to position_x
-    # swap → IO value
-    # add i my1; dac i my1 → add to position_y
-    let rng1 = spacewar:random(rng.state)
-    rng = rng1 with { state = rng1.state }
-    let disp_x = rng1.value >> consts.hyperspace_displacement_shift  # hr1: sar 9s (>>9)
-    let disp_y = (rng1.value <<< 9) >> consts.hyperspace_displacement_shift  # IO half
-
-    obj = obj with {
+    # ── Random displacement (L1018-1026) ─────────────────────────
+    # random           — generate next PRNG value in AC
+    # scr 9s           — combined shift right 9: split 18-bit word
+    #                    into two 9-bit signed halves
+    # sir 9s           — shift IO right 9 to right-align bottom half
+    # xct hr1          — execute scl 9s: combined shift left 9
+    #                    (scales both halves to screen coordinates)
+    # add i mx1        — add to position_x (from AC)
+    # dac i mx1
+    # swap             — exchange AC ↔ IO
+    # add i my1        — add to position_y (from IO half)
+    # dac i my1
+    #
+    # Net effect per Masswerk: random value split into two halves,
+    # each shifted left by hr1 (9) to full screen scale. Top 9 bits
+    # → position_x offset, bottom 9 bits → position_y offset.
+    let rng1 = spacewar:random(prng.state)
+    let disp_high = rng1.value >> 9
+    let disp_low = (rng1.value << 9) >> 9
+    let disp_x = disp_high << consts.hyperspace_displacement_scale
+    let disp_y = disp_low << consts.hyperspace_displacement_scale
+    let obj = obj with {
       position_x = obj.position_x + disp_x,
       position_y = obj.position_y + disp_y
     }
 
-    # --- Random velocity ---
-    # Source: L1027-1032
-    # random; scr 9s; sir 9s → same AC↔IO split
-    # xct hr2 → sar 4s (>>4, scaled by ±16)
-    # Set as new velocity (replaces, not adds)
-    let rng2 = spacewar:random(rng.state)
-    rng = rng2 with { state = rng2.state }
-    let vel_x = rng2.value >> consts.hyperspace_velocity_shift        # hr2: sar 4s
-    let vel_y = (rng2.value <<< 9) >> consts.hyperspace_velocity_shift
-
-    obj = obj with {
-      velocity_x = vel_x,                         # L1031: dac i \mdy
-      velocity_y = vel_y                           # L1032: dio i \mdx
+    # ── Random velocity (L1027-1032) ─────────────────────────────
+    # Same split-and-scale pattern, but with hr2 (scl 4s = left 4).
+    # Velocity is SET, not added (dac i \mdy / dio i \mdx).
+    #
+    # Note: AC → mdy (velocity_y) via dac, IO → mdx (velocity_x)
+    # via dio. This maps: high half → velocity_y, low half →
+    # velocity_x.
+    let rng2 = spacewar:random(rng1.state)
+    let vel_high = rng2.value >> 9
+    let vel_low = (rng2.value << 9) >> 9
+    let vel_y = vel_high << consts.hyperspace_velocity_scale
+    let vel_x = vel_low << consts.hyperspace_velocity_scale
+    let obj = obj with {
+      velocity_x = vel_x,
+      velocity_y = vel_y
     }
 
-    # --- Random angle ---
-    # Source: L1034-1035: lac ran; dac i mth
-    let rng3 = spacewar:random(rng.state)
-    rng = rng3 with { state = rng3.state }
-    var angle = rng3.value
+    # ── Random angle (L1034-1035) ────────────────────────────────
+    # lac ran; dac i mth
+    # Reuses the LAST random value from `ran` (NOT a new call).
+    # Masswerk: "We load the last random number (stored in
+    # location ran) and deposit it as the new rotation angle."
+    #
+    # Note: This deliberately reuses the velocity random call's
+    # output. Masswerk observes: "there is some sort of relation
+    # between the velocity vector and the rotary angle, since they
+    # are both based on the same random number."
+    let raw_angle = rng2.value
 
-    # --- Normalize angle (3 passes) ---
-    # Source: L1033: setup \hpt,3 → repeat 3 times
-    # L1036-1042: lap i mth; sma; sub (311040; spa; add (311040; dac i mth; count \hpt,hp4
-    repeat 3:
-      if angle > pi:
-        angle = angle - pi
-      if angle < -pi:
-        angle = angle + pi
+    # ── Normalize angle to ±2π (L1033, L1036-1042) ──────────────
+    # setup \hpt,3 → law i 3; dac \hpt → counter = -3
+    # Loop body at hp4:
+    #   lac i mth; sma; sub (311040; spa; add (311040; dac i mth
+    #   count \hpt, hp4
+    #
+    # isp from -3: -3→-2(jmp), -2→-1(jmp), -1→-0(jmp), -0→+1(skip)
+    # In ones-complement, -1+1 = -0 (777777₈), sign bit still set,
+    # so isp does NOT skip. -0+1 = +1 (with end-around carry), isp
+    # skips. Loop body executes 3 times.
+    #
+    # 311040₈ = 102944₁₀ = 2π in the sine-cosine format
+    # (binary point right of bit 3, so 2π = 6.2832 × 2^14 ≈ 102944).
+    #
+    # Per iteration:
+    #   If angle >= 0: subtract 2π
+    #   If result < 0: add 2π back (undo overshoot)
+    #   If angle < 0 (or still < 0 after add-back): no net change
+    #   from that branch
+    #
+    # After 3 passes, value is clamped to [-2π, +2π).
+    # Max raw = 131071. 131071 / 102944 ≈ 1.27, so one subtract
+    # suffices. The extra iterations are harmless no-ops.
+    let two_pi = 0o311040
 
-    obj = obj with { angle = angle }
+    for step in range(3) from angle = raw_angle:
+      let angle = if angle >= 0 then angle - two_pi else angle
+      let angle = if angle < 0 then angle + two_pi else angle
 
-    # --- Set breakout timer ---
-    # Source: L1043-1044: xct hd2; dac i ma1
-    obj = obj with { lifetime = -consts.hyperspace_breakout_duration }  # hd2 = law i 100₈ = -64
+    let obj = obj with { angle = angle }
 
-    object = obj
-    prng = rng
+    # ── Set breakout timer (L1043-1044) ──────────────────────────
+    # xct hd2 → executes `law i 100` → AC = -(100₈) = -(64₁₀)
+    # dac i ma1 → store as lifetime (breakout countdown)
+    let obj = obj with { lifetime = 0 - consts.hyperspace_breakout_duration }
+
+    output object = obj
+    output prng = prng with { state = rng2.state }

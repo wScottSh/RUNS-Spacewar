@@ -1,3 +1,5 @@
+#! runs-prim 1.0
+
 # spacewar:random — Pseudo-Random Number Generator
 #
 # Transforms PRNG state to produce the next pseudo-random value.
@@ -6,12 +8,29 @@
 #
 # Source: L170-177 of spacewar3.1_complete.txt (macro `random`)
 #
+# PDP-1 source (verbatim):
+#   lac ran        # AC = current PRNG state
+#   rar 1s         # rotate AC right 1 bit (circular, 18-bit)
+#   xor (355670    # AC = AC XOR 0o355670
+#   add (355670    # AC = AC + 0o355670 (ones-complement)
+#   dac ran        # store as new state
+#
 # This PRNG is used throughout Spacewar! for:
 #   - Hyperspace exit displacement and velocity (L1018-1032)
 #   - Hyperspace death check (L1064-1068)
 #   - Explosion particle scatter (L964-976)
 #   - Central star flicker (L525-536)
 #   - Star display burst count (L541-561)
+#
+# The `ranct S,SS,C` macro (L179-187) wraps `random` with scaling:
+#   random         # generate next value
+#   S              # execute first shift (e.g., sar 9s)
+#   SS             # execute second shift (e.g., sar 4s)
+#   sma            # skip if minus
+#   cma            # complement (negate to get absolute value)
+#   dac C          # store in C
+# This is NOT a separate Processor. Each calling Processor inlines
+# the ranct logic: result = abs(random_value >> S >> SS).
 
 processor spacewar:random
   inputs:
@@ -20,49 +39,22 @@ processor spacewar:random
     state:    spacewar:fixed18     # Updated PRNG value
     value:    spacewar:fixed18     # The random value produced (same as updated state)
 
-  # ── Algorithm (PDP-1 Macro, L170-177) ──────────────────────────
+  # ── Body ────────────────────────────────────────────────────────
   #
-  # PDP-1 source:
-  #   lac ran       # load current state into AC
-  #   rar 1s        # rotate right 1 bit (circular, NOT arithmetic shift)
-  #   xor (355670   # XOR with octal 355670 = decimal 121784
-  #   add (355670   # add octal 355670 = decimal 121784
-  #   dac ran       # store as new state
+  # Step 1: Rotate right 1 bit (circular, within 18-bit width).
+  #         PDP-1 `rar 1s` — bit 17 (LSB) wraps to bit 0 (MSB).
+  #         DIGS `>>>` rotates within the declared width of the type.
   #
-  # Step-by-step:
-  #   1. temp = rotate_right_1(state)
-  #      - This is a CIRCULAR rotate: bit 17 (LSB) moves to bit 0 (sign).
-  #      - NOT arithmetic shift (which would preserve sign).
-  #   2. temp = temp XOR 355670₈
-  #      - XOR with constant 121784₁₀
-  #      - XOR on ones-complement values operates on all 18 bits
-  #        including the sign bit.
-  #   3. temp = temp + 355670₈
-  #      - Add same constant again.
-  #      - Addition uses ones-complement arithmetic (end-around carry).
-  #   4. state = temp (also returned as value)
+  # Step 2: XOR with constant 0o355670 (= 121784₁₀).
+  #         Distributes bits across the word.
   #
-  # The constant 355670₈ = 011 101 101 110 111 000₂ = 121784₁₀.
+  # Step 3: ADD the same constant (ones-complement arithmetic).
+  #         Propagates carries for additional mixing.
   #
-  # Properties:
-  #   - Period: not analyzed; sufficient for Spacewar!'s needs.
-  #   - NOT cryptographically secure (not relevant here).
-  #   - Deterministic: same seed → same sequence.
-  #   - The XOR+ADD with the same constant is the key mixing step.
-  #     XOR distributes bits; ADD propagates carries.
-  #
-  # ── The ranct Wrapper (L179-187) ───────────────────────────────
-  #
-  # The `ranct S, SS, C` macro wraps `random` with scaling:
-  #   random        # generate next value
-  #   S             # execute shift instruction S (e.g., sar 9s)
-  #   SS            # execute shift instruction SS (e.g., sar 4s)
-  #   sma           # skip if minus
-  #   cma           # complement (take absolute value)
-  #   dac C         # store in C
-  #
-  # This is NOT a separate Processor. Each calling Processor that
-  # needs a bounded random value inlines the ranct logic:
-  #   result = abs(random_value >> S >> SS)
-  #
-  # Body: deferred to Phase 4 (expression language design)
+  # Step 4: The result is both the new state and the output value.
+
+  let rotated = state >>> 1
+  let xored = rotated ^ 0o355670
+  let next_state = xored + 0o355670
+  output state = next_state
+  output value = next_state

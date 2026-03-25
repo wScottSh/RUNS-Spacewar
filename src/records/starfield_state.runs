@@ -14,16 +14,26 @@ record spacewar:starfield_state
     scroll_offset:                int
       # Current right-margin pointer.
       # Source: fpr (L653). Initial value: 10000₈ = 4096₁₀.
-      # Advances by 1 every ~40 frames (20 ticks of the bkc timer).
+      # Decrements by 1 every 32 frames (16 bkc ticks × 2 bcc frames).
       # Wraps at 20000₈ = 8192₁₀ (L647: add (20000 when fpr < 0).
       # The runtime subtracts this from star x-coordinates to compute
       # the rendered position (L578: sub fpr).
       default: 4096
 
+    frame_counter:                int
+      # Level-1 timer: controls frame-skip cadence.
+      # Source: bcc (L651). Resets to -2₁₀ (L634-635: law i 2; dac bcc).
+      # isp bcc at L632: increments per frame, skips (fires) when >= 0.
+      # From -2 to 0 takes 2 isp increments → fires every 2 frames.
+      # When bcc does NOT fire, the entire EP is skipped (no render,
+      # no bkc advancement, no scroll change).
+      default: 0
+
     scroll_counter:               int
-      # Countdown timer for scroll advancement.
-      # Source: bkc (L652). Resets to -20₁₀ (L642-643: law i 20).
-      # When reaches 0 via isp: scroll_offset advances by 1.
-      # Combined with the outer bcc timer (fires every 2 frames),
-      # scroll advances every ~40 frames ≈ 2.7 seconds at 15fps.
+      # Level-2 timer: controls scroll advancement rate.
+      # Source: bkc (L652). Resets to -16₁₀ (L642-643: law i 20).
+      # IMPORTANT: source is octal — 20₈ = 16₁₀.
+      # isp bkc at L640: increments each bcc-tick, fires when >= 0.
+      # From -16 to 0 takes 16 isp increments.
+      # Combined with bcc: scroll advances every 16 × 2 = 32 frames.
       default: 0

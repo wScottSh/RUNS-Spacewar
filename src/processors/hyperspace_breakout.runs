@@ -1,9 +1,37 @@
+#! runs-prim 1.0
+
 # spacewar:hyperspace_breakout — Breakout Phase (Visible, Collidable, Risky)
 #
 # The ship is visible and collidable during breakout. Each use
 # of hyperspace accumulates uncertainty — eventually, re-entry kills.
 #
 # Source: L1047-1077 (hp3 routine)
+# Masswerk: Part 8 — Hyperspace!
+#
+# Algorithm summary (from PDP-1 source + Masswerk):
+#   1. Count up the breakout timer (lifetime / ma1). While still
+#      counting (lifetime <= 0), display a breakout dot at the
+#      ship's position (intensity 2) and return. The display
+#      is a rendering concern, not modeled in DIGS.
+#   2. When breakout completes (lifetime > 0):
+#      a. Restore the saved ship state from hyperspace_saved_state
+#      b. Count up remaining hyperspace shots (with count-around
+#         prevention: if count reaches 0, zero it out)
+#      c. Set the recharge timer to hd3 = -128
+#      d. Accumulate uncertainty: mh4 += hur (16384₁₀ per use)
+#      e. Random death check:
+#         - Generate random number, force negative (OR 400000₈)
+#         - Add updated uncertainty accumulator
+#         - If result >= 0: ship explodes (uncertainty overwhelmed
+#           the random bias)
+#         - If result < 0: ship survived
+#   3. On death: state → exploding, non-collidable, lifetime = -8
+#   4. On survival: state → ship (restored), collidable
+#
+# The death probability increases each use because uncertainty
+# accumulates. At use 8 (uncertainty = 8 × 16384 = 131072 =
+# 400000₈), the addition overflows to positive regardless of the
+# random value, guaranteeing death.
 
 processor spacewar:hyperspace_breakout
   inputs:
@@ -13,71 +41,104 @@ processor spacewar:hyperspace_breakout
   outputs:
     object:   spacewar:object
     prng:     spacewar:prng_state
+  preconditions:
+    object.state == spacewar:hyperspace_out
 
-  # --- Count down breakout timer ---
-  # Source: L1051: count i ma1, hp6
-  var life = object.lifetime + 1
-  if life < 0:
+  # ── Breakout timer ──────────────────────────────────────────────
+  # L1049: count i ma1, hp6
+  # Expands to: isp i ma1 / jmp hp6
+  # isp increments, then skips if result > 0.
+  # While result <= 0: jump to hp6 (display dot + return).
+  # When result > 0: breakout complete, fall through.
+  let life = object.lifetime + 1
+
+  if life <= 0:
     # Still in breakout — ship is visible and collidable but
     # no other action until timer expires.
-    # Source: L1075-1076: lac i mx1; dispt i, i my1, 2 (render at intensity 2)
-    object = object with { lifetime = life }
+    # L1075-1076: lac i mx1; dispt i, i my1, 2
+    # Display at intensity 2 — rendering concern, not modeled.
+    output object = object with { lifetime = life }
+    output prng = prng
   else:
-    # --- Breakout complete: finalize hyperspace ---
+    # ── Breakout complete: finalize hyperspace ───────────────────
 
-    # Restore saved state
-    # Source: L1052-1053: lac i \mh1; dac i ml1
-    var obj = object with {
-      state = object.hyperspace_saved_state
+    # L1052-1053: lac i \mh1; dac i ml1
+    # Restore saved spaceship state. The PDP-1 restores the routine
+    # address from \mh1 into ml1. In DIGS, this maps to restoring
+    # the state enum and re-enabling collidability.
+    let obj = object with {
+      state = object.hyperspace_saved_state,
+      collidable = true,
+      lifetime = life
     }
 
-    # --- Decrement shots remaining ---
-    # Source: L1056-1057: count i \mh2, hp7; dzm i \mh2
-    var shots = obj.hyperspace_shots_remaining + 1
-    if shots >= 0:
-      shots = 0                          # Count-around prevention (L1057)
-    obj = obj with { hyperspace_shots_remaining = shots }
+    # ── Count remaining hyperspace shots ────────────────────────
+    # L1056: count i \mh2, hp7
+    # Expands to: isp i \mh2 / jmp hp7
+    # The shots counter counts UP from -max_shots toward 0.
+    # isp increments, skip if > 0:
+    #   Still negative → jmp hp7 (still have shots)
+    #   Zero or positive → fall through to dzm
+    # L1057: dzm i \mh2 — zero counter (count-around prevention)
+    # BOTH branches converge at hp7.
+    let shots = obj.hyperspace_shots_remaining + 1
+    let shots = if shots > 0 then 0 else shots
+    let obj = obj with { hyperspace_shots_remaining = shots }
 
-    # --- Start recharge timer ---
-    # Source: L1059-1060: xct hd3; dac i \mh3
-    obj = obj with {
-      hyperspace_recharge_timer = -consts.hyperspace_recharge_time   # hd3 = law i 200₈ = -128
+    # ── Start recharge timer ────────────────────────────────────
+    # L1059: xct hd3 → executes `law i 200` → AC = -128₁₀
+    # L1060: dac i \mh3
+    # Octal 200 = decimal 128. `law i` loads ones-complement
+    # negative: -128.
+    let obj = obj with {
+      hyperspace_recharge_timer = 0 - consts.hyperspace_recharge_time
     }
 
-    # --- Accumulate uncertainty ---
-    # Source: L1061-1063: lac i \mh4; add hur; dac i \mh4
-    let uncertainty = obj.hyperspace_uncertainty_acc + consts.hyperspace_uncertainty  # hur = 0o40000 = 16384
+    # ── Accumulate uncertainty ──────────────────────────────────
+    # L1061: lac i \mh4 — load uncertainty accumulator
+    # L1062: add hur   — add 40000₈ = 16384₁₀
+    # L1063: dac i \mh4 — store updated accumulator
+    let uncertainty = obj.hyperspace_uncertainty_acc + consts.hyperspace_uncertainty
 
-    # --- Random death check ---
-    # Source: L1064-1068
-    # random; ior (400000 → set sign bit (bias random toward negative)
-    # add i \mh4       → add accumulated uncertainty
-    # spa              → if result >= 0: DEATH
-    # jmp hp5          → survived (result < 0)
-    var rng = spacewar:random(prng.state)
+    # ── Random death check ──────────────────────────────────────
+    # L1064: random — generate next PRNG value in AC
+    # L1065: ior (400000 — set sign bit (bit 0), force negative
+    # L1066: add i \mh4 — add updated uncertainty
+    # L1067: spa — skip if AC >= 0 (positive means DEATH)
+    # L1068: jmp hp5 — result < 0 → survived, jump to return
+    #
+    # Masswerk: "if the threshold in \mh4 exceeds or equals the
+    # absolute value of the random number, we will get a positive
+    # result and the ship will break at re-entry."
+    #
+    # 400000₈ = 131072₁₀ = maximum negative in 18-bit ones-complement.
+    # ior with 400000₈ sets the sign bit, making the value negative.
+    # Adding uncertainty pushes toward positive. When uncertainty
+    # reaches 400000₈ (after 8 uses), result is always positive.
+    let rng = spacewar:random(prng.state)
     let death_roll = (rng.value | 0o400000) + uncertainty
-    # 400000₈ sets MSB, making the random value negative.
-    # Adding positive uncertainty pushes it toward >= 0.
-    # After enough uses, uncertainty overwhelms the random bias.
 
     if death_roll >= 0:
-      # --- Ship explodes during re-entry ---
-      # Source: L1069-1074
-      # lac (mex 400000; dac i ml1 → exploding + non-collidable
-      # law i 10; dac i ma1 → 8 frames
-      # law 2000; dac i mb1 → budget
-      obj = obj with {
-        state = exploding,
+      # ── Ship explodes during re-entry ─────────────────────────
+      # L1069: lac (mex 400000 — explosion routine + non-collidable
+      # L1070: dac i ml1 — set as object routine
+      # L1071: law i 10 — load -8₁₀ (octal 10 = decimal 8)
+      # L1072: dac i ma1 — store as explosion countdown
+      # L1073: law 2000 — instruction budget (not modeled)
+      # L1074: dac i mb1
+      output object = obj with {
+        state = spacewar:exploding,
         collidable = false,
-        lifetime = -8,                   # law i 10 = octal 10 = decimal 8
+        lifetime = -8,
         hyperspace_uncertainty_acc = uncertainty
       }
+      output prng = prng with { state = rng.state }
     else:
-      # --- Survived ---
-      obj = obj with {
-        hyperspace_uncertainty_acc = uncertainty,
-        collidable = true               # hp3 has no 400000₈ → collidable
+      # ── Survived ──────────────────────────────────────────────
+      # Falls through to hp5 (return). Ship is restored to normal
+      # spaceship state with collidable = true (no 400000₈ in hp3
+      # routine address setup at L1017: `law hp3; dac i ml1`).
+      output object = obj with {
+        hyperspace_uncertainty_acc = uncertainty
       }
-
-    object = obj
-    prng = rng with { state = rng.state }
+      output prng = prng with { state = rng.state }

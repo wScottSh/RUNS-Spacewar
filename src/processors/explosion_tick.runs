@@ -1,65 +1,121 @@
+#! runs-prim 1.0
+
 # spacewar:explosion_tick — Explosion Progression
 #
-# Decelerates an exploding entity, generates particle scatter data,
-# and counts down to entity removal.
+# Advances an exploding entity by one frame: drifts the position
+# (no deceleration), computes particle count for the renderer,
+# captures the PRNG seed so the renderer can reproduce particles
+# deterministically, advances the PRNG, and counts down the
+# lifetime toward entity removal.
 #
-# Source: L946-983 (mex routine)
+# Source: L946-983 (mex — explosion handling routine)
+#   L950:     dap mxr — save return address
+#   L951-954: cla; diff ... — drift position (zero acceleration)
+#   L955-956: law mst; dap msh — initialize scatter scale pointer
+#   L957-960: lac i mb1; cma cli; sar 3s; dac \mxc — particle count
+#   L961-963: sub (140; sma; idx msh — scale selection (renderer)
+#   L964-977: particle display loop (2× random per particle)
+#   L978:     count i ma1, mxr — lifetime countdown (isp: skip if > 0)
+#   L979:     dzm i ml1 — clear entity when lifetime expires
+#
+# diff macro (L160-167):
+#   add i V → velocity += acceleration (AC has acceleration = 0)
+#   dac i V → store velocity (unchanged)
+#   xct SF  → AC = velocity >> shift
+#   add i S → position += velocity >> shift
+#   dac i S → store position
+#
+# count macro (L46-49):
+#   isp A   → increment A, skip if result > 0
+#   jmp B   → if still <= 0, jump to B (return)
+#   (fall through when A becomes positive → entity cleared)
 
 processor spacewar:explosion_tick
   inputs:
-    object:       spacewar:object
-    prng:         spacewar:prng_state
+    object:         spacewar:object
+    prng:           spacewar:prng_state
+    entity_index:   int
   outputs:
-    object:       spacewar:object
-    prng:         spacewar:prng_state
-    particle_seed:    spacewar:fixed18   # PRNG state for particle reproduction
-    particle_count:   int                # Number of particles this frame
+    object:         spacewar:object
+    prng:           spacewar:prng_state
+    particle_seed:  spacewar:fixed18
+    particle_count: int
 
-  # Decelerate: velocity -= velocity >> 3 (damping via diff with zero accel)
-  # Source: L952: cla; diff \mdx, mx1, (sar 3s — AC starts as 0
-  # The diff macro with AC=0 means: velocity += 0, position += velocity >> 3.
-  # Actually this DOESN'T decelerate — it just integrates position.
-  # The explosion has no acceleration. It drifts.
-  let ix = spacewar:velocity_integrate(
-    object.position_x, object.velocity_x, 0, 3
-  )
-  let iy = spacewar:velocity_integrate(
-    object.position_y, object.velocity_y, 0, 3
-  )
-  object = object with {
-    position_x = ix.position,
-    position_y = iy.position,
-    velocity_x = ix.velocity,
-    velocity_y = iy.velocity
-  }
+  preconditions:
+    object.state == spacewar:exploding
 
-  # Generate particle scatter data for render
-  # Source: L957-977
-  # The instruction budget (mb1) determines explosion scale.
-  # L957: lac i mb1; cma cli-opr; sar 3s; dac \mxc
-  # In RUNS: use a fixed explosion scale (the instruction budget
-  # is a PDP-1 timing artifact).
-  let explosion_scale = 12       # Reasonable default matching ~2000>>3 = 250, /140 ≈ 1.8 iterations... but simplified
+  # ── Position drift (no deceleration) ───────────────────────────
+  # L951: cla              — AC = 0 (zero acceleration)
+  # L952: diff \mdx, mx1, (sar 3s
+  #   velocity_x += 0      — velocity is constant (no deceleration)
+  #   position_x += velocity_x >> 3
+  # L953: cla
+  # L954: diff \mdy, my1, (sar 3s — same for Y
+  #
+  # The >> 3 is the standard Spacewar! velocity integration scale
+  # (ratio between velocity units and position units).
+  let ix = spacewar:velocity_integrate(object.position_x, object.velocity_x, 0, 3)
+  let iy = spacewar:velocity_integrate(object.position_y, object.velocity_y, 0, 3)
 
-  # Capture PRNG state before particle generation
-  particle_seed = prng.state
-  particle_count = explosion_scale
+  # ── Particle count from instruction budget ─────────────────────
+  # L957: lac i mb1       — load instruction budget of entity i
+  # L958: cma cli-opr     — negate AC, clear IO
+  # L959: sar 3s          — arithmetic right shift by 3
+  # L960: dac \mxc        — store as particle count (negative for count)
+  #
+  # The PDP-1 entity table stores the instruction budget (mb1) per
+  # entity: ships = 2000₈ = 1024₁₀, torpedoes = 20₈ = 16₁₀.
+  # RUNS does not carry mb1, so we derive it from entity_index:
+  # slots 0-1 are ships, slots 2-23 are torpedoes.
+  #
+  # Budget | -(budget) >> 3 | Particles
+  # -------|----------------|----------
+  # 1024   | -128           | 128
+  # 16     | -2             | 2
+  #
+  # The PDP-1 stores the count as negative (for the count macro).
+  # RUNS stores the positive value for the renderer.
+  let budget = if entity_index < 2 then 1024 else 16
+  let pcount = budget >> 3
 
-  # Advance PRNG state by particle_count iterations
-  # (the original generates particles inline; we defer rendering
-  # to the runtime, which reproduces particles from the seed)
-  var rng = prng
-  repeat 12 as i:
-    rng = spacewar:random(rng.state) with { state = rng.state }
-    # Two random calls per particle (x and y offset)
-    rng = spacewar:random(rng.state) with { state = rng.state }
-  prng = rng
+  # ── Capture PRNG state for particle reproduction ───────────────
+  # L964-977: particle display loop
+  # Each particle uses 2 random calls:
+  #   L964: random  — scatter x/display offset (9-bit mask at L965)
+  #   L968: random  — scatter y offset
+  #
+  # The renderer reproduces the exact particle pattern from the
+  # saved seed by replaying the same PRNG sequence.
+  output particle_seed = prng.state
+  output particle_count = pcount
 
-  # Count down lifetime
-  # Source: L978: count i ma1, mxr — isp i ma1; jmp mxr
-  var life = object.lifetime + 1
-  if life >= 0:
-    # Explosion finished — clear the entity slot
-    object = object with { state = empty, lifetime = 0 }
+  # Advance PRNG by 2 × particle_count steps.
+  # (The original renders inline; RUNS defers display to the renderer.)
+  for step in range(pcount) from rng = prng:
+    # Random call 1: display scatter offset (L964)
+    let rng = spacewar:random(rng)
+    # Random call 2: y scatter offset (L968)
+    let rng = spacewar:random(rng)
+
+  output prng = rng
+
+  # ── Lifetime countdown ─────────────────────────────────────────
+  # L978: count i ma1, mxr
+  #   Expands to: isp ma1[i]; jmp mxr
+  #   isp increments ma1[i] and skips if result > 0 (strictly positive).
+  #   If result <= 0: jump to mxr (return) — explosion continues.
+  #   If result > 0:  fall through to L979 — explosion finished.
+  #
+  # L979: dzm i ml1 — clear entity slot (set mtb[i] = 0 → empty state)
+  #
+  # Note: isp skips on STRICTLY POSITIVE (> 0), not on non-negative.
+  # When lifetime transitions from -1 to 0, isp does NOT skip
+  # (0 is not positive in ones-complement). The entity is cleared
+  # only when lifetime transitions from 0 to 1.
+  let life = object.lifetime + 1
+  let drifted = object with { position_x = ix.position, position_y = iy.position, velocity_x = ix.velocity, velocity_y = iy.velocity }
+
+  if life > 0:
+    output object = drifted with { state = spacewar:empty, collidable = false, lifetime = 0 }
   else:
-    object = object with { lifetime = life }
+    output object = drifted with { lifetime = life }

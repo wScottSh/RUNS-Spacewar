@@ -1,13 +1,19 @@
+#! runs-prim 1.0
+
 # spacewar:update_scores — Scoring and Round Transition
 #
-# Counts down the restart timer. When it fires, awards points
-# to surviving ships and triggers reinitialization.
+# Counts down the restart timer via isp semantics. When the timer
+# crosses from negative to positive, awards points to surviving
+# ships and triggers match reinitialization.
 #
-# Scoring truth table (verified by PDP-1 instruction trace):
+# PDP-1 scoring truth table (verified instruction trace L741-752):
 #   Ship 1 alive, Ship 2 alive → both +1 (tie round)
 #   Ship 1 alive, Ship 2 dead  → ship 1 +1
 #   Ship 1 dead,  Ship 2 alive → ship 2 +1
 #   Both dead                   → no points
+#
+# "Alive" = handler address still equals ss1/ss2 (RUNS: state == ship).
+# "Dead"  = handler replaced by mex or zeroed (exploding/inactive/hyperspace).
 #
 # Source: L738-754 (mdn routine)
 
@@ -17,45 +23,44 @@ processor spacewar:update_scores
     result:   spacewar:match_result
   outputs:
     result:           spacewar:match_result
-    trigger_reinit:   bool                    # Signal to run match_initialize
+    trigger_reinit:   bool
 
-  trigger_reinit = false
+  # L738: count \ntd, ml1 — isp \ntd; jmp ml1
+  # isp increments \ntd. If result <= 0, jump to ml1 (no scoring).
+  # If result > 0, fall through (timer expired, score now).
+  let timer = result.restart_timer + 1
 
   if result.restart_timer == 0:
-    # No restart pending — nothing to do
+    # No restart pending (timer inactive). Normal gameplay frame.
+    # In PDP-1: \ntd is reset to -2×torpedo_life every normal frame
+    # by md1 (L733-736), so we never reach mdn when timer == 0.
+    output result = result
+    output trigger_reinit = false
+
+  elif timer < 0:
+    # L738: isp fired but result still negative → jmp ml1
+    # Still counting down. Update timer only.
+    output result = result with { restart_timer = timer }
+    output trigger_reinit = false
+
   else:
-    # Count down restart timer
-    # Source: L738: count \ntd, ml1 — isp \ntd; jmp ml1
-    var timer = result.restart_timer + 1
-    if timer < 0:
-      # Still counting down
-      result = result with { restart_timer = timer }
-    else:
-      # Timer fired — SCORE!
-      # Source: L739-754
+    # Timer crossed to positive → scoring time.
+    # L739-740: stf 1; stf 2 (preset both flags — DIGS ignores flags)
 
-      # Determine who survived
-      # Source: L741-746 (ship 1 check):
-      # law ss1; xor mtb; sza; clf 1; sza i; idx \1sc
-      # If ship1 alive: XOR = 0, sza skips clf, sza i does NOT skip → idx fires (+1)
-      # If ship1 dead: XOR ≠ 0, sza doesn't skip → clf 1, sza i DOES skip → idx skipped
-      let ship1_alive = objects[0].state == ship
-      let ship2_alive = objects[1].state == ship
+    # L741-746: Ship 1 alive check and score
+    # law ss1; xor mtb; sza; clf 1; sza i; idx \1sc
+    # XOR == 0 means alive: sza skips clf 1, sza i does NOT skip → idx fires
+    # XOR != 0 means dead: sza falls through to clf, sza i skips → idx skipped
+    let ship1_alive = objects[0].state == spacewar:ship
 
-      var s1 = result.score_1
-      var s2 = result.score_2
+    # L747-752: Ship 2 alive check and score
+    # law ss2; xor mtb 1; sza; clf 2; sza i; idx \2sc
+    let ship2_alive = objects[1].state == spacewar:ship
 
-      if ship1_alive:
-        s1 = s1 + 1        # L746: idx \1sc
-      if ship2_alive:
-        s2 = s2 + 1        # L752: idx \2sc
+    let s1 = if ship1_alive then result.score_1 + 1 else result.score_1
+    let s2 = if ship2_alive then result.score_2 + 1 else result.score_2
 
-      result = result with {
-        score_1 = s1,
-        score_2 = s2,
-        restart_timer = 0
-      }
-
-      # Trigger reinitialization
-      # Source: L754: jmp a
-      trigger_reinit = true
+    # L753: clf 2 (flag cleanup — no DIGS equivalent)
+    # L754: jmp a (jump to game restart logic)
+    output result = result with { score_1 = s1, score_2 = s2, restart_timer = 0 }
+    output trigger_reinit = true

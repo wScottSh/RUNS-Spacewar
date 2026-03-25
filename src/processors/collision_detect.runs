@@ -1,84 +1,122 @@
+#! runs-prim 1.0
+
 # spacewar:collision_detect — Diamond-Shaped Collision Detection
 #
 # Pairwise Manhattan-distance collision check between all collidable
-# entities. Uses a DIAMOND hitbox, NOT circular — this is original
-# Spacewar! behavior and must be preserved.
+# entities. Uses a DIAMOND (octagonal) hitbox — this is original
+# Spacewar! behavior and must be preserved exactly.
 #
-# Source: L868-904 (collision loop within main dispatch)
+# The PDP-1 uses a nested loop: outer entity i (slots 0..22), inner
+# entity j (slots i+1..23). Collisions are applied immediately —
+# both entities transition to exploding/non-collidable, so later
+# comparisons see the updated state. This iteration order and
+# sequential mutation are deterministic and must be preserved.
+#
+# Explosion duration is computed from the PDP-1 instruction budget
+# (mb1) of each colliding entity. Ship budget = 2000₈ = 1024₁₀,
+# torpedo budget = 20₈ = 16₁₀. Duration = -(mb1[i]+mb1[j]) >> 8 + 1.
+#
+# Source: L843-903 (nested collision loop in main dispatch)
+#   L867-868: spq — skip if entity j is collidable (sign bit clear)
+#   L870-877: |dx| < me1 (square hitbox, x-axis)
+#   L878-884: |dy| < me1 (square hitbox, y-axis)
+#   L885-888: |dx|+|dy| < me1+me2 (diamond corner clipping)
+#   L889-898: collision resolution (both → exploding, compute lifetime)
+# Masswerk: Part 3, "The Main Loop" (insidespacewar-pt3-objects.html)
 
 processor spacewar:collision_detect
   inputs:
-    objects:  spacewar:object[]          # All 24 entity slots
+    objects:  spacewar:object[24]
     consts:   spacewar:game_constants
   outputs:
-    objects:  spacewar:object[]          # Updated with collision state transitions
+    objects:  spacewar:object[24]
 
-  let collision_radius = consts.collision_radius        # me1 = 3072
-  let collision_radius_half = consts.collision_radius_half  # me2 = 1536
+  # me1 = 6000₈ = 3072₁₀ (L272: 6000)
+  # me2 = 3000₈ = 1536₁₀ (L273: 3000)
+  let me1 = consts.collision_radius
+  let me2 = consts.collision_radius_half
 
-  var objs = objects
+  # Instruction budgets for explosion duration computation.
+  # L822-824: law 2000; dac nb1; dac nb1 1 → ship budget = 2000₈ = 1024₁₀
+  # L991-992: (tcr stores 20₈ = 16₁₀ in mb1 for torpedoes)
+  # These are PDP-1 timing artifacts repurposed for explosion scaling.
+  let ship_budget = 1024
+  let torpedo_budget = 16
 
-  # Pairwise comparison: for each pair (i, j) where i < j
-  # Source: L843-903 — the outer loop iterates entity i, inner loop
-  # iterates j > i via the index macro.
-  for i from 0 to 23:
-    if objs[i].collidable:
-      for j from i + 1 to 23:
-        if objs[j].collidable:
-          # --- Diamond hitbox check ---
-          # Source: L870-888
+  # Initialize output from input
+  output objects = objects
 
-          # Check 1: |dx| < me1
-          # Source: L870-877: lac mx1; sub mx2; spa; cma; dac \mt1; sub me1; sma; jmp mq2
-          let dx = objs[i].position_x - objs[j].position_x
-          let adx = abs(dx)
-          if adx < collision_radius:
+  # --- Pairwise comparison: i from 0..22, j from i+1..23 ---
+  # Source: L843-929 outer loop, L867-903 inner comparison loop.
+  # The index macro at L903 (index ml2, (lac mtb nob, ml2))
+  # iterates j from i+1 to nob-1.
+  #
+  # L843: lac . (ml1) — load entity i's state
+  # L844: sza i       — skip if active (non-zero)
+  # L845: jmp mq1     — inactive → skip to next entity
+  # L848: spi         — skip if sign bit clear (collidable)
+  # L849: jmp mq4     — non-collidable → handle but no comparison
+  for i in range(23):
+    if objects[i].collidable:
+      for j in range(24):
+        if j > i:
+          if objects[j].collidable:
+            # --- Diamond hitbox check ---
 
-            # Check 2: |dy| < me1
-            # Source: L878-884: lac my1; sub my2; spa; cma; sub me1; sma; jmp mq2
-            let dy = objs[i].position_y - objs[j].position_y
-            let ady = abs(dy)
-            if ady < collision_radius:
+            # Check 1: |dx| < me1
+            # L870: lac . (mx1) — load entity i's x position
+            # L871: sub . (mx2) — subtract entity j's x position
+            # L872: spa         — skip if AC >= 0
+            # L873: cma         — complement (absolute value)
+            # L874: dac \mt1    — store |dx|
+            # L875: sub me1     — |dx| - me1
+            # L876: sma         — skip if < 0 (|dx| < me1)
+            # L877: jmp mq2     — not within range
+            let dx = objects[i].position_x - objects[j].position_x
+            let adx = if dx >= 0 then dx else -dx
 
-              # Check 3: |dx| + |dy| < me2 (Manhattan distance, diamond)
-              # Source: L885-888: add \mt1; sub me2; sma; jmp mq2
-              # NOTE: the add at L885 adds \mt1 (which is |dx|) to what's
-              # left in AC. AC = ady - me1 (from check 2). So:
-              # AC = (ady - me1) + adx. Then sub me2.
-              # This is: adx + ady - me1 - me2. If < 0: collision.
-              # Equivalent to: adx + ady < me1 + me2 = 3072 + 1536 = 4608.
-              #
-              # Wait — re-reading: after L882 (sub me1), AC = ady - me1.
-              # L884 skips if AC >= 0. If we're here, ady - me1 < 0.
-              # L885: add \mt1 → AC = (ady - me1) + adx
-              # L886: sub me2 → AC = adx + ady - me1 - me2
-              # L887: sma → skip if AC < 0 (meaning collision)
-              #
-              # So the full condition is:
-              # adx < me1 AND ady < me1 AND (adx + ady) < (me1 + me2)
-              # = adx < 3072 AND ady < 3072 AND adx + ady < 4608
-              #
-              # This is a diamond (rhombus) inscribed in the square.
-              if adx + ady < collision_radius + collision_radius_half:
+            if adx < me1:
+              # Check 2: |dy| < me1
+              # L878: lac . (my1)
+              # L879: sub . (my2)
+              # L880: spa
+              # L881: cma
+              # L882: sub me1
+              # L883: sma
+              # L884: jmp mq2
+              let dy = objects[i].position_y - objects[j].position_y
+              let ady = if dy >= 0 then dy else -dy
 
-                # --- COLLISION! ---
-                # Source: L889-898
-                # Both entities explode.
-                # lac (mex 400000; dac i ml1; dac i ml2 → both → exploding + non-collidable
-                # Explosion duration: -(mb1[i] + mb1[j]) >> 8 + 1
-                # In RUNS: mb1 is the instruction budget (PDP-1 timing artifact).
-                # Use a fixed explosion duration.
-                let explosion_life = -12   # ~12 frames, reasonable default
+              if ady < me1:
+                # Check 3: Diamond clip — |dx| + |dy| < me1 + me2
+                # L885: add \mt1 — AC = (ady - me1) + adx
+                #   (AC still holds ady - me1 from check 2's sub me1)
+                # L886: sub me2  — AC = adx + ady - me1 - me2
+                # L887: sma      — skip if AC < 0 (collision)
+                # L888: jmp mq2  — no collision
+                #
+                # Full condition: adx + ady < me1 + me2
+                # = adx + ady < 3072 + 1536 = 4608
+                # This clips the corners of the square hitbox into
+                # a diamond (octagonal) shape.
+                if adx + ady < me1 + me2:
 
-                objs[i] = objs[i] with {
-                  state = exploding,
-                  collidable = false,
-                  lifetime = explosion_life
-                }
-                objs[j] = objs[j] with {
-                  state = exploding,
-                  collidable = false,
-                  lifetime = explosion_life
-                }
+                  # --- COLLISION ---
+                  # L889: lac (mex 400000 — load explosion routine | non-collidable
+                  # L890: dac i ml1      — entity i → exploding
+                  # L891: dac i ml2      — entity j → exploding
 
-  objects = objs
+                  # Compute explosion duration from instruction budgets.
+                  # L892: lac i mb1      — load budget of entity i
+                  # L893: add . (mb2)    — add budget of entity j
+                  # L894: cma            — complement (negate)
+                  # L895: sar 8s         — shift right 8 (divide by 256)
+                  # L896: add (1         — add 1
+                  # L897: dac . (ma1)    — store as lifetime of entity i
+                  # L898: dac . (ma2)    — store as lifetime of entity j
+                  let budget_i = if objects[i].state == spacewar:ship then ship_budget else torpedo_budget
+                  let budget_j = if objects[j].state == spacewar:ship then ship_budget else torpedo_budget
+                  let explosion_life = (-(budget_i + budget_j) >> 8) + 1
+
+                  output objects[i] = objects[i] with { state = spacewar:exploding, collidable = false, lifetime = explosion_life }
+                  output objects[j] = objects[j] with { state = spacewar:exploding, collidable = false, lifetime = explosion_life }

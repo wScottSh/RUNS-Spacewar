@@ -23,7 +23,7 @@ Every RUNS concept used in the bible mapped to the spec heading where it's defin
 | Protocol / Library / Ecosystem split | `02_record_definitions.md` (Library analogues) | `runs-spec/README.md` § "Architecture: Protocol, Library, Ecosystem" |
 | Lifecycle (Discover → Build → Run) | `03_aems_layer.md` § Build-Time Compilation Seam | `runs-spec/README.md` § "Lifecycle: Discover → Build → Run" |
 | What RUNS excludes | Rendering, physics, input, scripting | `runs-spec/README.md` § "What RUNS is Not" |
-| Expression Language | Processor body notation | `runs-spec/EXPRESSION_LANGUAGE.md` (draft) |
+| Expression Language | Processor body notation | `runs-spec/DIGS_EXPRESSION_LANGUAGE.md` (draft) |
 | EGS integration table | AEMS/MAPS/WOCS relationships | `runs-spec/README.md` § "Integration with EGS" |
 
 ---

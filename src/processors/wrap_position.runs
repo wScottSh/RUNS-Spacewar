@@ -1,10 +1,29 @@
+#! runs-prim 1.0
+
 # spacewar:wrap_position — Toroidal Position Wrapping
 #
-# The PDP-1's 10-bit display registers overflow silently, giving
-# free toroidal wrapping. In RUNS, this must be explicit.
+# The PDP-1's 18-bit ones-complement word size provides toroidal
+# wrapping for free: adding 1 to 377777₈ (+131071) overflows to
+# 400000₈ (-131071), and vice versa. There is NO explicit wrapping
+# code in the PDP-1 source — the hardware's word-size overflow IS
+# the toroidal space.
 #
-# Source: implicit in PDP-1 hardware (register overflow)
-# Cross-reference: 04_conversion_phases.md Phase 4 Work Item 5
+# In RUNS, this processor makes the implicit behavior explicit.
+# The spacewar:fixed18 type (18-bit, ones-complement, range ±131071)
+# enforces this constraint through its arithmetic rules: all
+# operations on fixed18 values produce fixed18 results that are
+# already wrapped within the 18-bit range. The 10-bit display
+# register uses only the top 10 bits of this 18-bit position;
+# the lower 8 bits are sub-pixel precision that the display ignores.
+#
+# Source: implicit in PDP-1 hardware (18-bit word overflow)
+# Masswerk Part 3 (Objects): "Thanks to the 18 bit one's complement
+#   number representation of the PDP-1, toroidal space — popping up
+#   at the other side when crossing the borders of the screen —
+#   will come for free."
+# Masswerk Part 5 (Ships): "any update resulting in a potential
+#   off-screen position will just cause an overflow ... and the
+#   ship will pop up right on the other side."
 
 processor spacewar:wrap_position
   inputs:
@@ -14,28 +33,11 @@ processor spacewar:wrap_position
     position_x: spacewar:fixed18
     position_y: spacewar:fixed18
 
-  # Wrap to ±512 range (10-bit display register equivalent).
-  # On PDP-1, the 10-bit dpy register wraps automatically.
-  # Here, we mask to 10 bits and sign-extend.
-  #
-  # The wrap boundary is at ±(2^9) = ±512.
-  # Values > 511 wrap to negative; values < -511 wrap to positive.
-
-  let half_range = 0o1000 as spacewar:fixed18      # 512
-  let full_range = 0o2000 as spacewar:fixed18       # 1024
-
-  var x = position_x
-  var y = position_y
-
-  if x > half_range:
-    x = x - full_range
-  else if x < -half_range:
-    x = x + full_range
-
-  if y > half_range:
-    y = y - full_range
-  else if y < -half_range:
-    y = y + full_range
-
-  position_x = x
-  position_y = y
+  # The spacewar:fixed18 type guarantees values in [-131071, +131071].
+  # All upstream arithmetic (velocity_integrate, thrust, gravity)
+  # produces fixed18 results that are already wrapped within the
+  # 18-bit ones-complement range. This processor is a type-enforcing
+  # pass-through: it documents the toroidal topology without
+  # changing any values.
+  output position_x = position_x
+  output position_y = position_y

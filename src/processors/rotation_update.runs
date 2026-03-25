@@ -1,9 +1,25 @@
+#! runs-prim 1.0
+
 # spacewar:rotation_update — Ship Rotation, Angle Normalization, Trig Cache
 #
 # Processes rotation inputs, updates angular velocity and heading,
 # normalizes the angle, and computes sin/cos for downstream Processors.
 #
-# Source: L1091-1119 (sr0 routine through sin call)
+# Source: L1091-1119 (sr0/sc1 routine through jda sin, dac \sn)
+#
+# Two rotation modes selected by game_config.angular_damping (SW1):
+#
+#   SW1 OFF (default, "rocket thrusters"):
+#     Angular velocity accumulates in object.angular_velocity.
+#     Angle is updated by the accumulated velocity each frame.
+#
+#   SW1 ON ("gyros" / Bergenholm rotation):
+#     Angular velocity is zeroed each frame (no accumulation).
+#     Frame's rotation delta is multiplied by 128 (ral 7s at L1104)
+#     and applied directly to the angle — instant, responsive rotation.
+#
+# Thrust flag is set if the player is pressing thrust AND fuel remains.
+# Fuel is a negative counter; fuel >= 0 means exhausted.
 
 processor spacewar:rotation_update
   inputs:
@@ -16,58 +32,100 @@ processor spacewar:rotation_update
     sin_heading:    spacewar:fixed18    # sin(angle) for downstream use
     cos_heading:    spacewar:fixed18    # cos(angle) for downstream use
     thrust_enabled: bool                # Whether thrust should fire this frame
+  preconditions:
+    object.state == spacewar:ship
 
-  let pi = 0o311040 as spacewar:fixed18   # π in angle units
+  # ── Constants ──────────────────────────────────────────────────
+  let two_pi = 0o311040     # 311040₈ = 102944₁₀ — full circle (2π in angle units)
+                            # Binary point right of bit 3 — see sin subroutine header (L192-193)
 
-  # --- Angular velocity update ---
-  # Source: L1092-1100
-  # lio \scw; spi → test bit 0 (rotate CCW)
-  # ril 1s; spi → test bit 1 (rotate CW)
-  var omega = object.angular_velocity
+  # ── Angular velocity update ────────────────────────────────────
+  # L1092: lio \scw          — load control word into IO
+  # L1093: clf 6 cla-opr     — clear flag 6, clear AC (AC = 0)
+  # L1094: spi               — skip if IO >= 0 (CCW bit not set)
+  # L1095: add maa           — AC += angular_acceleration (CCW rotation)
+  # L1096: ril 1s            — rotate IO left 1 (advance to CW bit)
+  # L1097: spi               — skip if IO >= 0 (CW bit not set)
+  # L1098: sub maa           — AC -= angular_acceleration (CW rotation)
+  #
+  # Note: the PDP-1 tests bits individually via spi after rotating IO.
+  # Both bits set simultaneously = hyperspace intent (handled elsewhere).
+  # If both CCW and CW pressed: delta = +maa - maa = 0 (no net rotation).
 
-  if controls.rotate_ccw and not controls.rotate_cw:
-    omega = omega + consts.angular_acceleration       # L1095: add maa
-  else if controls.rotate_cw and not controls.rotate_ccw:
-    omega = omega - consts.angular_acceleration       # L1098: sub maa
+  let frame_delta = if controls.rotate_ccw and controls.rotate_cw then
+    0
+  elif controls.rotate_ccw then
+    consts.angular_acceleration
+  elif controls.rotate_cw then
+    0 - consts.angular_acceleration
+  else
+    0
 
-  # Note: if BOTH rotate buttons are pressed, that's hyperspace intent.
-  # Handled by spacewar:hyperspace_check, not here. Angular velocity unchanged.
+  # ── Add frame delta to stored angular velocity ─────────────────
+  # L1099: mom, add .         — AC = frame_delta + angular_velocity
+  # L1100: dac i mom          — store back to angular_velocity
+  let new_angular_velocity = frame_delta + object.angular_velocity
 
-  # --- Angular damping (SW1) ---
-  # Source: L1101-1103: szs 10; jmp sr8; dzm i mom
-  if config.angular_damping:
-    omega = 0
+  # ── Angular damping (SW1) ──────────────────────────────────────
+  # L1101: szs 10             — skip next if SW1 is set (damping active)
+  # L1102: jmp sr8            — SW1 off → jump to sr8 (keep accumulated velocity)
+  # L1103: dzm i mom          — SW1 on → zero angular_velocity in table
+  # L1104: ral 7s             — AC = AC << 7 (multiply frame's value by 128)
+  #
+  # Two modes:
+  #   SW1 OFF: angular_velocity accumulates, angle += angular_velocity
+  #   SW1 ON:  angular_velocity zeroed, angle += frame_delta << 7
+  #            (in steady state, angular_velocity was 0, so AC = frame_delta)
+  #
+  # The ral 7s instruction multiplies the AC by 128, giving direct
+  # responsive rotation without momentum buildup.
 
-  # --- Thrust flag ---
-  # Source: L1104-1110
-  # ral 7s; ril 1s; spi → test thrust bit
-  # Then check fuel: lio i \mfu; spi i → if fuel >= 0, clear thrust flag
-  var can_thrust = controls.thrust                    # L1105-1107: test bit 2
-  if object.fuel >= 0:
-    can_thrust = false                                # L1108-1110: fuel exhausted
+  let stored_omega = if config.angular_damping then 0 else new_angular_velocity
+  let rotation_amount = if config.angular_damping then new_angular_velocity << 7 else new_angular_velocity
 
-  thrust_enabled = can_thrust
+  # ── Thrust flag (flag 6) ───────────────────────────────────────
+  # L1105: sr8, ril 1s        — rotate IO left 1 more (thrust bit now in sign)
+  # L1106: spi                — skip if IO >= 0 (thrust NOT pressed)
+  # L1107: stf 6              — thrust pressed → set flag 6
+  # L1108: lio i \mfu         — load fuel into IO
+  # L1109: spi i              — skip if IO < 0 (fuel remaining)
+  # L1110: clf 6              — fuel >= 0 (exhausted) → clear flag 6
+  #
+  # Flag 6 is set iff: thrust pressed AND fuel < 0 (fuel remaining).
 
-  # --- Angle update + normalization ---
-  # Source: L1112-1117
-  # mth: add . → angle += angular_velocity
-  # sma; sub (311040 → if angle > 0, subtract π if overflowed
-  # spa; add (311040 → if angle < 0, add π if underflowed
-  var angle = object.angle + omega
+  let can_thrust = controls.thrust and object.fuel < 0
 
-  if angle > pi:
-    angle = angle - pi
-  if angle < -pi:
-    angle = angle + pi
+  # ── Angle update + normalization ───────────────────────────────
+  # L1112: mth, add .         — AC = rotation_amount + angle
+  # L1113: sma                — skip if AC < 0
+  # L1114: sub (311040        — AC >= 0 → subtract 2π
+  # L1115: spa                — skip if AC >= 0
+  # L1116: add (311040        — AC < 0 → add 2π
+  # L1117: dac i mth          — store updated angle
+  #
+  # Normalization clamps angle to a single revolution.
+  # The pattern: if positive, try subtracting 2π (if that goes negative, add it back).
+  #              if negative, add 2π (if that goes positive... already positive, keep it).
+  # Net effect: wraps angle into approximately [0, 2π) — matching the PDP-1 behavior.
 
-  # --- Trig computation ---
-  # Source: L1118-1119: jda sin; dac \sn
-  let trig = spacewar:sin(angle)
-  sin_heading = trig.sin
-  cos_heading = trig.cos
+  let raw_angle = rotation_amount + object.angle
 
-  # --- Store updated object ---
-  object = object with {
-    angular_velocity = omega,
-    angle = angle
+  # Exact PDP-1 normalization: sma/sub/spa/add cascade
+  # L1113-1114: if raw_angle >= 0, subtract 2π
+  let angle_step1 = if raw_angle >= 0 then raw_angle - two_pi else raw_angle
+  # L1115-1116: if result < 0, add 2π
+  let angle_final = if angle_step1 < 0 then angle_step1 + two_pi else angle_step1
+
+  # ── Trig computation ───────────────────────────────────────────
+  # L1118: jda sin             — call sin(angle)
+  # L1119: dac \sn             — store sin result
+  let trig = spacewar:sin(angle_final)
+
+  # ── Outputs ────────────────────────────────────────────────────
+  output sin_heading = trig.sin
+  output cos_heading = trig.cos
+  output thrust_enabled = can_thrust
+  output object = object with {
+    angular_velocity = stored_omega,
+    angle = angle_final
   }

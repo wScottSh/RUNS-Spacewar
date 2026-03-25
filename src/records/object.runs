@@ -81,8 +81,8 @@ record spacewar:object
 
     angle:                        spacewar:fixed18
       # Source: nth[i] (L689-690). Binary point right of bit 3.
-      # Ship heading in angle units. ±π range via normalization
-      # (±311040₈ = ±102944₁₀).
+      # Ship heading in angle units. [0, 2π) range via normalization
+      # (311040₈ = 102944₁₀ = 2π full circle).
       # Init: 144420₈ = 51472₁₀ (L803-804) for both ships.
       default: 0
 
@@ -127,7 +127,8 @@ record spacewar:object
       # Source: nh1[i] (L704-705).
       # The ship's state before entering hyperspace. Restored on breakout
       # (L1052: `lac i \mh1; dac i ml1`).
-      # Only meaningful for ships.
+      # Only meaningful for ships. The restored routine address
+      # never has the 400000₈ sign bit, so collidable = true.
       default: empty
 
     hyperspace_shots_remaining:   int

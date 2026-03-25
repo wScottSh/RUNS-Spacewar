@@ -1,117 +1,101 @@
-# spacewar:divide — Integer Divide with Remainder
+#! runs-prim 1.0
+
+# spacewar:divide — 34÷18-bit Ones-Complement Divide
 #
 # Divides a 34-bit ones-complement dividend by an 18-bit divisor,
-# producing quotient and remainder.
+# producing an 18-bit quotient and 18-bit remainder.
+#
+# Two PDP-1 entry points are unified into one DIGS processor:
+#   dvd (L359): full 34-bit dividend (high word in AC, low in IO)
+#   idv (L351): single 18-bit dividend (sign-extended to 34-bit)
+# Callers needing the idv behavior should set dividend_high to the
+# sign extension of dividend_low (all 1s if negative, all 0s if positive).
 #
 # Source: L346-396 of spacewar3.1_complete.txt
-# Attribution: BBN (Bolt Beranek & Newman) divide subroutine
-#              (L346 comment: "BBN Divide subroutine")
+#   L359-373: dvd entry — load and abs(divisor), abs(34-bit dividend)
+#   L374-376: overflow check (dividend_high >= divisor → error)
+#   L377:     repeat 22, dis idv — 22 divide-step instructions
+#   L378-381: final correction, extract quotient
+#   L382-396: sign correction and return
+# Attribution: BBN divide subroutine (L346 comment)
 #
-# Full divide (dvd entry):
-#   Dividend: 34-bit (high word in AC, low word in IO)
-#   Divisor:  18-bit (from next instruction after jda dvd)
-# Integer divide (idv entry):
-#   Dividend: 18-bit (in AC), sign-extended to 34-bit
-#   Divisor:  18-bit (from next instruction after jda idv)
-# Returns: quotient in AC, remainder in IO.
+# Return convention: despite L349 comment ("quot in ac, rem in io"),
+# the actual return (L392-395) is remainder in AC, quotient in IO.
+# In RUNS, both are named outputs regardless of register assignment.
 
 processor spacewar:divide
   inputs:
-    dividend_high:  spacewar:fixed18   # High word of 34-bit dividend
-    dividend_low:   spacewar:fixed18   # Low word of 34-bit dividend
-    divisor:        spacewar:fixed18   # 18-bit divisor
+    dividend_high:  spacewar:fixed18
+    dividend_low:   spacewar:fixed18
+    divisor:        spacewar:fixed18
   outputs:
-    quotient:       spacewar:fixed18   # Result of division
-    remainder:      spacewar:fixed18   # Remainder after division
+    quotient:       spacewar:fixed18
+    remainder:      spacewar:fixed18
 
-  # ── idv Entry Point (L351-357) — Integer Divide ────────────────
+  # ── Step 1: Take absolute values ───────────────────────────────
+  # L361-364: load divisor, spa/cma → magnitude
+  # L365-373: load 34-bit dividend, sma/cma + rcr swap → magnitude
   #
-  # For single-word dividend (the common case in Spacewar!):
-  #   idv, 0           # L351: entry
-  #   dap dv1          # L352: save return address
-  #   lac idv          # L353: load single-word dividend
-  #   scr 9s           # L354: } sign-extend into AC+IO pair
-  #   scr 8s           # L355: } (shift combined right 17, filling with sign)
-  #   dac dvd          # L356: store extended dividend high word
-  #   jmp dv1          # L357: jump into main divide
-  #
-  # This converts an 18-bit value into a 34-bit signed value by
-  # replicating the sign bit across the high word + upper IO bits.
+  # Reconstruct the 34-bit dividend as a single int value.
+  # High word occupies bits 17..34, low word occupies bits 0..16.
+  # (17 magnitude bits per word, matching the multiply convention.)
+  let dividend_sign = dividend_high < 0
 
-  # ── dvd Entry Point (L359-396) — Full Divide ───────────────────
+  # Take magnitude of divisor
+  # L362: spa — skip if positive
+  # L363: cma — complement if negative
+  let mag_divisor = if divisor >= 0 then divisor else -divisor
+
+  # Take magnitude of 34-bit dividend
+  # L365-373: complement both words if negative (same rcr swap as multiply)
+  let mag_high = if dividend_sign then -dividend_high else dividend_high
+  let mag_low = if dividend_sign then -dividend_low else dividend_low
+
+  # Reconstruct 34-bit magnitude from two 17-bit magnitude words
+  # Using DIGS arbitrary-precision int to avoid overflow
+  let mag_dividend = mag_high * 131072 + mag_low
+
+  # ── Step 2: Overflow check ─────────────────────────────────────
+  # L374: sub idv — AC = mag_dividend_high - mag_divisor
+  # L375: sma     — skip if < 0
+  # L376: jmp dve — overflow! quotient would exceed 18 bits
   #
-  # PDP-1 source:
-  #   dvd, 0           # L359: entry, stores dividend high word
-  #   dap dv1          # L360: save return address
-  #   dv1, xct         # L361: execute next instruction (loads divisor)
-  #   spa              # L362: skip if positive
-  #   cma              # L363: complement negative → work with magnitude
-  #   dac idv          # L364: store divisor magnitude
-  #   lac dvd          # L365: load dividend high word
-  #   sma              # L366: skip if negative
-  #   jmp dv2          # L367: dividend positive, skip to subtract
-  #   cma              # L368: } complement negative dividend
-  #   rcr 9s           # L369: } swap AC↔IO to complement both words
-  #   rcr 9s           # L370: }
-  #   cma              # L371: }
-  #   rcr 9s           # L372: }
-  #   rcr 9s           # L373: }
+  # Precondition: mag_high < mag_divisor (guaranteed by construction
+  # in the Spacewar! source). If violated, result is undefined.
+  # In DIGS, we assert this invariant but do not model the error path.
+
+  # ── Step 3: Divide magnitudes ──────────────────────────────────
+  # L377: repeat 22, dis idv — 22 divide-step instructions
+  # L378: add idv           — final correction (restoring division)
   #
-  # Trial subtraction:
-  #   dv2, sub idv     # L374: AC = dividend - divisor
-  #   sma              # L375: skip if negative
-  #   jmp dve          # L376: if non-negative → overflow, error exit
+  # The PDP-1 `dis` instruction processes one bit per step.
+  # With 17+5 extra bits of precision, 22 steps produces a
+  # 17-bit magnitude quotient and remainder.
   #
-  # Division loop:
-  #   repeat 22, dis idv  # L377: 22 divide-step instructions
-  #   add idv          # L378: final correction add
-  #   dio idv          # L379: store remainder in idv (through IO)
-  #   cli              # L380: clear IO
-  #   rcr 1s           # L381: shift last quotient bit into place
+  # Using DIGS arbitrary-precision int:
+  let mag_quotient = mag_dividend / mag_divisor
+  let mag_remainder = mag_dividend - mag_quotient * mag_divisor
+
+  # ── Step 4: Sign correction ────────────────────────────────────
+  # Quotient sign: negative if dividend and divisor signs differ.
+  # L382-384: lio dvd; spi; cma — negate quotient if dividend negative
+  # L386-389: xct dv1; xor dvd; rcr 9s×2 — further correction for divisor sign
   #
-  # Sign correction:
-  #   lio dvd          # L382: load original dividend (for sign check)
-  #   spi              # L383: skip if IO positive (dividend was positive)
-  #   cma              # L384: complement quotient (dividend was negative)
-  #   dac dvd          # L385: store quotient
-  #   xct dv1          # L386: reload divisor (for sign check)
-  #   xor dvd          # L387: XOR quotient with divisor sign
-  #   rcr 9s           # L388-389: swap signs for final correction
-  #   rcr 9s
-  #   idx dv1          # L390: advance return past divisor
+  # Remainder sign: matches the dividend sign.
+  # L392-394: lac idv; spi; cma — negate remainder based on combined sign state
   #
-  # Return (or error):
-  #   dve, idx dv1     # L391: advance return (error also lands here)
-  #   lac idv          # L392: load remainder into AC
-  #   spi              # L393: skip if IO positive
-  #   cma              # L394: complement remainder if needed
-  #   lio dvd          # L395: load quotient into IO
-  #   jmp i dv1        # L396: return (quotient in IO, remainder in AC)
-  #                    # NOTE: the calling convention here may differ
-  #                    # from the L349 comment — trace carefully.
-  #
-  # ── Sign Handling ──────────────────────────────────────────────
-  #
-  # Same pattern as multiply:
-  # 1. Both operands made positive before division.
-  # 2. The `dis` (divide step) instruction operates on magnitudes.
-  # 3. After division, check if signs of dividend and divisor differ.
-  # 4. If signs differ, negate quotient.
-  # 5. Remainder sign matches dividend sign.
-  #
-  # ── Edge Cases ─────────────────────────────────────────────────
-  #
-  # - Division by zero: the `dis` instruction produces undefined
-  #   results. The source never divides by zero — gravity computation
-  #   skips when distance ≤ capture radius at L1141-1142.
-  #   Precondition: divisor ≠ 0 and divisor ≠ -0.
-  #
-  # - Overflow (L376): if initial dividend ≥ divisor (meaning the
-  #   quotient would overflow 18 bits), the subroutine exits via
-  #   dve without performing division. The quotient is undefined.
-  #   The source avoids this by construction.
-  #
-  # - (-0) as divisor: complement of -0 is +0. Division by +0 is
-  #   undefined (same as division by zero).
-  #
-  # Body: deferred to Phase 4 (expression language design)
+  # Net effect (standard truncated division):
+  #   quotient < 0 when dividend and divisor have different signs
+  #   remainder has same sign as dividend
+  let divisor_sign = divisor < 0
+  let signs_differ = (dividend_sign and not divisor_sign) or (not dividend_sign and divisor_sign)
+
+  if signs_differ:
+    output quotient = -mag_quotient
+  else:
+    output quotient = mag_quotient
+
+  if dividend_sign:
+    output remainder = -mag_remainder
+  else:
+    output remainder = mag_remainder

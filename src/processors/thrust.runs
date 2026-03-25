@@ -1,70 +1,76 @@
-# spacewar:thrust — Engine Thrust + Gravity Application
+#! runs-prim 1.0
+
+# spacewar:thrust — Engine Thrust Application + Velocity Integration
 #
-# Applies thrust (if enabled) and gravity to ship velocity.
-# Performs the two diff macro calls that integrate velocity/position.
+# Computes the combined acceleration from thrust and gravity, then
+# integrates velocity and position using the diff macro.
 #
 # Source: L1167-1186 (bsg through diff calls)
+#
+# L1167 bsg, cla         — clear AC (reset from gravity code)
+# L1168 sad i \mfu        — skip if fuel != 0 (fuel still available)
+# L1169 clf 6             — fuel exhausted: clear flag 6 (no thrust)
+# L1170 lac i mth         — load angle
+# L1171 jda cos           — compute cosine
+# L1172 dac \cs            — store cosine in \cs
+# L1173 sar 9s            — cos >> 9 (normalize to single-location scale)
+# L1174 xct sac           — cos >> 4 (sac = sar 4s, total >> 13)
+# L1175 szf i 6           — skip if flag 6 SET (thrusting)
+# L1176 cla               — not thrusting: zero the thrust component
+# L1177 add \by            — add gravity_y factor
+# L1178 diff \mdy, my1, (sar 3s  — integrate Y: vel += accel, pos += vel >> 3
+# L1179 lac \sn            — load sine
+# L1180 sar 9s            — sin >> 9
+# L1181 xct sac           — sin >> 4 (total >> 13)
+# L1182 cma               — negate: thrust X is -sin (ship thrusts nose-first)
+# L1183 szf i 6           — skip if flag 6 SET
+# L1184 cla               — not thrusting: zero the component
+# L1185 add \bx            — add gravity_x factor
+# L1186 diff \mdx, mx1, (sar 3s  — integrate X: vel += accel, pos += vel >> 3
+#
+# Flag 6 encoding:
+#   Set by control word parsing at L1105-1110 when thrust button is
+#   pressed AND fuel is available. The sad/clf pair at L1167-1169
+#   provides a redundant safety check — Masswerk: "the code is making
+#   pretty sure that the flag would not be set when the ship would be
+#   run out of fuel."
+#
+# Fuel decrement:
+#   Does NOT occur here. Fuel is burned in the exhaust flame rendering
+#   loop at L1222-1224 (count i \mfu, st2; dzm i \mfu), which is a
+#   separate display concern outside this processor's scope.
 
 processor spacewar:thrust
   inputs:
     object:         spacewar:object
-    sin_heading:    spacewar:fixed18
-    cos_heading:    spacewar:fixed18
-    gravity_x:      spacewar:fixed18
-    gravity_y:      spacewar:fixed18
-    thrust_enabled: bool
+    sin_heading:    spacewar:fixed18     # sin(angle), from jda sin
+    cos_heading:    spacewar:fixed18     # cos(angle), from jda cos
+    gravity_x:      spacewar:fixed18     # \bx from gravity processor
+    gravity_y:      spacewar:fixed18     # \by from gravity processor
+    thrust_enabled: bool                 # flag 6: thrust button AND fuel > 0
     consts:         spacewar:game_constants
   outputs:
     object:         spacewar:object
-    flame_length:   int                   # For render: exhaust length, 0 if not thrusting
+  preconditions:
+    object.state == spacewar:ship
 
-  flame_length = 0
+  # ── Y-axis acceleration (L1173-1177) ───────────────────────────
+  # cos >> 9 >> sac (sac = 4): total shift 13
+  # If thrusting, accel_y = (cos >> 13) + gravity_y
+  # If not thrusting, accel_y = gravity_y
+  let cos_thrust = cos_heading >> 9 >> consts.thrust_scale_shift
+  let accel_y = if thrust_enabled then cos_thrust + gravity_y else gravity_y
 
-  # --- Thrust computation ---
-  # Source: L1167-1186
-  # If thrust_enabled:
-  #   cos_component = cos >> 9 >> sac (sac=4, total >>13)
-  #   sin_component = sin >> 9 >> sac (total >>13), negated
-  #   accel_y = gravity_y + cos_component
-  #   accel_x = gravity_x + (-sin_component)
-  #
-  # L1170-1176:
-  #   lac i mth; jda cos; dac \cs → cos of heading
-  #   sar 9s; xct sac             → cos >> 9 >> 4 = cos >> 13
-  #   szf i 6; cla                → if not thrusting, zero the accel
-  #   add \by                      → add gravity_y
-  #
-  # L1179-1185:
-  #   lac \sn; sar 9s; xct sac    → sin >> 13
-  #   cma                          → negate (thrust is opposite to heading)
-  #   szf i 6; cla                → if not thrusting, zero
-  #   add \bx                      → add gravity_x
+  # ── X-axis acceleration (L1179-1185) ───────────────────────────
+  # sin >> 9 >> sac, then cma (negate): thrust along X is -sin
+  # This is because the ship thrusts nose-first, and in the PDP-1
+  # coordinate system, X position decreases as the ship moves in
+  # the direction of sin(angle).
+  let sin_thrust = -(sin_heading >> 9 >> consts.thrust_scale_shift)
+  let accel_x = if thrust_enabled then sin_thrust + gravity_x else gravity_x
 
-  var accel_y = gravity_y
-  var accel_x = gravity_x
-
-  if thrust_enabled:
-    let cos_thrust = cos_heading >> 9 >> consts.thrust_scale_shift  # >>13 total
-    let sin_thrust = -(sin_heading >> 9 >> consts.thrust_scale_shift)
-    accel_y = accel_y + cos_thrust                  # L1177: add \by
-    accel_x = accel_x + sin_thrust                  # L1185: add \bx
-
-    # Decrement fuel
-    # Source: L1225-1226: count i \mfu, st2; dzm i \mfu
-    var fuel = object.fuel + 1
-    if fuel >= 0:
-      fuel = 0                                      # Count-around prevention
-    object = object with { fuel = fuel }
-
-    # Flame length from ranct
-    # Source: L1218: ranct sar 9s, sar 4s, \src
-    # This produces a random exhaust length. In RUNS, the runtime
-    # handles flame rendering; we just set a nonzero flag.
-    flame_length = 4                                 # Semantic: "thrusting"
-
-  # --- Integrate velocity and position ---
-  # Source: L1178: diff \mdy, my1, (sar 3s
-  #         L1186: diff \mdx, mx1, (sar 3s
+  # ── Velocity/position integration (L1178, L1186) ──────────────
+  # diff macro: vel += accel; pos += vel >> 3
   let iy = spacewar:velocity_integrate(
     object.position_y, object.velocity_y, accel_y, 3
   )
@@ -72,7 +78,7 @@ processor spacewar:thrust
     object.position_x, object.velocity_x, accel_x, 3
   )
 
-  object = object with {
+  output object = object with {
     position_x = ix.position,
     position_y = iy.position,
     velocity_x = ix.velocity,

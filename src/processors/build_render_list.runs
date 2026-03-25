@@ -1,24 +1,41 @@
+#! runs-prim 1.0
+
 # spacewar:build_render_list — Render Projection Construction
 #
 # Reads internal game state and produces outbound render_object[]
 # for the runtime to draw. This is a DATA PROJECTION — no gameplay
 # decisions flow backward from rendering.
 #
-# Source: L1187-1231 (ship display prep), entity dispatch rendering,
-#         plus star/central-star handling
+# This processor has no single PDP-1 counterpart. In the original,
+# rendering is interleaved with entity computation: each entity's
+# handling routine (ss1/ss2, tcr, mex, hp1, hp3) both computes
+# AND displays in one pass via dpy/dispt instructions. The RUNS
+# architecture separates these concerns — this processor collects
+# the scattered rendering decisions into a single output list.
+#
+# PDP-1 rendering instructions by entity type:
+#   Ship:           L1187-1216 — outline compiler output (scalable shape)
+#   Torpedo:        L1004      — dispt i, i my1, 1 (single point, intensity 1)
+#   Explosion:      L946-977   — mex particle loop (random scatter display)
+#   Hyperspace out: L1075-1076 — dispt i, i my1, 2 (single point, intensity 2)
+#   Hyperspace in:  (none)     — invisible, non-collidable
+#   Empty:          (none)     — slot unused
+#   Central star:   L586-622   — blp routine (always displayed after main loop)
+#
 # Cross-reference: 04_conversion_phases.md Phase 5 Work Item 7
 
 processor spacewar:build_render_list
   inputs:
-    objects:    spacewar:object[]
-    configs:    spacewar:ship_config[]
+    objects:    spacewar:object[24]
+    configs:    spacewar:ship_config[2]
   outputs:
     render_list: spacewar:render_object[]
 
-  var list: spacewar:render_object[] = []
-
   # --- Central star (always present) ---
-  list = list + [{
+  # Source: L938-939: jsp blp — called unconditionally at end of main loop.
+  # The central star is displayed regardless of entity state, after all
+  # entity handling and the Expensive Planetarium background.
+  output render_list = [{
     object_type = central_star,
     position_x = 0,
     position_y = 0,
@@ -30,73 +47,113 @@ processor spacewar:build_render_list
   }]
 
   # --- Active entities ---
-  for i from 0 to 23:
-    let obj = objects[i]
+  # Source: L843-937 — main loop iterates over nob (30₈ = 24₁₀) entity slots.
+  # L843: lac . (ml1) — load handling routine from mtb[i]
+  # L844: sza i       — skip if non-zero (active)
+  # L845: jmp mq1     — zero → inactive, skip to next slot
+  for obj in objects:
 
-    match obj.state:
-      case empty:
-        # Not rendered
-        continue
+    if obj.state == spacewar:empty:
+      # mtb[i] = 0. Unused entity slot. Not rendered.
+      # L844-845: sza i; jmp mq1 — skips directly to next object.
+      output render_list = render_list
 
-      case ship:
-        # Source: L1187-1216 (display prep for ships)
-        # Emit ship with position, angle, outline, and flame
-        list = list + [{
-          object_type = ship,
-          position_x = obj.position_x,
-          position_y = obj.position_y,
-          angle = obj.angle,
-          outline_data = configs[obj.outline_ref].outline_data,
-          brightness = 0,
-          particle_seed = 0,
-          particle_count = 0,
-          flame_length = 0     # Set by thrust Processor via separate channel
-        }]
+    elif obj.state == spacewar:ship:
+      # Source: L1079-1216 (ss1/ss2 spaceship handling routine)
+      # The ship routine computes physics, then renders the outline
+      # using the compiled outline code (stored at not[i]).
+      # L1189: lac i mx1     — load x position
+      # L1195: lac i my1     — load y position
+      # L1112-1117: mth angle normalization
+      # L1214: cla cli-opr  — clear before display
+      # L1215: dpy-4000     — display with outline
+      # Flame rendering: L1217-1231 (sq6-sq9) — only if thrusting (flag 6 set)
+      output render_list = render_list ++ [{
+        object_type = ship,
+        position_x = obj.position_x,
+        position_y = obj.position_y,
+        angle = obj.angle,
+        outline_data = configs[obj.outline_ref].outline_data,
+        brightness = 0,
+        particle_seed = 0,
+        particle_count = 0,
+        flame_length = 0
+      }]
 
-      case torpedo:
-        # Source: L1004: dispt i, i my1, 1 (single point at intensity 1)
-        list = list + [{
-          object_type = torpedo,
-          position_x = obj.position_x,
-          position_y = obj.position_y,
-          angle = 0,
-          brightness = 0,
-          particle_seed = 0,
-          particle_count = 0,
-          flame_length = 0
-        }]
+    elif obj.state == spacewar:torpedo:
+      # Source: L985-1005 (tcr — torpedo calc routine)
+      # L997-1003: torpedo applies space warpage to velocity
+      # L1004: dispt i, i my1, 1 — display single point at intensity 1
+      #   dispt is a macro: display point at (mx1, my1) with brightness 1
+      output render_list = render_list ++ [{
+        object_type = torpedo,
+        position_x = obj.position_x,
+        position_y = obj.position_y,
+        angle = 0,
+        brightness = 1,
+        particle_seed = 0,
+        particle_count = 0,
+        flame_length = 0
+      }]
 
-      case exploding:
-        # Source: L946-977 (mex routine generates particles)
-        # particle_seed and particle_count come from explosion_tick
-        list = list + [{
-          object_type = explosion,
-          position_x = obj.position_x,
-          position_y = obj.position_y,
-          angle = 0,
-          brightness = 0,
-          particle_seed = 0,      # Populated by explosion_tick outputs
-          particle_count = 0,     # Populated by explosion_tick outputs
-          flame_length = 0
-        }]
+    elif obj.state == spacewar:exploding:
+      # Source: L946-980 (mex — explosion routine)
+      # L950: dap mxr        — store return address
+      # L951-954: cla; diff  — apply velocity decay (sar 3s = velocity/8)
+      # L957-960: lac i mb1; cma cli-opr; sar 3s; dac \mxc — particle count
+      # L961-977: particle display loop
+      #   L964: random        — PRNG state drives particle scatter
+      #   L972: mi1 (= hlt + random shift) — combined random display offset
+      #   L976: dpy-i 300     — display particle
+      #   L977: count \mxc,mz1 — loop until particle count exhausted
+      # L978: count i ma1, mxr — decrement lifetime; if expired, return
+      # L979: dzm i ml1       — clear mtb[i] (entity becomes empty)
+      #
+      # The particle_seed and particle_count are computed by the
+      # explosion_tick processor and passed via the render_object fields.
+      # This projection only emits the entity position — the runtime
+      # reproduces the particle positions using the PRNG from the seed.
+      output render_list = render_list ++ [{
+        object_type = explosion,
+        position_x = obj.position_x,
+        position_y = obj.position_y,
+        angle = 0,
+        brightness = 0,
+        particle_seed = 0,
+        particle_count = 0,
+        flame_length = 0
+      }]
 
-      case hyperspace_in:
-        # Source: invisible, non-collidable — NOT rendered
-        continue
+    elif obj.state == spacewar:hyperspace_in:
+      # Source: L1007-1047 (hp1 — hyperspace transit routine)
+      # mtb[i] = hp1 | 400000₈ — sign bit set (non-collidable).
+      # The ship is INVISIBLE during transit. No dpy/dispt instruction
+      # is issued in the hp1 routine — it only randomizes position and
+      # velocity for the eventual breakout.
+      # NOT RENDERED.
+      output render_list = render_list
 
-      case hyperspace_out:
-        # Source: L1075-1076: dispt i, i my1, 2 (rendered at intensity 2)
-        # Ship is visible during breakout, at reduced brightness
-        list = list + [{
-          object_type = ship,
-          position_x = obj.position_x,
-          position_y = obj.position_y,
-          angle = obj.angle,
-          outline_data = configs[obj.outline_ref].outline_data,
-          brightness = 2,         # Reduced intensity (breakout phase)
-          particle_seed = 0,
-          particle_count = 0,
-          flame_length = 0
-        }]
+    elif obj.state == spacewar:hyperspace_out:
+      # Source: L1050-1077 (hp3 — hyperspace breakout routine)
+      # mtb[i] = hp3 — no sign bit (collidable during breakout).
+      # L1075: lac i mx1           — load x position
+      # L1076: dispt i, i my1, 2  — display at intensity 2 (reduced brightness)
+      # The ship is visible as a single point with reduced brightness
+      # during the breakout phase, before returning to full ship display.
+      # The outline is also rendered since the ship is transitioning back
+      # to normal state.
+      output render_list = render_list ++ [{
+        object_type = ship,
+        position_x = obj.position_x,
+        position_y = obj.position_y,
+        angle = obj.angle,
+        outline_data = configs[obj.outline_ref].outline_data,
+        brightness = 2,
+        particle_seed = 0,
+        particle_count = 0,
+        flame_length = 0
+      }]
 
-  render_list = list
+    else:
+      # Unknown state — should not occur. Pass through unchanged.
+      output render_list = render_list

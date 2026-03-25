@@ -272,10 +272,10 @@ Phases are strictly ordered — each phase's inputs are produced by prior phases
    - **The `sar 3s` is NOT general damping** — it's specific to each `diff` call. Gravity uses `sar 3s` (L1178, L1186), torpedo gravity uses `sar 3s` as well (L1000, L1003). These are integration scale factors.
 
 5. **`spacewar:wrap_position`** (implicit in PDP-1):
-   - The PDP-1's 10-bit display registers overflow silently — a position at 512 wraps to -511 automatically. In RUNS, this must be explicit.
-   - Input: `position_x/y`, `display_config.width/height`.
-   - Logic: wrap coordinates modularly within the playfield bounds. Use ones-complement-compatible modular arithmetic.
-   - Output: wrapped `position_x`, `position_y`.
+   - The PDP-1's 18-bit ones-complement word size provides toroidal wrapping for free — a position at 131071 (`377777₈`) overflows to -131071 (`400000₈`) automatically. The 10-bit display registers use only the top 10 bits of this 18-bit position; the lower 8 bits are sub-pixel precision. In RUNS, this wrapping is implicit in the `spacewar:fixed18` type; the explicit Processor documents the toroidal topology in the network graph.
+   - Input: `position_x/y`.
+   - Logic: identity pass-through. The `spacewar:fixed18` type (18-bit, ones-complement, range ±131071) enforces wrapping through its arithmetic rules. All upstream operations produce already-wrapped results.
+   - Output: `position_x`, `position_y` (unchanged).
 
 6. **`spacewar:torpedo_launch`** (L1232–1244):
    - Input: `player_controls.fire`, `object.prev_controls`, `object.lifetime` (reload timer), `object.torpedoes`, `game_config.rapid_fire`

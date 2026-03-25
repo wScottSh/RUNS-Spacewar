@@ -1,88 +1,82 @@
-# spacewar:sqrt — Integer Square Root
+#! runs-prim 1.0
+
+# spacewar:sqrt — Integer Square Root (Binary Digit-by-Digit)
 #
-# Computes the integer square root of an 18-bit ones-complement value.
-# Iterative algorithm with 23 fixed steps.
+# Computes the integer square root of an 18-bit ones-complement value
+# using a binary digit-by-digit algorithm. In binary, each step has
+# only two cases (digit = 0 or 1), eliminating the trial-and-error
+# that makes decimal long-form square root cumbersome.
 #
 # Source: L304-343 of spacewar3.1_complete.txt
-# No external attribution (likely PDP-1 community subroutine)
+#   L309-315: sqt entry — save return, init counter/result/remainder
+#   L317-320: loop control — isp sq1, return when counter > 0
+#   L322-340: loop body — bring down 2 bits, test divisor, update
+#   L342-343: sq1 (counter), sq2 (result) — private storage
+# No external attribution (PDP-1 community subroutine, likely BBN)
 #
-# Input:  binary point to right of bit 17 (integer)
-# Output: binary point between bits 8 and 9
-# Largest valid input: 177777₈ = 65535₁₀ (L307 comment)
+# Masswerk: Part 6, §Square Roots (insidespacewar-pt6-gravity.html)
+# Full annotated listing and JavaScript pseudocode verified against
+# the PDP-1 emulator by Norbert Landsteiner.
+#
+# Input:  binary point to right of bit 17 (integer).
+#         Largest valid input: 177777₈ = 65535₁₀ (L307 comment).
+# Output: binary point between bits 8 and 9.
+#         sqrt(N) is returned scaled by 2^9 = 512.
+#         Example: sqrt(4) → 2 × 512 = 1024 = 2000₈.
+#
+# Loop count: `law i 23` loads -23₈ = -19₁₀. The `isp` loop
+# produces 18 result digits (confirmed by Masswerk pseudocode).
+#
+# Algorithm (per Masswerk pseudocode, verified against PDP-1 source):
+#   result = 0; remainder = 0; num = input
+#   for 18 iterations:
+#     result <<= 1                              [L322-324: sal 1s]
+#     t = (remainder << 2) | (num >> 16)        [L325-326: rcl 2s]
+#     num <<= 2                                 [rcl 2s on IO]
+#     if t != 0:                                [L327: sza i]
+#       remainder = t                           [L329: dac sqt]
+#       divisor = (result << 1) + 1             [L330-332: sal 1s, add (1]
+#       if divisor <= remainder:                [L333-335: sub sqt, sma+sza]
+#         remainder -= divisor                  [L336-338: spa, cma, dac sqt]
+#         result++                              [L339: idx sq2]
 
 processor spacewar:sqrt
   inputs:
     value:    spacewar:fixed18     # Non-negative integer to take sqrt of
   outputs:
-    root:     spacewar:fixed18     # Integer square root
+    root:     spacewar:fixed18     # Integer square root (bp between bits 8,9)
+  preconditions:
+    value >= 0
 
-  # ── Algorithm (L309-343) ───────────────────────────────────────
+  # ── Main loop: 18 iterations (L317-340) ───────────────────────
+  # Each iteration extracts 2 bits from the input MSB-first and
+  # determines one bit of the result.
   #
-  # This is a digit-by-digit (binary) square root algorithm,
-  # computing one bit of the result per iteration (23 iterations).
+  # Initialization (L311-315):
+  #   sq1 = -19₁₀ (loop counter, 23₈ = 19₁₀)
+  #   sq2 = 0 (result accumulator)
+  #   IO  = input, sqt = 0 (remainder)
   #
-  # Variables:
-  #   sqt  = input value / working remainder (L309, also used as scratch)
-  #   sq1  = iteration counter, initialized to -23 (L311: law i 23)
-  #   sq2  = accumulating result (root), initialized to 0 (L313: dzm sq2)
+  # Per-iteration logic:
+  #   result <<= 1                     shift result for new digit
+  #   t = (remainder << 2) | top2(num) bring down 2 bits via rcl 2s
+  #   num <<= 2                        consume 2 input bits
+  #   if t == 0: digit = 0, remainder unchanged (sza i shortcut)
+  #   else: divisor = (result << 1) + 1
+  #         if divisor <= t: remainder = t - divisor, result++
+  #         else: remainder = t (digit = 0)
   #
-  # PDP-1 source:
-  #   sqt, 0          # L309: entry, stores argument
-  #   dap sqx          # L310: save return address
-  #   law i 23         # L311: load -23 (23 iterations)
-  #   dac sq1          # L312: store in counter
-  #   dzm sq2          # L313: clear result accumulator
-  #   lio sqt          # L314: load argument into IO register
-  #   dzm sqt          # L315: clear sqt (will build remainder here)
-  #
-  # Main loop at sq3 (L317):
-  #   isp sq1          # L317: increment counter, skip if positive
-  #   jmp .+3          # L318: if not done, continue at L322
-  #   lac sq2          # L319: done — load result
-  #   sqx, jmp .       # L320: return
-  #
-  #   -- Loop body (L322-340) --
-  #   lac sq2          # L322: load partial result
-  #   sal 1s           # L323: shift left 1
-  #   dac sq2          # L324: store shifted result
-  #   lac sqt          # L325: load remainder
-  #   rcl 2s           # L326: rotate left 2 (shift in next 2 bits from IO)
-  #   sza i            # L327: skip if NOT zero (test extracted bits)
-  #   jmp sq3          # L328: if zero, this bit of root is 0, next iteration
-  #   dac sqt          # L329: store updated remainder
-  #   lac sq2          # L330: load partial result
-  #   sal 1s           # L331: shift left 1
-  #   add (1           # L332: add 1 (trial bit)
-  #   sub sqt          # L333: subtract remainder
-  #   sma+sza-skip     # L334: skip if negative or zero (trial too large)
-  #   jmp sq3          # L335: trial too large → bit is 0, next iteration
-  #   spa              # L336: skip if positive (exact or remainder > 0)
-  #   cma              # L337: complement if negative (ones-complement abs)
-  #   dac sqt          # L338: store new remainder
-  #   idx sq2          # L339: increment partial result (this bit is 1)
-  #   jmp sq3          # L340: next iteration
-  #
-  # ── Binary Point Shift ─────────────────────────────────────────
-  #
-  # Input has binary point right of bit 17 (integer).
-  # Output has binary point between bits 8 and 9.
-  # This means: sqrt(N) is returned scaled by 2^9 = 512.
-  # For example: sqrt(4) → 2 × 512 = 1024 = 2000₈.
-  #
-  # The 23 iterations produce a result with ~9 bits of precision
-  # in the integer part and ~14 bits total (including fractional).
-  #
-  # ── Edge Cases ─────────────────────────────────────────────────
-  #
-  # - Input = 0: IO register is 0, rcl 2s always produces 0,
-  #   sza i always skips → sq2 stays 0 for all 23 iterations.
-  #   Result: 0. Correct.
-  #
-  # - Input = 177777₈ (max): produces correct result per the
-  #   bit-position convention. Verify experimentally.
-  #
-  # - Negative input: undefined. The source only calls sqt after
-  #   computing r² (which is always non-negative). The Processor
-  #   should either document this precondition or clamp to 0.
-  #
-  # Body: deferred to Phase 4 (expression language design)
+  # Bit masking: 262143 = 0o777777 = 2^18 - 1 (18-bit mask).
+  # num >> 16: extracts top 2 bits of 18-bit word.
+  for step in range(18) from result = 0, remainder = 0, num = value:
+    let result = result << 1
+    let t = (remainder << 2) | ((num >> 16) & 3)
+    let num = (num << 2) & 262143
+    let d = (result << 1) + 1
+    let result = if t != 0 and d <= t then result + 1 else result
+    let remainder = if t == 0 then remainder elif d <= t then t - d else t
+
+  # ── Return (L319-320) ──────────────────────────────────────────
+  # lac sq2  — load result
+  # sqx, jmp .  — return
+  output root = result

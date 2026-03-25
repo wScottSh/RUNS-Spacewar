@@ -1,10 +1,44 @@
+#! runs-prim 1.0
+
 # spacewar:torpedo_launch — Torpedo Fire Intent
 #
 # Edge-detects the fire button, checks reload timer and ammo,
 # and produces a spawn request if all conditions are met.
-# Actual entity creation is handled by Phase 5's process_spawns.
+# Actual entity creation is handled by process_spawns.
 #
-# Source: L1232-1244 (sq9 through st1)
+# Source: L1232-1244 (sq9 through sr5), with spawn parameters
+# derived from L1187-1199 (nose position) and L1274-1284
+# (torpedo velocity and reload timer).
+#
+# Algorithm (L1232-1244):
+#   L1232: count i ma1, sr5 — increment reload timer. If still
+#          negative, jump to sr5 (tubes cooling). If >= 0, tubes
+#          are reloaded.
+#   L1233: dzm i ma1 — zero reload timer (prevent count-around).
+#   L1234: lac mco — load previous control word.
+#   L1235: cma — complement (invert all bits for edge detection).
+#   L1236: szs i 30 — skip if SW3 (rapid_fire) is NOT set.
+#   L1237: clc — SW3 is set: AC = all-1s (bypass edge detection).
+#   L1238: and \scw — AND with current control word.
+#          Normal:     (~prev) & current = newly pressed buttons.
+#          Rapid fire: all-1s & current = current (every frame fires).
+#   L1239: ral 3s — rotate left 3: torpedo bit (4th from top) → sign.
+#   L1240: sma — skip if AC < 0 (torpedo bit was set after masking).
+#   L1241: jmp sr5 — no fire intent → skip.
+#   L1242: count i \mtr, st1 — increment torpedo count. If still
+#          negative (ammo remaining), jump to st1 (fire!). If >= 0,
+#          torpedoes exhausted.
+#   L1243: dzm i \mtr — zero torpedo count (prevent count-around).
+#   L1244: jmp sr5 — no ammo → skip.
+#
+# Edge detection:
+#   The PDP-1 derives fire intent from (complement of prev_controls)
+#   AND'd with current_controls. This detects 0→1 transitions (button
+#   presses, not holds). With rapid_fire (SW3), the complement is
+#   replaced with all-1s, making every frame a "press".
+#   In RUNS, controls.fire is edge-detected by the runtime (true only
+#   on the frame the button is pressed). Rapid-fire maps to: fire on
+#   every frame the button is held.
 
 processor spacewar:torpedo_launch
   inputs:
@@ -12,8 +46,8 @@ processor spacewar:torpedo_launch
     controls:     spacewar:player_controls
     config:       spacewar:game_config
     consts:       spacewar:game_constants
-    sin_heading:  spacewar:fixed18       # From rotation_update
-    cos_heading:  spacewar:fixed18       # From rotation_update
+    sin_heading:  spacewar:fixed18       # \sn from jda sin at L1118
+    cos_heading:  spacewar:fixed18       # \cs from jda cos at L1172
   outputs:
     object:         spacewar:object
     spawn_torpedo:  bool                 # Whether to spawn a torpedo
@@ -21,67 +55,107 @@ processor spacewar:torpedo_launch
     spawn_y:        spacewar:fixed18
     spawn_dx:       spacewar:fixed18     # Torpedo velocity (heading + inherited)
     spawn_dy:       spacewar:fixed18
-    reload_time:    int                  # Reload timer value to set
+  preconditions:
+    object.state == spacewar:ship
 
-  spawn_torpedo = false
-
-  # --- Check reload timer ---
-  # Source: L1232-1233: count i ma1, sr5; dzm i ma1
+  # ── Reload timer (L1232-1233) ──────────────────────────────────
+  # count i ma1, sr5: isp increments the reload timer. If the result
+  # is still negative, tubes are cooling → no fire possible.
+  # If >= 0, the timer has expired → tubes reloaded, zero the timer.
+  #
   # The lifetime field is re-used as reload timer for ships.
-  var reload = object.lifetime + 1
-  if reload >= 0:
-    reload = 0                           # Count-around prevention (L1233: dzm i ma1)
-  object = object with { lifetime = reload }
+  let reload = object.lifetime + 1
+  let reload = if reload >= 0 then 0 else reload
+  let object = object with { lifetime = reload }
 
-  # If still reloading and NOT rapid fire, skip
-  # Source: L1236-1237: szs i 30; clc — SW3 inverts the reload check
+  # ── Check reloaded OR rapid_fire (L1236-1237) ──────────────────
+  # szs i 30: skip if SW3 is NOT set. If SW3 is set (rapid_fire),
+  # the edge detection mask becomes all-1s via clc, bypassing the
+  # reload check by allowing fire even while reloading.
+  # In RUNS: reloaded = reload >= 0, or rapid_fire overrides.
   let reloaded = reload >= 0 or config.rapid_fire
 
   if not reloaded:
-    # Still reloading, no fire possible
+    # Still reloading, no fire possible.
+    output object = object
+    output spawn_torpedo = false
+    output spawn_x = 0
+    output spawn_y = 0
+    output spawn_dx = 0
+    output spawn_dy = 0
   else:
-    # --- Edge detect fire button ---
-    # Source: L1234-1240
-    # lac mco (prev controls); cma; and \scw (current); ral 3s; sma
-    # Fire only on PRESS (transition from not-pressed to pressed).
-    # In RUNS: the runtime provides the current state. We compare
-    # with prev_controls stored on the object.
-    let fire_pressed = controls.fire           # Current frame
-    # Edge detection would compare with prev_controls, but in RUNS
-    # the controls Record provides intent per-frame. The runtime
-    # is responsible for edge detection (fire = true only on press frame).
-
-    if fire_pressed:
-      # --- Check ammo ---
-      # Source: L1242-1244: count i \mtr, st1; dzm i \mtr; jmp sr5
-      var torps = object.torpedoes + 1
+    # ── Edge-detect fire button (L1234-1241) ─────────────────────
+    # In the PDP-1, this is:
+    #   lac mco; cma; [szs i 30; clc]; and \scw; ral 3s; sma
+    # Normal mode: (~prev_controls) & current → fires on 0→1 press.
+    # Rapid mode: all-1s & current → fires every held frame.
+    #
+    # In RUNS: controls.fire is already edge-detected by the runtime
+    # (true only on press frame). With rapid_fire, fire is true on
+    # every frame the button is held, which the runtime provides.
+    if not controls.fire:
+      # No fire intent this frame.
+      output object = object
+      output spawn_torpedo = false
+      output spawn_x = 0
+      output spawn_y = 0
+      output spawn_dx = 0
+      output spawn_dy = 0
+    else:
+      # ── Check ammo (L1242-1244) ────────────────────────────────
+      # count i \mtr, st1: increment torpedo count. If still negative
+      # (ammo remaining), jump to st1 (proceed to fire). If >= 0,
+      # torpedoes exhausted → zero counter and skip.
+      let torps = object.torpedoes + 1
       if torps >= 0:
-        torps = 0                        # Count-around prevention (L1243)
-        # Torpedoes exhausted — cannot fire
-        object = object with { torpedoes = torps }
+        # Torpedoes exhausted. L1243: dzm i \mtr (zero counter).
+        let object = object with { torpedoes = 0 }
+        output object = object
+        output spawn_torpedo = false
+        output spawn_x = 0
+        output spawn_y = 0
+        output spawn_dx = 0
+        output spawn_dy = 0
       else:
-        # --- Fire torpedo! ---
-        object = object with { torpedoes = torps }
+        # ── Fire torpedo! ────────────────────────────────────────
+        # Decrement ammo (torps is already incremented).
+        let object = object with { torpedoes = torps }
 
-        spawn_torpedo = true
+        output spawn_torpedo = true
 
-        # Source: L1260-1264: torpedo position = ship nose (\stx, \sty)
-        # Ship nose = position + 2× (sin, cos) offset
-        # L1191-1199: sub \ssn; dac \sx1; sub \ssn; dac \stx (nose is 2× further)
-        # \ssn = sin >> 5 (from scale at L1187)
+        # ── Spawn position: ship nose (L1187-1199) ──────────────
+        # L1187: scale \sn, 5s, \ssn → ssn = sin >> 5
+        # L1188: scale \cs, 5s, \scn → scn = cos >> 5
+        # L1191-1192: lac mx1; sub \ssn; dac \sx1 → tip_x = pos_x - ssn
+        # L1193-1194: sub \ssn; dac \stx → nose_x = tip_x - ssn = pos_x - 2*ssn
+        # L1195-1196: lac my1; add \scn; dac \sy1 → tip_y = pos_y + scn
+        # L1198-1199: add \scn; dac \sty → nose_y = tip_y + scn = pos_y + 2*scn
         let sin_offset = sin_heading >> 5
         let cos_offset = cos_heading >> 5
-        spawn_x = object.position_x - sin_offset - sin_offset   # Nose X
-        spawn_y = object.position_y + cos_offset + cos_offset   # Nose Y
+        output spawn_x = object.position_x - sin_offset - sin_offset
+        output spawn_y = object.position_y + cos_offset + cos_offset
 
-        # Source: L1274-1282: torpedo velocity = heading × tvl + ship velocity
-        # lac \sn; xct tvl → sin >> tvl_shift
-        # cma; add i \mdx  → -sin component + ship velocity_x
+        # ── Torpedo velocity (L1274-1282) ────────────────────────
+        # L1274: lac \sn — load sine
+        # L1275: xct tvl — execute sar 4s (torpedo velocity scale)
+        # L1276: cma — complement (negate for X direction)
+        # L1277: add i \mdx — add ship velocity_x
+        # L1278: sr3, dac . — store as torpedo dx
+        # L1279: lac \cs — load cosine
+        # L1280: xct tvl — execute sar 4s
+        # L1281: add i \mdy — add ship velocity_y
+        # L1282: sr4, dac . — store as torpedo dy
         let torp_speed_x = -(sin_heading >> consts.torpedo_velocity_shift)
         let torp_speed_y = cos_heading >> consts.torpedo_velocity_shift
-        spawn_dx = torp_speed_x + object.velocity_x   # L1277: add i \mdx
-        spawn_dy = torp_speed_y + object.velocity_y   # L1281: add i \mdy
+        output spawn_dx = torp_speed_x + object.velocity_x
+        output spawn_dy = torp_speed_y + object.velocity_y
 
-        # Set reload timer
-        # Source: L1283-1284: xct rlt; dac i ma1
-        reload_time = -consts.torpedo_reload_time
+        # ── Set reload timer (L1283-1284) ────────────────────────
+        # L1283: xct rlt — execute law i 20₈ → AC = -16₁₀
+        # L1284: dac i ma1 — store in reload timer (lifetime field)
+        #
+        # The reload time is stored as a negative ones-complement
+        # value. The count macro will increment it each frame
+        # until it reaches 0.
+        let object = object with { lifetime = 0 - consts.torpedo_reload_time }
+        output object = object

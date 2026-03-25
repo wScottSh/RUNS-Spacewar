@@ -1,40 +1,73 @@
+#! runs-prim 1.0
+
 # spacewar:cos — Cosine Function (Wrapper for Sin)
 #
 # Computes the cosine by adding π/2 to the argument and calling sin.
 # This is not a separate computation — the PDP-1 source implements
 # cos as an entry point that falls through to the sin polynomial.
 #
+# cos(θ) = sin(θ + π/2)
+#
 # Source: L200-205 of spacewar3.1_complete.txt
-# Attribution: Adams Associates sine-cosine subroutine
+#   L200: cos, 0         — entry point (argument stored here by jda cos)
+#   L201: dap csx        — save return address
+#   L202: lac (62210     — AC = π/2 = 62210₈ = 25736₁₀
+#   L203: add cos        — AC = π/2 + argument
+#   L204: dac sin        — store shifted argument at sin's entry point
+#   L205: jmp .+4        — jump to L209 (lac sin), entering sin's body
+# Attribution: Adams Associates sine-cosine subroutine (L190)
 
 processor spacewar:cos
   inputs:
-    angle:    spacewar:fixed18     # Angle with binary point right of bit 3
+    angle:    spacewar:fixed18
   outputs:
-    cos:      spacewar:fixed18     # Cosine result with binary point right of bit 0
-    sin:      spacewar:fixed18     # Sine result (also computed as side effect)
+    cos:      spacewar:fixed18
+    sin:      spacewar:fixed18
 
-  # ── Algorithm (L200-205) ───────────────────────────────────────
+  # L202: lac (62210 — π/2 in angle units
+  # Binary point right of bit 3. 62210₈ = 25736₁₀.
+  # Full circle = 4 × π/2 = 4 × 25736 = 102944₁₀ = 311040₈.
+  let pi_half = 25736
+
+  # L203: add cos — AC = π/2 + argument
+  let shifted_angle = angle + pi_half
+
+  # L204-205: dac sin; jmp .+4 — store in sin and enter sin's body.
+  # The entire sin subroutine runs on the shifted angle.
+  # sin(θ + π/2) = cos(θ)
   #
-  # PDP-1 source:
-  #   cos, 0                  # L200: entry point, return address storage
-  #   dap csx                 # L201: save return address
-  #   lac (62210              # L202: load π/2 (62210₈ = 25736₁₀)
-  #   add cos                 # L203: add to original argument
-  #   dac sin                 # L204: store as sin's argument
-  #   jmp .+4                 # L205: jump into sin's normalization
+  # The sin subroutine outputs:
+  #   .sin = sin(shifted_angle) = sin(θ + π/2) = cos(θ)   ← our primary result
+  #   .cos = cos(shifted_angle) = cos(θ + π/2) = -sin(θ)  ← secondary
   #
-  # This is functionally:
-  #   cos(θ) = sin(θ + π/2)
+  # BUT: the PDP-1 sin subroutine uses the "cos" memory location as
+  # scratch storage for x² during polynomial evaluation (L221, L224,
+  # L226, L230). The value left in "cos" after return is NOT the
+  # mathematical cosine of the shifted angle — it's the last polynomial
+  # intermediate. The only reliable output is what's left in AC after
+  # the return (the sin result).
   #
-  # The sin subroutine then computes both sin and cos of the
-  # shifted angle. The "cos" output here is the primary result;
-  # the "sin" output is the secondary.
+  # In RUNS, the spacewar:sin processor's outputs are defined as:
+  #   .sin = primary result (sin of input angle)
+  #   .cos = cosine (computed as documented side effect)
+  # So calling sin(θ + π/2) gives:
+  #   .sin = sin(θ + π/2) = cos(θ)
+  #   .cos = from sin's cosine computation of shifted angle
+
+  let result = spacewar:sin(shifted_angle)
+
+  # The sin processor's primary output (.sin) for the shifted angle
+  # is our cosine result.
+  output cos = result.sin
+
+  # The sin of the original angle: sin(θ) = -cos(θ + π/2).
+  # However, the PDP-1 return sequence at L240 loads "lac cos" which
+  # is the scratch value, not a proper sin output. The actual sin
+  # value for the original angle is NOT reliably returned by the
+  # cos entry point in the PDP-1 — callers of jda cos only use AC
+  # (which contains the cosine result).
   #
-  # ── Constant ───────────────────────────────────────────────────
-  #
-  # pi_half = 62210₈ = 25736₁₀
-  #   In angle units (binary point right of bit 3), this represents
-  #   π/2 radians. The full circle is 4 × 62210₈ = 310040₈ ≈ 311040₈.
-  #
-  # Body: deferred to Phase 4 (expression language design)
+  # In RUNS, we provide the sin output via the sin processor's
+  # secondary output for completeness, noting that the PDP-1 cos
+  # entry point does not guarantee this value.
+  output sin = result.cos

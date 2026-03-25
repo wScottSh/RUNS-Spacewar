@@ -1,9 +1,12 @@
+#! runs-prim 1.0
+
 # spacewar:advance_starfield_scroll — Two-Level Timer Starfield Scroll
 #
 # Peter Samson's Expensive Planetarium scrolls the star background
-# by 1 position every ~40 frames, using a two-level timer cascade.
+# by 1 position every 32 frames, using a two-level timer cascade.
 #
-# Source: L623-653 (bck routine, bcc/bkc/fpr variables)
+# Source: L629-653 (bck routine, bcc/bkc/fpr variables)
+# Masswerk: Part 1, "The Expensive Planetarium" (insidespacewar-pt1-ep.html)
 
 processor spacewar:advance_starfield_scroll
   inputs:
@@ -13,48 +16,52 @@ processor spacewar:advance_starfield_scroll
     starfield:  spacewar:starfield_state
 
   # --- SW4: disable background ---
-  # Source: L630: szs 40; jmp bcx
+  # L630: szs 40  — skip if sense switch 4 is NOT set
+  # L631: jmp bcx — if SW4 set, return immediately (no stars)
   if config.disable_background:
-    # No scroll when background is disabled
+    output starfield = starfield
   else:
     # --- Level 1: frame counter (bcc) ---
-    # Source: L632-635
-    # isp bcc; jmp bcx  → count up, skip if positive
-    # law i 2; dac bcc  → reset to -2 (fires every 2 frames)
-    var frame_counter = starfield.scroll_counter + 1
-    if frame_counter < 0:
-      # Not yet time — just update counter
-      starfield = starfield with { scroll_counter = frame_counter }
-    else:
-      # Frame counter fired — reset and check scroll counter
-      frame_counter = -2                     # L634-635: law i 2; dac bcc
+    # L632: isp bcc — increment bcc, skip if result >= 0
+    # L633: jmp .   — (bcx) return if bcc still negative
+    let bcc = starfield.frame_counter + 1
 
-      # Source: L636-639: dislis calls (runtime rendering, not game logic)
+    if bcc < 0:
+      # bcc still negative — not yet time. Return with updated counter.
+      output starfield = starfield with { frame_counter = bcc }
+    else:
+      # bcc fired (>= 0). Reset to -2.
+      # L634: law i 2  — AC = -2
+      # L635: dac bcc  — bcc = -2
+      let bcc_reset = -2
+
+      # L636-639: dislis calls — rendering only, not game state.
+      # The four dislis macro expansions display star magnitudes 1-4
+      # at different CRT brightness levels. This is a runtime concern,
+      # not modeled in DIGS.
 
       # --- Level 2: scroll counter (bkc) ---
-      # Source: L640-648
-      # isp bkc; jmp bcx → count up, skip if positive
-      # law i 20; dac bkc → reset to -20 (fires every 20 level-1 ticks)
-      # law i 1; add fpr → advance scroll offset by 1
-      # spa; add (20000 → wrap at 0 (fpr goes down; add 20000₈ = 8192 when negative)
-      # dac fpr
+      # L640: isp bkc — increment bkc, skip if result >= 0
+      # L641: jmp bcx — return if bkc still negative
+      let bkc = starfield.scroll_counter + 1
 
-      # Note: we combine bcc into the scroll_counter field.
-      # The two-level timer means: bkc fires every 20 × 2 = 40 frames.
-      # For simplicity, we model the combined behavior:
-      # scroll_counter counts from -40 to 0, advancing scroll by 1 when it fires.
-      var scroll_ctr = starfield.scroll_counter + 1
-      if scroll_ctr < 0:
-        starfield = starfield with { scroll_counter = scroll_ctr }
+      if bkc < 0:
+        # bkc still negative — no scroll this tick.
+        output starfield = starfield with { frame_counter = bcc_reset, scroll_counter = bkc }
       else:
-        # Scroll advances!
-        scroll_ctr = -40                     # Combined: -20 × 2 frames
+        # bkc fired (>= 0). Reset to -16.
+        # L642: law i 20  — AC = -16₁₀ (20₈ = 16₁₀)
+        # L643: dac bkc   — bkc = -16
+        let bkc_reset = -16
 
-        var offset = starfield.scroll_offset - 1  # L644: law i 1; add fpr (fpr counts DOWN)
-        if offset < 0:
-          offset = offset + 8192             # L647: add (20000 — wrap
+        # Advance scroll offset (fpr) by decrementing.
+        # L644: law i 1   — AC = -1
+        # L645: add fpr   — AC = fpr + (-1) = fpr - 1
+        let offset = starfield.scroll_offset + -1
 
-        starfield = starfield with {
-          scroll_offset = offset,
-          scroll_counter = scroll_ctr
-        }
+        # L646: spa        — skip if AC >= 0
+        # L647: add (20000 — AC = AC + 8192₁₀ (wrap around)
+        # L648: dac fpr    — fpr = AC
+        let offset = if offset >= 0 then offset else offset + 8192
+
+        output starfield = starfield with { frame_counter = bcc_reset, scroll_counter = bkc_reset, scroll_offset = offset }

@@ -1,59 +1,118 @@
-# spacewar:check_restart — Round-End Detection
+#! runs-prim 1.0
+
+# spacewar:check_restart — Round-End Detection and Scoring
 #
-# Checks if the round should end: either a ship is dead, or
-# both ships are alive but out of torpedoes (stalemate).
-# Sets the restart countdown timer.
+# Checks if the round should end: either a ship is dead (state ≠ ship),
+# or both ships are alive but out of torpedoes (stalemate). Manages
+# the restart countdown timer and updates scores when the timer expires.
 #
-# Source: L717-736
+# Source: L717-754
+#   L717-724: Ship alive checks (xor mtb with ss1/ss2)
+#   L725-732: Torpedo stalemate check (law 1; add ntr; spa)
+#   L733-736: md1 — normal frame: reset restart_timer to -192
+#   L738-754: mdn — scoring countdown: count \ntd, then score survivors
+# Masswerk: Part 3, "Ending at the Beginning" (insidespacewar-pt3-objects.html)
 
 processor spacewar:check_restart
   inputs:
-    objects:  spacewar:object[]
+    objects:  spacewar:object[24]
     result:   spacewar:match_result
     consts:   spacewar:game_constants
   outputs:
     result:   spacewar:match_result
 
-  let ship1_alive = objects[0].state == ship
-  let ship2_alive = objects[1].state == ship
+  # --- Ship alive checks ---
+  # L717: law ss1
+  # L718: xor mtb       — XOR ship 1's handling routine with ss1
+  # L719: sza           — skip if zero (ship 1 IS alive)
+  # L720: jmp mdn       — not alive → scoring countdown
+  # L721-724: same for ship 2
+  let ship1_alive = objects[0].state == spacewar:ship
+  let ship2_alive = objects[1].state == spacewar:ship
 
-  # --- Both ships alive? ---
-  # Source: L717-724
-  # law ss1; xor mtb; sza; jmp mdn → if ship1 not alive, go to scoring
-  # law ss2; xor mtb 1; sza; jmp mdn → if ship2 not alive, go to scoring
   if ship1_alive and ship2_alive:
-    # Both alive — check stalemate (both out of torpedoes)
-    # Source: L725-731
-    # law 1; add ntr; spa; jmp md1 → if ship1 still has torpedoes, skip
-    # law 1; add ntr 1; spa i; jmp mdn → if ship2 still has torpedoes, go to scoring
-    let ship1_has_torps = objects[0].torpedoes < 0
-    let ship2_has_torps = objects[1].torpedoes < 0
-
-    if not ship1_has_torps and not ship2_has_torps:
-      # Stalemate: both alive, both out of torpedoes
-      # BUT: only trigger if NO torpedoes exist in the world either
-      # (we check if any torpedo entities are active)
-      var any_active_torps = false
-      for k from 2 to 23:
-        if objects[k].state == torpedo:
-          any_active_torps = true
-          break
-
-      if not any_active_torps:
-        # Set restart timer = 2 × torpedo_lifetime
-        # Source: L733-735: xct tlf; sal 1s; dac \ntd
-        result = result with {
-          restart_timer = -(consts.torpedo_lifetime * 2)
-        }
-  else:
-    # At least one ship is dead — the round might be over.
-    # But we need to wait for all torpedoes/explosions to clear.
-    # The restart timer is only set once via md1 path.
-    # In the original, any non-alive ship immediately branches to mdn
-    # (the scoring countdown). The timer was already set on a previous frame.
+    # Both ships alive. Check for torpedo stalemate.
     #
-    # If restart_timer is not yet set, set it now.
-    if result.restart_timer == 0:
-      result = result with {
-        restart_timer = -(consts.torpedo_lifetime * 2)
+    # L725: law 1        — AC = 1
+    # L726: add ntr      — AC = 1 + ship1_torpedoes
+    # L727: spa          — skip if AC >= 0 (ship 1 is OUT of torpedoes)
+    # L728: jmp md1      — ship 1 still has torpedoes → normal play
+    #
+    # Torpedo counter semantics: torpedoes start at -33 (tno = law i 41,
+    # 41₈ = 33₁₀) and count UP toward 0. "law 1; add ntr; spa" tests
+    # if ntr + 1 >= 0, i.e. ntr >= -1. When ntr >= -1, the ship has
+    # fired all torpedoes (counter reached 0 or was dzm'd to prevent
+    # count-around).
+    let ship1_out = objects[0].torpedoes + 1 >= 0
+    let ship2_out = objects[1].torpedoes + 1 >= 0
+
+    if ship1_out and ship2_out:
+      # L731: spa i       — skip if ship2 NOT out (negated test)
+      # L732: jmp mdn     — both out → stalemate → scoring countdown
+      #
+      # STALEMATE: both ships alive, both out of torpedoes.
+      # Fall through to mdn (scoring countdown).
+      # NOTE: The PDP-1 does NOT check for active torpedo entities
+      # in the world. It only checks the two ships' counters.
+
+      # --- mdn path: scoring countdown ---
+      # L738: count \ntd, ml1 — isp \ntd; if still negative → jmp ml1
+      # When \ntd reaches >= 0 → fall through to scoring
+      let timer = result.restart_timer + 1
+
+      if timer < 0:
+        # Timer still counting — game continues, defer scoring
+        output result = result with { restart_timer = timer }
+      else:
+        # Timer expired — score survivors and signal round end
+        # L739-740: stf 1; stf 2 — set both flags (assume both survived)
+        # L741-746: check ship 1: clear flag 1 if dead, else idx \1sc
+        # L747-752: check ship 2: clear flag 2 if dead, else idx \2sc
+        # Both ships are alive in this branch (stalemate).
+        # Both flags stay set → both scores increment.
+        # L746: idx \1sc — score_1 += 1
+        # L752: idx \2sc — score_2 += 1
+        output result = result with {
+          score_1 = result.score_1 + 1,
+          score_2 = result.score_2 + 1,
+          restart_timer = 0,
+          state = spacewar:round_over
+        }
+    else:
+      # At least one ship still has torpedoes → normal play.
+      # L733: xct tlf    — execute "law i 140" → AC = -96₁₀ (140₈ = 96₁₀)
+      # L734: sal 1s     — shift left 1 → AC = -192
+      # L735: dac \ntd   — restart_timer = -192 (= -2 × torpedo_lifetime)
+      # L736: jmp ml1    — continue to entity loop
+      #
+      # The timer is reset EVERY frame during normal play.
+      # This ensures the scoring countdown can only begin when
+      # the stalemate or death condition persists.
+      let timer_reset = -(consts.torpedo_lifetime * 2)
+      output result = result with { restart_timer = timer_reset }
+
+  else:
+    # At least one ship is dead (not in state == ship).
+    # L720 or L724: jmp mdn → scoring countdown path.
+    #
+    # --- mdn path: scoring countdown ---
+    # L738: count \ntd, ml1 — count restart_timer toward 0
+    let timer = result.restart_timer + 1
+
+    if timer < 0:
+      # Timer still counting — explosions play out, game continues
+      output result = result with { restart_timer = timer }
+    else:
+      # Timer expired — score the surviving ship
+      # L739-740: stf 1; stf 2
+      # L741-746: ship 1 alive? → idx \1sc (increment score_1)
+      # L747-752: ship 2 alive? → idx \2sc (increment score_2)
+      let new_score_1 = if ship1_alive then result.score_1 + 1 else result.score_1
+      let new_score_2 = if ship2_alive then result.score_2 + 1 else result.score_2
+
+      output result = result with {
+        score_1 = new_score_1,
+        score_2 = new_score_2,
+        restart_timer = 0,
+        state = spacewar:round_over
       }

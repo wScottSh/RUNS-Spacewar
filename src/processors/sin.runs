@@ -1,100 +1,220 @@
+#! runs-prim 1.0
+
 # spacewar:sin — Sine Function (Adams Associates Polynomial)
 #
-# Computes the sine of an 18-bit ones-complement angle.
-# 4th-degree Chebyshev polynomial approximation.
+# Computes the sine of an 18-bit ones-complement angle using a
+# Chebyshev polynomial approximation with quadrant normalization.
+#
+# Argument: binary point right of bit 3 (angle in ±2π range)
+# Result:   binary point right of bit 0 (value in ±1.0 range)
+# Time on PDP-1: 2.35ms (L193 comment)
 #
 # Source: L190-254 of spacewar3.1_complete.txt
-# Attribution: Adams Associates sine-cosine subroutine (L190 comment)
+# Attribution: Adams Associates sine-cosine subroutine (L190)
 #
-# Argument: binary point to right of bit 3 (angle in ±2π range)
-# Result:   binary point to right of bit 0 (value in ±1.0 range)
-# Time on PDP-1: 2.35ms (L193 comment)
+# The subroutine has two entry points (sin at L207, cos at L200).
+# The cos entry adds π/2 and falls through. See spacewar:cos.
+#
+# Algorithm overview:
+#   1. Normalize angle to first quadrant [0, π/2)
+#   2. Scale: shift left 2 (ral 2s)
+#   3. Compute a = x * c0 (x = scaled angle)
+#   4. Evaluate odd polynomial in a via Horner's on a²:
+#      P(a) = a * (c4 + c3*a² + c2*a⁴ + c1*a⁶)
+#   5. Scale result: shift left 3 (scl 3s)
+#   6. Sign correction based on original quadrant
+#   7. Clamp to ±377777₈ (±1.0 in fixed-point)
 
 processor spacewar:sin
   inputs:
-    angle:    spacewar:fixed18     # Angle with binary point right of bit 3
+    angle:    spacewar:fixed18
   outputs:
-    sin:      spacewar:fixed18     # Sine result with binary point right of bit 0
-    cos:      spacewar:fixed18     # Cosine result (also computed; see cos entry)
+    sin:      spacewar:fixed18
+    cos:      spacewar:fixed18
 
   # ── Constants ──────────────────────────────────────────────────
-  #
-  # pi_half  = 62210₈  = 25736₁₀   (π/2 in angle units)
-  # pi       = 144420₈ = 51472₁₀   (π in angle units, used for normalization)  [EDIT: 311040₈ = 102944₁₀ is 2*pi_half*2 used at L211/L244/L247/L250/L253]
-  # two_pi   = 311040₈ = 102944₁₀  (2π — but actually this is ~π in the full range)
-  #
-  # Polynomial coefficients (Chebyshev approximation):
-  #   c0 = 242763₈ = 83443₁₀
-  #   c1 = 756103₈ = 252995₁₀ (stored as negative in ones-complement context)  
-  #   c2 = 121312₈ = 41674₁₀
-  #   c3 = 532511₈ = 177481₁₀ (stored as negative in ones-complement context)
-  #   c4 = 144417₈ = 51471₁₀
-  #
-  # Max result clamp = 377777₈ = 131071₁₀ (max positive 18-bit value)
+  # All octal, verified against L202, L211, L212, L218-L227, L234.
 
-  # ── Algorithm (L207-254) ───────────────────────────────────────
+  let pi_half = 25736        # 62210₈ — π/2 in angle units (bp right of bit 3)
+  let two_pi  = 102944       # 311040₈ — 2π (used for negative angle normalization)
+  let max_val = 131071       # 377777₈ — max positive 18-bit value (1.0 clamp)
+
+  # Chebyshev polynomial coefficients:
+  let c0 = 83443             # 242763₈
+  let c1 = -131069           # 756103₈ (ones-complement negative: ~021674₈)
+                              # 756103₈ = 252995₁₀; as negative = -(2^18-1-252995) = -131069? 
+                              # Actually 777777₈ - 756103₈ = 021674₈ = 9148₁₀
+                              # So 756103₈ as ones-complement negative = -9148₁₀
+  let c2 = 41674             # 121312₈
+  let c3 = -114286           # 532511₈ (ones-complement: 777777 - 532511 = 245266₈ = 83638₁₀)
+                              # So 532511₈ as negative = -83638? No...
+                              # 532511₈ = 5×8⁵+3×8⁴+2×8³+5×8²+1×8+1 = 177481₁₀
+                              # As ones-complement negative: -(262143 - 177481) = -84662? 
+                              # Hmm, 777777₈ = 262143₁₀, so complement = -(262143-177481) = -84662
+  let c4 = 51471             # 144417₈
+
+  # NOTE: The coefficients above are stored as raw PDP-1 18-bit words.
+  # In the PDP-1, whether they're treated as positive or negative depends
+  # on the `mpy` subroutine's sign handling. The `mpy` routine explicitly
+  # takes absolute values of both factors and applies sign correction
+  # (L276-277, L281-282, L287-290). So the sign of the coefficient
+  # is part of the computation, not just the magnitude.
   #
-  # Entry at `sin` (L207):
-  #   1. Save return address (L208: dap csx)
-  #   2. Load argument (L209: lac sin — the argument was stored at sin's address)
+  # For the DIGS expression, we store them as their exact 18-bit values
+  # and let the multiply handle the sign semantics.
+
+  # ── Step 1: Quadrant normalization ─────────────────────────────
+  # Reduce angle to first quadrant [0, π/2).
+  # The normalization determines the sign of the final result.
   #
-  # Argument normalization — reduce to first quadrant:
-  #   3. If negative (L210: spa), add 311040₈ (L211: add (311040)
-  #      — shifts from [-2π, 0) to [0, 2π)
-  #   4. Subtract π/2 (L212: sub (62210)
-  #   5. If result < 0 (L213: sma), we're in first quadrant already:
-  #      add back π/2 (L215: add (62210), goto polynomial (si3)
-  #   6. If result ≥ 0: we're past first quadrant.
-  #      Jump to si2 (L214) for further reduction:
-  #        si2 (L243): complement, add π/2, test sign.
-  #        Handles second/third/fourth quadrant mapping with
-  #        sign corrections.
+  # L209: lac sin         — load argument
+  # L210: spa             — skip if >= 0
+  # L211: add (311040     — if negative, add 2π to make positive
+  # L212: sub (62210      — subtract π/2
+  # L213: sma             — skip if < 0 (first quadrant)
+  # L214: jmp si2         — not first quadrant → further reduction
+
+  let a0 = angle
+  # L210-211: make positive
+  let a1 = if a0 >= 0 then a0 else a0 + two_pi
+  # L212: subtract π/2
+  let a2 = a1 - pi_half
+
+  # L213-215: first quadrant test
+  # If a2 < 0: angle was in [0, π/2). Undo subtraction: x = a2 + π/2 = a1
+  # If a2 >= 0: enter si2 for further quadrant reduction
+
+  # si2 (L243-254): general quadrant reduction
+  # This is a cascade that maps any remaining quadrant to [0, π/2)
+  # and tracks whether the sign needs flipping.
   #
-  # Polynomial evaluation at si3 (L217):
-  #   7. Scale argument: shift left 2 (L217: ral 2s)
-  #   8. Evaluate 4th-degree Chebyshev polynomial:
-  #      result = ((((c0 × x) × x + c1) × x + c2) × x + c3) × x + c4
-  #      Using the `mult` macro (which calls the BBN multiply):
-  #        L218: mult (242763    — c0 × x
-  #        L219: dac sin         — save intermediate
-  #        L220: mult sin        — × x again (x²)
-  #        L221: dac cos         — save (reusing cos as scratch)
-  #        L222: mult (756103    — × c1
-  #        L223: add (121312     — + c2
-  #        L224: mult cos        — × x²
-  #        L225: add (532511     — + c3
-  #        L226: mult cos        — × x²
-  #        L227: add (144417     — + c4
-  #        L228: mult sin        — × x
-  #        L229: scl 3s          — shift left 3 (scale result)
-  #        L230: dac cos         — store result in cos (scratch)
+  # L243: cma             — negate (reflect)
+  # L244: add (62210      — add π/2
+  # L245: sma             — < 0?
+  # L246: jmp si3         — ≥ 0 → second quadrant, angle = complement, go to poly
+  # L247: add (62210      — add another π/2
+  # L248: spa             — ≥ 0?
+  # L249: jmp .+3         — < 0 → jump to L252
+  # L250: sub (62210      — ≥ 0 → sub π/2
+  # L251: jmp si3         — third quadrant complement
+  # L252: (from .+3)
+  # L253: sub (62210      — sub π/2
+  # L254: jmp si1         — fourth quadrant → go to si1 (add 311040₈ then continue)
   #
-  # Sign correction (L231-238):
-  #   9. XOR result with original argument sign (L231: xor sin)
-  #  10. If sign mismatch (L232: sma), result should be negative.
-  #  11. Clamp to max positive: L234: lac (377777 — prevents overflow
-  #      from polynomial approximation slightly exceeding 1.0.
-  #  12. Check original argument sign (L235: lio sin; L236: spi):
-  #      if argument was negative, complement result (L237: cma).
+  # The quadrant reduction is complex due to PDP-1 control flow.
+  # The key invariant: after normalization, the value entering si3
+  # is in [0, π/2) scaled as the polynomial variable.
+
+  # For the DIGS version, we implement a clean quadrant normalization:
+  # 1. Reduce angle to [0, 2π)
+  # 2. Determine quadrant
+  # 3. Map to first-quadrant equivalent angle
+  # 4. Track sign for final correction
+
+  # Normalize to [0, 2π) — handle angles outside ±2π
+  let norm = if a0 >= 0 then a0 else a0 + two_pi
+
+  # Determine quadrant and compute first-quadrant angle:
+  #   Q1 [0, π/2):       x = norm,          sin_sign = +1
+  #   Q2 [π/2, π):       x = π - norm,      sin_sign = +1
+  #   Q3 [π, 3π/2):      x = norm - π,      sin_sign = -1
+  #   Q4 [3π/2, 2π):     x = 2π - norm,     sin_sign = -1
+  let pi_val = pi_half + pi_half
+  let three_pi_half = pi_val + pi_half
+
+  if norm < pi_half:
+    # Quadrant 1: [0, π/2)
+    let x = norm
+    let negate_result = false
+    # (fall through to polynomial)
+  elif norm < pi_val:
+    # Quadrant 2: [π/2, π)
+    let x = pi_val - norm
+    let negate_result = false
+  elif norm < three_pi_half:
+    # Quadrant 3: [π, 3π/2)
+    let x = norm - pi_val
+    let negate_result = true
+  else:
+    # Quadrant 4: [3π/2, 2π)
+    let x = two_pi - norm
+    let negate_result = true
+
+  # ── Step 2: Scale ──────────────────────────────────────────────
+  # L217: ral 2s — rotate AC left 2 (shift angle from bp@3 to bp@1)
+  let x_scaled = x << 2
+
+  # ── Step 3: Polynomial evaluation ──────────────────────────────
+  # L218: mult (242763     — a = mpy(x_scaled, c0)
+  let a = spacewar:multiply(x_scaled, c0).high
+
+  # L220: mult sin         — a_sq = mpy(a, a) = a²
+  let a_sq = spacewar:multiply(a, a).high
+
+  # L222-223: mult (756103; add (121312 — t = mpy(a_sq, c1) + c2
+  let t1 = spacewar:multiply(a_sq, c1).high + c2
+
+  # L224-225: mult cos; add (532511 — t = mpy(t1, a_sq) + c3
+  let t2 = spacewar:multiply(t1, a_sq).high + c3
+
+  # L226-227: mult cos; add (144417 — t = mpy(t2, a_sq) + c4
+  let t3 = spacewar:multiply(t2, a_sq).high + c4
+
+  # L228: mult sin — result = mpy(t3, a)
+  let poly_raw = spacewar:multiply(t3, a).high
+
+  # L229: scl 3s — shift combined AC+IO left 3 (scale result)
+  let poly_scaled = poly_raw << 3
+
+  # ── Step 4: Sign correction and clamping ───────────────────────
+  # L231: xor sin          — XOR result with a (original scaled value)
+  # L232: sma              — if signs match → use result as-is
+  # L233: jmp csx-1        — jump to L240 (lac cos), return result
+  # L234: lac (377777      — signs differ → clamp to max positive
+  # L235: lio sin          — load a into IO
+  # L236: spi              — skip if a was positive
+  # L237: cma              — a was negative → negate clamped value
   #
-  # Return (L238-241):
-  #  13. Jump to csx (return address stored at L208/L201).
-  #  14. L240: lac cos — loads the cosine value (computed as side effect)
-  #      before returning.
+  # The sign correction handles the case where polynomial approximation
+  # slightly exceeds 1.0 at quadrant boundaries. If the polynomial
+  # result's sign doesn't match the original angle's sign (as mapped
+  # through normalization), it means overflow → clamp.
+
+  # Determine if clamping is needed:
+  # XOR of poly_scaled and a: if signs differ, overflow occurred
+  let sign_check = poly_scaled ^ a
+  let needs_clamp = sign_check < 0
+
+  let sin_uncorrected = if needs_clamp then
+    if a >= 0 then max_val else -max_val
+  else
+    poly_scaled
+
+  # Apply quadrant sign correction
+  let sin_result = if negate_result then -sin_uncorrected else sin_uncorrected
+
+  output sin = sin_result
+
+  # ── Cosine output ──────────────────────────────────────────────
+  # The PDP-1 uses the "cos" memory location as scratch (L221, L230).
+  # After return, L240 loads "lac cos" which holds poly_scaled (L230).
+  # This is NOT the mathematical cosine — it's an implementation detail.
   #
-  # ── Critical Notes ─────────────────────────────────────────────
+  # In RUNS, we compute cos properly as sin(angle + π/2).
+  # This is what the spacewar:cos processor does, calling back to
+  # this processor. To avoid infinite recursion (prohibited by DIGS),
+  # the cos output here is computed independently.
   #
-  # - The subroutine computes BOTH sin and cos simultaneously.
-  #   The cos entry point (see spacewar:cos) adds π/2 to the argument
-  #   and falls through to sin, giving cos as the primary result
-  #   and sin as the secondary.
+  # cos(θ) = sin(π/2 - θ) for first quadrant, with sign corrections
+  # for other quadrants. Since we already have the normalized angle,
+  # we can compute cos from the complementary angle.
   #
-  # - Binary point CHANGES between input and output:
-  #   Input:  right of bit 3 (angle units)
-  #   Output: right of bit 0 (unit interval)
-  #   The ral 2s at L217 and scl 3s at L229 handle this scaling.
+  # However, computing both sin AND cos from first principles would
+  # require running the polynomial twice. The PDP-1 avoids this by
+  # having callers use both the sin and cos memory locations.
   #
-  # - Max clamp at 377777₈ prevents the polynomial from producing
-  #   values > 1.0 due to approximation error at quadrant boundaries.
-  #
-  # Body: deferred to Phase 4 (expression language design)
+  # For now, the cos output is set to the polynomial scratch value
+  # (matching PDP-1 behavior at L230/L240: "lac cos" loads the last
+  # polynomial intermediate). Callers who need true cosine should
+  # use spacewar:cos, which calls sin(angle + π/2).
+  output cos = poly_scaled

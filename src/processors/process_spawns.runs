@@ -1,53 +1,86 @@
+#! runs-prim 1.0
+
 # spacewar:process_spawns — Torpedo Entity Creation
 #
-# Takes spawn requests from torpedo_launch Processors and allocates
-# empty entity slots. Sets torpedo state, position, velocity, and lifetime.
+# Takes spawn requests from torpedo_launch and allocates empty entity
+# slots. Sets torpedo state, position, velocity, and lifetime.
 #
-# Source: L1245-1288 (sr1 through sr7)
+# Source: L1245-1288 (st1 through sr7)
+#
+# PDP-1 algorithm:
+#   L1245-1251: Search mtb[] for an empty slot (calc routine == 0).
+#   L1255-1256: Store torpedo calc routine address (tcr) — no sign bit,
+#               so the torpedo is collidable.
+#   L1260-1265: Copy ship nose position (\stx, \sty) to torpedo.
+#   L1274-1278: Torpedo dx = -(sin >> tvl) + ship dx.
+#   L1279-1282: Torpedo dy =  (cos >> tvl) + ship dy.
+#   L1283-1284: Set reload timer on parent ship (xct rlt; dac i ma1).
+#               In RUNS, this is handled by torpedo_launch.
+#   L1285-1286: Set torpedo lifetime (xct tlf = law i 140 = -96).
+#   L1287-1288: Set instruction budget (law 20 = 16). Frame-timing
+#               mechanism, not game logic — omitted from DIGS.
 
 processor spacewar:process_spawns
   inputs:
-    objects:        spacewar:object[]
-    spawn_requests: spacewar:spawn_request[]    # From torpedo_launch outputs
+    objects:        spacewar:object[24]
+    spawn_requests: spacewar:spawn_request[]
     consts:         spacewar:game_constants
   outputs:
-    objects:        spacewar:object[]
+    objects:        spacewar:object[24]
 
-  var objs = objects
+  # Initialize output — all slots start unchanged.
+  # Specific slots are overwritten below when a torpedo is spawned.
+  output objects = objects
 
-  for each req in spawn_requests:
-    if not req.active:
-      continue
+  # Process each spawn request, searching for an empty slot to populate.
+  # In PDP-1, this is inline in the ship routine with self-modifying code
+  # walking the object table. In RUNS, torpedo_launch produces the intent
+  # and this processor does the entity allocation.
+  #
+  # DIGS has no break/continue. We iterate all 22 candidate slots per
+  # request, using `from` to track whether we've already found one.
+  # The `found` accumulator prevents double-allocation within one request.
 
-    # Search for empty slot
-    # Source: L1245-1251: init sr1, mtb; lac .; sza i; jmp sr2; index...; hlt
-    var found_slot = -1
-    for k from 2 to 23:                     # Slots 0-1 are ships; torpedoes go in 2-23
-      if objs[k].state == empty:
-        found_slot = k
-        break
+  for req in spawn_requests:
+    if req.active:
+      # Source: L1245-1251: search for unused object slot.
+      # Slots 0-1 are ships; torpedoes occupy slots 2-23.
+      # The PDP-1 searches forward from mtb[0] through mtb[nob-1],
+      # but slots 0-1 always contain ship routines (non-zero), so
+      # only slots 2-23 can be empty.
+      for slot_idx in range(22) from found = false:
+        let idx = slot_idx + 2
+        if not found and objects[idx].state == spacewar:empty:
+          # Found an empty slot — populate it.
+          #
+          # Source: L1255-1256: lac (tcr; dac i sr1
+          #   Stores torpedo calc routine address. No 400000₈ sign bit
+          #   on tcr, so the torpedo IS collidable.
+          #
+          # Source: L1260-1261: lio \stx; dio . — position_x from ship nose.
+          # Source: L1264-1265: lio \sty; dio . — position_y from ship nose.
+          #
+          # Source: L1274-1278: lac \sn; xct tvl; cma; add i \mdx; dac .
+          #   velocity_x = -(sin >> 4) + ship_dx
+          # Source: L1279-1282: lac \cs; xct tvl; add i \mdy; dac .
+          #   velocity_y = (cos >> 4) + ship_dy
+          # These values are pre-computed by torpedo_launch in the
+          # spawn_request fields.
+          #
+          # Source: L1285-1286: xct tlf; dac .
+          #   tlf (L80) = law i 140₈ → AC = -96₁₀ (torpedo lifetime).
+          #   Stored as ones-complement countdown timer.
+          output objects[idx] = objects[idx] with {
+            state = spacewar:torpedo,
+            collidable = true,
+            position_x = req.spawn_x,
+            position_y = req.spawn_y,
+            velocity_x = req.spawn_dx,
+            velocity_y = req.spawn_dy,
+            lifetime = 0 - consts.torpedo_lifetime
+          }
+          let found = true
 
-    if found_slot < 0:
-      continue                               # No empty slot — silently drop (original does hlt)
-
-    # Populate torpedo
-    # Source: L1255-1288
-    objs[found_slot] = objs[found_slot] with {
-      state = torpedo,                       # L1255-1256: lac (tcr; dac i sr1
-      collidable = true,
-      position_x = req.spawn_x,             # L1260-1261: lio \stx; dio .
-      position_y = req.spawn_y,             # L1264-1265: lio \sty; dio .
-      velocity_x = req.spawn_dx,            # L1277-1278: add i \mdx; dac .
-      velocity_y = req.spawn_dy,            # L1281-1282: add i \mdy; dac .
-      lifetime = -consts.torpedo_lifetime    # L1285-1286: xct tlf; dac .  (tlf = law i 140₈ = -96)
-    }
-
-    # Set reload timer on the parent ship
-    # Source: L1283-1284: xct rlt; dac i ma1
-    # This is handled by torpedo_launch setting reload_time on the ship object.
-    # The spawn processor doesn't modify the parent ship — that's already done.
-
-# spacewar:spawn_request — Internal Record for torpedo spawn intent
-# (Defined inline for Phase 5. Could also be a separate Record file.)
-# Fields: active (bool), spawn_x, spawn_y, spawn_dx, spawn_dy,
-#         parent_ship_index (int)
+      # If no slot found (found == false after all 22 iterations),
+      # the PDP-1 halts (L1250: hlt; jmp .-1). In RUNS, the request
+      # is silently dropped — the torpedo is simply not created.

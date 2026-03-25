@@ -1,3 +1,5 @@
+#! runs-prim 1.0
+
 # spacewar:velocity_integrate — Core Integration Step
 #
 # Implements the `diff` macro (L160-167) that is the heart of
@@ -9,17 +11,12 @@
 # Usage: L952/954 (explosion), L1000/1003 (torpedo), L1178/1186 (ship)
 #
 # The `diff V,S,SF` macro:
-#   add i V    # AC = AC + velocity → this is "acceleration += velocity"...
-#              # actually: AC (which holds scaled acceleration) is added to V
+#   add i V    # AC (holding acceleration) is added to velocity
 #   dac i V    # store updated velocity
 #   xct SF     # execute the scale factor instruction (e.g., sar 3s)
+#              # AC now holds (new velocity >> shift)
 #   add i S    # add scaled velocity to position
 #   dac i S    # store updated position
-#
-# In practice, AC enters diff holding the acceleration. The macro:
-#   1. Adds acceleration to velocity, stores velocity
-#   2. Scales the result by SF (e.g., >>3)
-#   3. Adds scaled result to position, stores position
 
 processor spacewar:velocity_integrate
   inputs:
@@ -32,9 +29,13 @@ processor spacewar:velocity_integrate
     velocity:     spacewar:fixed18    # Updated velocity
 
   # Step 1: velocity += acceleration
-  velocity = velocity + acceleration
+  # L162: add i V — AC (acceleration) added to velocity
+  # L163: dac i V — store new velocity
+  let velocity = velocity + acceleration
 
-  # Step 2: position += velocity >> scale_shift
-  # The >> 3 is the integration timestep scaling. It's not damping —
-  # it's the ratio between velocity units and position units.
-  position = position + (velocity >> scale_shift)
+  # Step 2: position += (new velocity) >> scale_shift
+  # L164: xct SF  — execute shift (e.g., sar 3s): AC = velocity >> shift
+  # L165: add i S — add scaled velocity to position
+  # L166: dac i S — store new position
+  output velocity = velocity
+  output position = position + (velocity >> scale_shift)

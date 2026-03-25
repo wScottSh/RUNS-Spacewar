@@ -1,46 +1,67 @@
+#! runs-prim 1.0
+
 # spacewar:hyperspace_check — Hyperspace Entry Intent Detection
 #
 # Detects hyperspace entry (both rotate buttons simultaneously),
 # checks recharge and ammo, transitions to hyperspace_in state.
 #
-# Source: L1289-1309 (sr5 through st3)
+# Source: L1289-1309 (sr5 through st3/srt)
 # In original: chord detection via both rotate bits in control word.
 # In RUNS: the runtime maps chord/dedicated button to controls.hyperspace.
+#
+# Masswerk: Part 8 "The Trigger" section.
+#
+# PDP-1 field mb1 (instruction budget) is a frame-timing concern,
+# not game logic. Omitted from DIGS.
+# PDP-1 field mco (old control word) OR in L1296 is dead code per
+# Masswerk: "\mco is never set in Spacewar! 3.1." Omitted.
 
 processor spacewar:hyperspace_check
   inputs:
     object:     spacewar:object
     controls:   spacewar:player_controls
+    consts:     spacewar:game_constants
   outputs:
     object:     spacewar:object
+  preconditions:
+    object.state == spacewar:ship
 
-  # --- Check recharge timer ---
-  # Source: L1289-1290: count i \mh3, st3; dzm i \mh3
-  var recharge = object.hyperspace_recharge_timer + 1
-  if recharge >= 0:
-    recharge = 0                         # Count-around prevention (L1290)
-  object = object with { hyperspace_recharge_timer = recharge }
+  # ── Step 1: Tick recharge timer (L1289-1290) ──────────────────
+  # count i \mh3, st3 → isp mh3; jmp st3
+  # Increment recharge timer. If still negative: recharging, exit.
+  # If >= 0: ready. Zero it (prevent count-around via dzm i \mh3).
+  let recharge = object.hyperspace_recharge_timer + 1
 
-  # If still cooling down, no hyperspace entry
   if recharge < 0:
-    # Still recharging — exit
+    # Still recharging — update timer and exit
+    output object = object with { hyperspace_recharge_timer = recharge }
   else:
-    # --- Check shots remaining ---
-    # Source: L1291-1293: lac i \mh2; sza i; jmp st3
+    # Timer expired — zero it (count-around prevention, L1290)
+    let object = object with { hyperspace_recharge_timer = 0 }
+
+    # ── Step 2: Check shots remaining (L1291-1293) ────────────
+    # lac i \mh2; sza i; jmp st3
+    # Load shots remaining. sza i = skip if NOT zero.
+    # If zero: no shots left, exit.
     if object.hyperspace_shots_remaining == 0:
       # No shots left — exit
+      output object = object
     else:
-      # --- Detect hyperspace intent ---
-      # Source: L1294-1298 (original uses chord detection):
-      #   lac \scw; cma; ior i mco; and (600000; sza; jmp st3
-      # In RUNS: the controls.hyperspace boolean handles this.
-      if controls.hyperspace:
-        # --- Enter hyperspace! ---
-        # Source: L1300-1307
-        # Save current state, transition to hyperspace_in
-        object = object with {
-          hyperspace_saved_state = object.state,   # L1300-1301: lac i ml1; dac i \mh1
-          state = hyperspace_in,                   # L1302-1303: lac (hp1 400000; dac i ml1
-          collidable = false,                      # 400000₈ = non-collidable flag
-          lifetime = -32                           # L1304-1305: xct hd1; dac i ma1 (hd1 = law i 40₈ = -32)
+      # ── Step 3: Detect hyperspace intent (L1294-1299) ───────
+      # In PDP-1: lac \scw; cma; ior i mco; and (600000; sza; jmp st3
+      # In RUNS: the controls.hyperspace boolean abstracts this.
+      if not controls.hyperspace:
+        # No hyperspace input — exit
+        output object = object
+      else:
+        # ── Step 4: Enter hyperspace (L1300-1307) ─────────────
+        # lac i ml1; dac i \mh1 — save current state (L1300-1301)
+        # lac (hp1 400000; dac i ml1 — set hyperspace_in + non-collidable (L1302-1303)
+        # xct hd1; dac i ma1 — set lifetime to -hd1 (L1304-1305)
+        #   hd1 = "law i 40" → load -(40₈) = -(32₁₀)
+        output object = object with {
+          hyperspace_saved_state = object.state,
+          state = spacewar:hyperspace_in,
+          collidable = false,
+          lifetime = 0 - consts.hyperspace_entry_delay
         }

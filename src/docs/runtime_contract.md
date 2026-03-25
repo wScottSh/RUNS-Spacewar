@@ -185,12 +185,18 @@ An array of objects to draw this frame. Each has:
 
 ### Coordinate System
 
-The PDP-1 uses a 1024×1024 display with (0, 0) at center. The game logic uses 18-bit fixed-point coordinates where the display range is approximately ±131,072. Map game coordinates to screen:
+The PDP-1 uses a 1024×1024 display with (0, 0) at center. Positive X is right,
+**positive Y is up** (PDP-1 CRT convention). The game logic uses 18-bit
+fixed-point coordinates where the display range is approximately ±131,072.
+Map game coordinates to screen:
 
 ```
 screen_x = (game_x / 131072) * (screen_width / 2) + (screen_width / 2)
-screen_y = (game_y / 131072) * (screen_height / 2) + (screen_height / 2)
+screen_y = (screen_height / 2) - (game_y / 131072) * (screen_height / 2)
 ```
+
+Note the Y-flip: PDP-1 Y-up → screen Y-down. Positive game_y maps to the
+upper half of the screen (lower screen_y values).
 
 The display wraps toroidally — positions outside the playfield wrap to the opposite edge.
 
@@ -218,7 +224,24 @@ Exact PRNG-driven placement is authentic but not mandatory. The visual should co
 
 #### Central Star (`object_type == central_star`)
 
-Draw a bright, flickering point source at `(0, 0)` — the center of the playfield. The original used a PRNG-driven burst of dots around the center (L522-539, the `blp` routine). A flickering star icon, a bright dot, or a small animated sprite all satisfy this. The key constraint: it must be visible and clearly mark the center.
+Source: `blp` routine at L522-539, `bpt` subroutine at L541-561.
+
+The central star is rendered as a **mirrored line of individual dots through
+the origin at a random angle**, redrawn each frame. The algorithm:
+
+1. Generate random displacement `(bx, by)` via PRNG (L525-536)
+2. Draw a dot at center `(0, 0)` (L550-551)
+3. Starting from center, draw up to 20 dots along direction `(bx, by)`,
+   each offset by `(bx, by)` from the previous (the `starp` macro, L553)
+4. Negate `(bx, by)` (L557-560), restart from center → draws the
+   mirror-image line through origin
+5. Result: a randomly-oriented line of point-plotted dots through center
+
+This produces the iconic flickering, rotating line that changes angle
+each frame. The `bx`/`by` offsets incorporate the gravity vector
+(`\bx`, `\by`) when gravity is active, making the line wobble with
+nearby ships. On a P7 phosphor display, frame persistence blurs this
+into a pulsing starburst.
 
 ### Starfield (from star_catalog + starfield_state)
 

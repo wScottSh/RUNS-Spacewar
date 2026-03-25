@@ -303,7 +303,7 @@ This is entirely a **runtime concern**. The outline data is the artistic asset; 
 
 Spacewar! is a fixed-point game on 18-bit ones-complement hardware. The game's *feel* — the way ships accelerate, the gravitational curve near the star, the torpedo drift, the hyperspace uncertainty — all emerge from the specific bit-level behavior of these arithmetic operations.
 
-**The problem**: RUNS EXPRESSION_LANGUAGE.md lists `fixed16_mul` as an example but doesn't define a fixed-point type system. Spacewar! needs:
+**The problem**: RUNS DIGS_EXPRESSION_LANGUAGE.md lists `fixed16_mul` as an example but doesn't define a fixed-point type system. Spacewar! needs:
 - 18-bit ones-complement integers (not twos-complement!)
 - Context-dependent binary point positions (not a single fixed format)
 - Specific overflow/underflow behavior of the PDP-1 (ones-complement wrapping, negative zero)

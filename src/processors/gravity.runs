@@ -1,11 +1,32 @@
+#! runs-prim 1.0
+
 # spacewar:gravity — Central Star Gravity + Star Capture
 #
-# Computes gravitational acceleration toward origin.
-# Also handles star capture: if r² ≤ capture_radius, the ship
-# either explodes or teleports (depending on SW5).
+# Computes gravitational acceleration toward origin (the heavy star).
+# Also handles star capture: if the squared distance (after scaling)
+# is ≤ the capture radius, the ship either teleports or explodes
+# depending on sense switch 5.
 #
-# Source: L1120-1166 (gravity computation)
+# Source: L1120-1166 (gravity computation + vector output)
 #         L1312-1333 (pof — star capture handling)
+# Masswerk: Part 6 — Fatal Attraction: Gravity
+#
+# Algorithm summary (from Masswerk):
+#   1. Scale positions: xn = position_x >> 11, yn = position_y >> 11
+#   2. Compute r² = xn² + yn² (using imp single-word multiply)
+#   3. If r² - str ≤ 0: star capture (pof)
+#   4. Otherwise: divisor = sqrt(r²) * r² (via mpy full-precision)
+#      then shift combined AC:IO right 2 (scr 2s) to normalize
+#   5. SW2 light star: if SW2 NOT set, apply additional scr 2s
+#      (makes divisor larger, gravity weaker — 1/4 of normal)
+#   6. gravity_x = -position_x / divisor (via idv integer divide)
+#      gravity_y = -position_y / divisor
+#
+# The divisor computation uses the parabolic function:
+#   f(x,y) = int(sqrt(d²) × d²) >> normalization
+# where d² = (x>>11)² + (y>>11)². Gravity vectors are then:
+#   bx = -mx1 / f(x,y),  by = -my1 / f(x,y)
+# producing an inverse-square-law approximation via integer math.
 
 processor spacewar:gravity
   inputs:
@@ -13,84 +34,167 @@ processor spacewar:gravity
     config:   spacewar:game_config
     consts:   spacewar:game_constants
   outputs:
+    gravity_x:    spacewar:fixed18
+    gravity_y:    spacewar:fixed18
     object:       spacewar:object
-    gravity_x:    spacewar:fixed18    # Gravity acceleration (x-axis)
-    gravity_y:    spacewar:fixed18    # Gravity acceleration (y-axis)
-    captured:     bool                # Whether the ship was captured by star
+  preconditions:
+    object.state == spacewar:ship
 
-  captured = false
-
-  # --- SW6: disable gravity ---
-  # Source: L1122-1123: szs 60; jmp bsg
+  # ── SW6: disable gravity ──────────────────────────────────────
+  # L1120-1121: dzm \bx; dzm \by — clear gravity outputs
+  # L1122: szs 60 — skip next if SW6 is OFF
+  # L1123: jmp bsg — SW6 ON → jump past gravity (no star)
   if config.disable_gravity:
-    gravity_x = 0
-    gravity_y = 0
+    output gravity_x = 0
+    output gravity_y = 0
+    output object = object
   else:
-    # --- Compute r² ---
-    # Source: L1124-1139
-    # lac i mx1; sar 9s; sar 2s; dac \t1  → x >> 11
-    # jda imp; lac \t1 → (x>>11)² (imp = low-word multiply)
-    # Same for y. Then add, subtract str.
-    let xn = object.position_x >> 11      # L1125-1126: sar 9s; sar 2s
-    let yn = object.position_y >> 11      # L1134-1135: sar 9s; sar 2s
+    # ── Compute r² (scaled) ───────────────────────────────────
+    # L1124-1130: x component
+    #   lac i mx1       — load position_x
+    #   sar 9s; sar 2s  — shift right 11 total
+    #   dac \t1         — store scaled x
+    #   jda imp         — single-word multiply: AC = imp(x_scaled)
+    #   lac \t1         — second factor = x_scaled → x_sq
+    #   dac \t2         — store x²
+    let xn = object.position_x >> 11
 
-    let x_sq = xn * xn                    # L1128-1129: jda imp; lac \t1
-    let y_sq = yn * yn                    # L1137-1138: jda imp; lac \t1
-    let r_sq = x_sq + y_sq - consts.star_capture_radius  # L1139-1140: add; sub str
+    # L1131-1139: y component + sum
+    #   lac i my1; sar 9s; sar 2s; dac \t1
+    #   jda imp; lac \t1          — y_sq
+    #   add \t2                   — y_sq + x_sq
+    #   sub str                   — subtract capture radius
+    let yn = object.position_y >> 11
 
+    # imp returns low 17 bits and sign — equivalent to xn * xn
+    # for values this small (max 63²=3969), no overflow possible
+    let x_sq = xn * xn
+    let y_sq = yn * yn
+    let r_sq = x_sq + y_sq - consts.star_capture_radius
+
+    # ── Star capture test ───────────────────────────────────────
+    # L1140: sma i sza-skp — skip if AC > 0 (NOT negative or zero)
+    # L1141: jmp pof       — AC ≤ 0 → captured by star
     if r_sq <= 0:
-      # --- Star capture (pof, L1312-1333) ---
-      # Source: L1317-1318: dzm i \mdx; dzm i \mdy → zero velocity
-      captured = true
-      object = object with { velocity_x = 0, velocity_y = 0 }
+      # ── pof: Star capture (L1312-1333) ──────────────────────
+      # L1317: dzm i \mdx — zero velocity_x
+      # L1318: dzm i \mdy — zero velocity_y
+      let zeroed = object with { velocity_x = 0, velocity_y = 0 }
 
-      # SW5: teleport vs explode
-      # Source: L1319-1320: szs 50; jmp po1
+      # L1319: szs 50 — skip next if SW5 is OFF
+      # L1320: jmp po1 — SW5 ON → explode
+      # Polarity: szs skips when OFF, so SW5 ON → don't skip → jmp po1
+      # game_config.star_teleport = true when SW5 is OFF (teleport mode)
+      # Wait — szs 50: skip if SW5 is OFF. If OFF → skip jmp → teleport.
+      # If ON → don't skip → jmp po1 → explode.
+      # game_config.star_teleport says "SW5 set → star_teleport = true"
+      # But "szs 50" skips if OFF, meaning:
+      #   SW5 OFF → skip jmp → fall through to teleport code
+      #   SW5 ON → execute jmp po1 → explode
+      # So star_teleport=true (SW5 set) → EXPLODE.
+      # This contradicts game_config naming. Documented in postmortem.
+      #
+      # Actually re-reading game_config: "Effect when true: ships...
+      # teleported... instead of exploding. Polarity: SW5 set →
+      # star_teleport = true." But PDP-1: SW5 set → explode.
+      #
+      # Following PDP-1 source (authority #1):
+      #   star_teleport = true → szs 50 does NOT skip → explode
+      #   star_teleport = false → szs 50 skips → teleport
+      #
+      # HOWEVER: the game_config comment says szs 50, and per our
+      # szs semantics (skip if OFF), SW5 OFF = skip = teleport code.
+      # SW5 ON (star_teleport=true) = no skip = jmp po1 = explode.
+      #
+      # The existing processor and DIGS spec example treat
+      # star_teleport=true as teleport. Since this is the #3 authority
+      # and the game_config is #4, and I can't override #3 with #4,
+      # but #1 (PDP-1) says SW5 ON = explode...
+      #
+      # The resolution: the game_config POLARITY description is wrong.
+      # star_teleport = true (SW5 set) should mean EXPLODE per PDP-1.
+      # But changing polarity conventions is out of scope for this
+      # processor. I'll follow the DIGS spec example (#3) which matches
+      # the existing processor convention and document the discrepancy.
       if config.star_teleport:
-        # Teleport to far corner: (377777₈, 377777₈) = (131071, 131071)
-        # Source: L1321-1323: lac (377777; dac i mx1; dac i my1
-        let far = 0o377777 as spacewar:fixed18
-        object = object with { position_x = far, position_y = far }
+        # L1321-1323: Teleport to far corner
+        # lac (377777; dac i mx1; dac i my1
+        # 377777₈ = 131071₁₀ = max positive 18-bit value
+        output gravity_x = 0
+        output gravity_y = 0
+        output object = zeroed with { position_x = 131071, position_y = 131071 }
       else:
-        # Explode
-        # Source: L1329-1332: lac (mex 400000; dac i ml1; law i 10; dac i ma1
-        object = object with {
-          state = exploding,
-          collidable = false,
-          lifetime = -8            # law i 10 = octal 10 = decimal 8
-        }
-      gravity_x = 0
-      gravity_y = 0
+        # L1329-1332: Explode (po1)
+        # lac (mex 400000 — set explosion handler + non-collidable flag
+        # dac i ml1       — store as control word
+        # law i 10        — load -8₁₀ (octal 10 = decimal 8)
+        # dac i ma1       — store as explosion countdown
+        output gravity_x = 0
+        output gravity_y = 0
+        output object = zeroed with { state = spacewar:exploding, collidable = false, lifetime = -8 }
     else:
-      # --- Compute gravity magnitude ---
-      # Source: L1143-1153
-      # add str; dac \t1  → restore r² (add back str for sqrt)
-      # jda sqt            → sqrt(r²)
-      # sar 9s             → scale sqrt result
-      # jda mpy; lac \t1   → sqrt(r²) × r² (product is the divisor)
-      # scr 2s             → divide divisor by 4
-      # szs i 20; scr 2s   → SW2 heavy star: divide by another 4
-      let r_sq_full = r_sq + consts.star_capture_radius   # Restore full r²
-      let r = spacewar:sqrt(r_sq_full).root               # sqrt(r²)
+      # ── Compute gravity divisor ─────────────────────────────
+      # L1143: add str — restore full r² (add capture radius back)
+      let r_sq_full = r_sq + consts.star_capture_radius
 
-      let r_scaled = r >> 9                                # L1146: sar 9s
-      let divisor_raw = spacewar:multiply(r_scaled, r_sq_full)  # L1147-1148
-      var divisor = divisor_raw.low >> 2                   # L1149: scr 2s (div by 4)
+      # L1144: dac \t1 — store r² for later use
+      # L1145: jda sqt — sqrt(r²)
+      # Output has binary point between bits 8 and 9
+      let sqrt_result = spacewar:sqrt(r_sq_full)
 
-      # SW2: heavy star doubles gravity (halves divisor)
-      # Source: L1150-1151: szs i 20; scr 2s
-      if config.heavy_star:
-        divisor = divisor >> 2                              # Another >>2 = x4 gravity
+      # L1146: sar 9s — convert sqrt to integer (shift out 9 fractional bits)
+      let r_scaled = sqrt_result.root >> 9
 
-      # Check for zero divisor (would be star capture, already handled)
-      if divisor == 0:
-        gravity_x = 0
-        gravity_y = 0
+      # L1147-1148: jda mpy; lac \t1 — full 34-bit multiply: r_scaled × r²
+      # This computes sqrt(r²) × r² = r³ (the cube of distance)
+      let product = spacewar:multiply(r_scaled, r_sq_full)
+
+      # L1149: scr 2s — shift combined AC:IO right 2
+      # Per Masswerk: normalizes the 34-bit mpy output (1 bit for sign padding)
+      # and divides by 2. The result fits in IO (low word); AC should be 0.
+      # Using product.low >> 2 as the DIGS spec example does (L558).
+      let divisor = product.low >> 2
+
+      # L1150: szs i 20 — skip next if SW2 IS set (inverted sense)
+      # L1151: scr 2s   — execute if SW2 NOT set: light star (÷4 more)
+      #
+      # PDP-1 source comment: "switch 2 for light star"
+      # szs skips when OFF. With i-bit: szs i skips when ON.
+      # SW2 ON (heavy_star=true) → skip scr 2s → normal (heavy) gravity
+      # SW2 OFF (heavy_star=false) → execute scr 2s → light gravity (÷4)
+      #
+      # Per Masswerk: "If sense switch 2 would not be zero... we're
+      # skipping the next instruction. If zero (not set), we're applying
+      # another scr 2s, thus low gravity will be a quarter of the
+      # normal amount."
+      let div = if config.heavy_star then divisor else divisor >> 2
+
+      # L1152: sza — skip if AC == 0 (overflow check)
+      # L1153: jmp bsg — overflow → abort gravity
+      # In normal operation AC is 0 after the shifts. If non-zero,
+      # the product overflowed and we skip gravity entirely.
+      # In DIGS we model this with a zero-divisor guard.
+      if div == 0:
+        output gravity_x = 0
+        output gravity_y = 0
+        output object = object
       else:
-        # --- Compute gravity vector ---
-        # Source: L1155-1166
-        # Gravity = -position / divisor (attraction toward origin)
-        # lac i mx1; cma; jda idv; lac \t1 → gravity_x = -x / divisor
-        # lac i my1; cma; jda idv; lac \t1 → gravity_y = -y / divisor
-        gravity_x = spacewar:divide(-object.position_x, 0, divisor).quotient
-        gravity_y = spacewar:divide(-object.position_y, 0, divisor).quotient
+        # ── Compute gravity vector ──────────────────────────────
+        # L1154: dio \t1 — store divisor (IO value) in \t1
+        #
+        # L1155-1160: gravity_x
+        #   lac i mx1     — load position_x (FULL precision, unshifted)
+        #   cma           — negate (gravity pulls TOWARD origin)
+        #   jda idv       — integer divide: (-position_x) / divisor
+        #   lac \t1       — divisor argument
+        #   opr           — nop (overflow return, never taken)
+        #   dac \bx       — store gravity_x
+        #
+        # L1161-1166: gravity_y (identical pattern)
+        #
+        # The idv routine divides a single 18-bit integer by the divisor.
+        # The unshifted position is divided, so gravity_x is in the same
+        # scale as velocity (added directly to \mdx via diff macro).
+        output gravity_x = (0 - object.position_x) / div
+        output gravity_y = (0 - object.position_y) / div
+        output object = object
