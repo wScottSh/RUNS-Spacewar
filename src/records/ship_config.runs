@@ -32,7 +32,7 @@ record spacewar:ship_config
       # these codes relative to the ship's current heading (using
       # rotation matrix components derived from sin/cos of the angle).
       #
-      # See 04_conversion_phases.md Phase 7 for full outline format
+      # See 06_runtime_rendering_contract.md §2 for full outline format
       # documentation.
 
     player_id:                    int

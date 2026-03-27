@@ -1,0 +1,113 @@
+#! runs-prim 1.0
+
+# spacewar:display_starfield — Expensive Planetarium Star Projection
+#
+# Projects Peter Samson's star catalog onto the 1024×1024 display
+# by applying the scroll offset, performing the sliding-window
+# visibility test, and emitting screen-relative coordinates.
+#
+# This processor implements the dislis macro logic (L565-653).
+# It is called conceptually 4 times per active frame (once per
+# brightness tier), but in DIGS we express it as a single pass
+# over all 469 stars since the per-tier iteration is identical.
+#
+# Source: L565-653 (dislis macro), L629-653 (bck main routine)
+# Masswerk: Part 1, "The Expensive Planetarium" (insidespacewar-pt1-ep.html)
+#
+# The PDP-1's dislis macro is a complex self-modifying loop with:
+#   - Per-run starting pointer optimization (flo advancement)
+#   - Wraparound handling at x-domain boundaries (fgr)
+#   - Early exit when past the visible window (fuu + flag 5)
+# These optimizations are PDP-1 performance concerns. In DIGS,
+# we express the LOGICAL behavior: for each star, test visibility
+# and project to screen coordinates.
+#
+# Algorithm per star (from Masswerk/PDP-1 source):
+#   1. screen_x = star.x - scroll_offset          (L578: sub fpr)
+#   2. if screen_x >= 0: off-screen right →
+#        screen_x = screen_x - 8192               (L596: add (-20000+2000)
+#        (this is the wraparound: star map is circular)
+#        re-enter at step 3 to check left bound
+#   3. screen_x = screen_x + 1024                 (L582: add (2000)
+#   4. if screen_x <= 0: off-screen left → skip   (L583: spq)
+#   5. screen_x = screen_x - 512                  (L584: sub (1000)
+#   6. emit (screen_x, star.y, tier)               (L585-587: sal 8s, lio Y, dpy)
+
+processor spacewar:display_starfield
+  inputs:
+    catalog:    spacewar:star_catalog
+    starfield:  spacewar:starfield_state
+    config:     spacewar:game_config
+  outputs:
+    visible:    spacewar:visible_star_list
+
+  # --- SW4: disable background ---
+  # L630: szs 40 — skip if sense switch 4 is NOT set
+  # If background is disabled, emit empty list.
+  if config.disable_background:
+    output visible = { stars = [] }
+  else:
+    # Project every star through the dislis visibility window.
+    #
+    # The PDP-1 processes stars in 4 separate dislis expansions
+    # (one per brightness tier), each with its own flo pointer
+    # optimization. In DIGS we iterate all stars in a single pass
+    # since the projection math is identical across tiers.
+    #
+    # The scroll_offset is fpr (L653, range 0-8191).
+    # The star x-coordinates are in the range 0-8191 (after the
+    # mark macro's 8192-X transformation).
+    # The x-domain wraps circularly at 8192 (20000₈).
+    let fpr = starfield.scroll_offset
+
+    # Accumulate visible stars using for-from with list concatenation.
+    # This is the DIGS idiomatic pattern for filter+map over a list.
+    for star in catalog.stars from result = []:
+
+      # Step 1: subtract scroll offset (L578: sub fpr)
+      let dx = star.x - fpr
+
+      # Step 2: right-boundary check and wraparound
+      # L579: sma — skip if dx < 0 (i.e., on-screen side)
+      # L580: jmp fgr — if dx >= 0, star is past right margin
+      # At fgr (L596): add (-20000+2000) = add (-8192+1024) = dx - 7168
+      # Then jump to frr (L583) for left-boundary re-check.
+      #
+      # Simplified: if dx >= 0, wrap by subtracting 8192.
+      # The +2000 in the PDP-1 is because fgr jumps to frr which
+      # is AFTER the add (2000 at L582. So the combined operation is:
+      # dx = dx - 8192 + 1024 = dx - 7168, then check spq.
+      #
+      # For clarity, we decompose into the two logical steps:
+      let dx = if dx >= 0 then dx - 8192 else dx
+
+      # Step 3: add display width (L582: add (2000 = add 1024₁₀)
+      let screen_x = dx + 1024
+
+      # Step 4: left-boundary check
+      # L583: spq — skip if AC > 0 (positive but not zero)
+      # If screen_x <= 0, star is off-screen left → skip
+      if screen_x > 0:
+        # Step 5: re-center to display origin (L584: sub (1000 = sub 512₁₀)
+        let screen_x = screen_x - 512
+
+        # Step 6: emit visible star
+        # L585: sal 8s — shift into display register bits (CRT concern)
+        # L586: lio Y  — load Y coordinate (already ×256 scaled by mark)
+        # L587: dpy-i+B — display at brightness B
+        #
+        # The brightness tiers map to CRT intensity levels:
+        #   dislis 1j,1q,3 → tier 1 stars at intensity 3
+        #   dislis 2j,2q,2 → tier 2 stars at intensity 2
+        #   dislis 3j,3q,1 → tier 3 stars at intensity 1
+        #   dislis 4j,4q,0 → tier 4 stars at intensity 0
+        #
+        # In DIGS, brightness is stored per-star in the catalog
+        # as tier 1-4. The CRT intensity mapping is:
+        #   intensity = 4 - star.brightness
+        #   (tier 1 → 3, tier 2 → 2, tier 3 → 1, tier 4 → 0)
+        let intensity = 4 - star.brightness
+
+        let result = result ++ [{ x = screen_x, y = star.y, brightness = intensity }]
+
+    output visible = { stars = result }

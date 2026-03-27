@@ -1,0 +1,55 @@
+# spacewar:visible_star_list + spacewar:visible_star — Rendered Starfield
+#
+# Outbound boundary Record: produced by spacewar:display_starfield
+# each frame the EP is active.
+#
+# Contains only the stars currently visible on the 1024×1024 display,
+# with positions projected to screen coordinates (-512 to +512).
+#
+# Source: dislis macro output (L565-653, insidespacewar-pt1-ep.html)
+
+record spacewar:visible_star_list
+  scope:     outbound boundary
+  instances: 1
+
+  fields:
+
+    stars:                        spacewar:visible_star[]
+      # Stars currently on screen, projected from the star catalog
+      # by subtracting starfield_state.scroll_offset.
+      # Maximum ~60 visible at any time (display width 1024 out of
+      # 8192 total x-domain; 469 × 1024/8192 ≈ 59).
+
+record spacewar:visible_star
+  fields:
+
+    x:                            int
+      # Screen-relative X position, range -512 to +512.
+      # Computed by dislis: star.x - scroll_offset, then
+      # wraparound, then add 1024 (display width), then
+      # subtract 512 (re-center to origin).
+      # Source: L578-584 (sub fpr; add (2000; sub (1000; sal 8s).
+      # NOTE: The sal 8s shifts into bits 0-9 for the dpy instruction.
+      # In DIGS we emit the logical value BEFORE the shift, since
+      # the shift is a CRT register format concern, not a game value.
+
+    y:                            int
+      # Screen-relative Y position, raw from star catalog.
+      # The mark macro already scaled Y by ×256 (repeat 8, Y=Y+Y)
+      # for the PDP-1 IO register format. In DIGS we emit the
+      # LOGICAL value (the original Y argument), since ×256 scaling
+      # is a CRT register format concern.
+      # Range: approximately -512 to +512.
+
+    brightness:                   int
+      # CRT intensity tier, 0-3.
+      # Source: dislis parameter B, shifted left 6 bits into dpy
+      # instruction bits 9-11.
+      #   Tier 1 (brightest 9 stars):  B=3 → intensity 3
+      #   Tier 2 (10 bright stars):    B=2 → intensity 2
+      #   Tier 3 (82 medium stars):    B=1 → intensity 1
+      #   Tier 4 (370 dim stars):      B=0 → intensity 0 (default)
+      # In Spacewar! 2b, brightness was controlled by refresh
+      # frequency instead (1st magnitude refreshed twice per cycle).
+      # Version 3.1 switched to the Type 30 CRT's built-in 8-level
+      # intensity parameter.

@@ -9,3 +9,4 @@ enum spacewar:render_type
   explosion           # Particle scatter. Uses particle_seed and particle_count.
   star                # Background star from catalog. Uses brightness (1-4).
   central_star        # Fixed at origin. Random dot burst + flicker.
+  hyperspace_dot      # Single point at intensity 2. Hyperspace breakout.

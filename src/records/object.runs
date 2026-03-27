@@ -156,3 +156,68 @@ record spacewar:object
       # the ship explodes instead of returning (L1064-1068).
       # Higher accumulator = more likely death. After ~4 uses, certain death.
       default: 0
+
+    # ── Per-Frame Derived Fields ─────────────────────────────────
+    #
+    # These are NOT persistent state from the PDP-1 entity table.
+    # They are scratch variables (\sn, \cs, \bx, \by, flag 6, \src)
+    # that the decomposition of the monolithic ship routine into
+    # multiple Processors promoted to Record fields. In a Petri net,
+    # these are tokens that must flow through places (Records)
+    # between transitions (Processors). Every inter-Processor data
+    # flow MUST pass through a Record — no direct handoffs.
+
+    sin_heading:                  spacewar:fixed18
+      # Source: \sn — sin(angle), computed by rotation_update (L1118).
+      # Consumed by thrust (L1180), torpedo_launch (L1274), and
+      # build_render_list (outline rotation matrix).
+      # Only meaningful for ships.
+      default: 0
+
+    cos_heading:                  spacewar:fixed18
+      # Source: \cs — cos(angle), computed by rotation_update (L1171-1172).
+      # Consumed by thrust (L1173), torpedo_launch (L1279).
+      # Only meaningful for ships.
+      default: 0
+
+    thrust_enabled:               bool
+      # Source: flag 6 — set by rotation_update (L1105-1110) when
+      # thrust button pressed AND fuel remaining (fuel < 0).
+      # Consumed by thrust (L1175/1183) and exhaust_burn (L1221).
+      # Only meaningful for ships.
+      default: false
+
+    gravity_x:                    spacewar:fixed18
+      # Source: \bx — gravity acceleration X component, computed by
+      # gravity Processor (L1155-1160).
+      # Consumed by thrust (L1185).
+      # Only meaningful for ships. Zero when gravity disabled (SW6).
+      default: 0
+
+    gravity_y:                    spacewar:fixed18
+      # Source: \by — gravity acceleration Y component, computed by
+      # gravity Processor (L1161-1166).
+      # Consumed by thrust (L1177).
+      # Only meaningful for ships. Zero when gravity disabled (SW6).
+      default: 0
+
+    particle_seed:                spacewar:fixed18
+      # PRNG state at start of explosion particle generation.
+      # Computed by explosion_tick (L964). Consumed by build_render_list
+      # for particle position reproduction.
+      # Only meaningful when state == exploding.
+      default: 0
+
+    particle_count:               int
+      # Number of explosion particles, derived from instruction
+      # budget via scale loop (L957-960: sub (140).
+      # Computed by explosion_tick. Consumed by build_render_list.
+      # Only meaningful when state == exploding.
+      default: 0
+
+    flame_length:                 int
+      # Source: \src — random exhaust length (0-15 dots), computed by
+      # exhaust_burn Processor (L1218: ranct sar 9s, sar 4s).
+      # Consumed by build_render_list. 0 when not thrusting.
+      # Only meaningful for ships.
+      default: 0

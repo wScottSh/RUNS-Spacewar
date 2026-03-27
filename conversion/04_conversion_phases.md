@@ -507,8 +507,8 @@ Phases are strictly ordered — each phase's inputs are produced by prior phases
 ### Work Items
 
 1. **Define `spacewar:ship_update` bundle**: A sub-Network containing the ship-specific Processors in order:
-   - `spacewar:rotation_update` → `spacewar:gravity` → `spacewar:thrust` → `spacewar:velocity_integrate` → `spacewar:wrap_position` → `spacewar:torpedo_launch` → `spacewar:hyperspace_check`
-   - This is a sequential pipeline — each Processor's output feeds the next.
+   - `spacewar:rotation_update` → `spacewar:gravity` → `spacewar:thrust` → `spacewar:exhaust_burn` → `spacewar:velocity_integrate` → `spacewar:wrap_position` → `spacewar:torpedo_launch` → `spacewar:hyperspace_check`
+   - This is a sequential pipeline — each Processor reads from and writes to `spacewar:object` Record fields. Inter-Processor data (sin/cos cache, gravity vector, thrust flag, flame length) flows through `object` fields per the Petri net model. No direct Processor-to-Processor handoffs.
 
 2. **Define `spacewar:game_tick` Network**: The top-level game tick with guarded dispatch:
    ```
@@ -590,13 +590,13 @@ Phases are strictly ordered — each phase's inputs are produced by prior phases
 
 4. **Publish AEMS Manifestation events**: Create 4 JSON events per `03_aems_layer.md` § Manifestations. Kind 30051 events with `d`-tags: `spacewar:needle` (with outline_data), `spacewar:wedge` (with outline_data), `spacewar:torpedo` (no properties), `spacewar:central-star` (no properties).
 
-5. **Document outline format for runtime implementers**: The PDP-1 outline compiler (`oc`, L398–507) interprets each outline word as a sequence of 3-bit direction codes:
+5. **Document outline format for runtime implementers**: ✅ See `06_runtime_rendering_contract.md` §2. The PDP-1 outline compiler (`oc`, L398–507) interprets each outline word as a sequence of 3-bit direction codes:
    - 0 = draw NE, 1 = draw NW, 2 = draw N, 3 = draw SE, 4 = draw SW, 5 = draw S, 6 = store checkpoint, 7 = return to checkpoint
    - Each word contains six 3-bit codes read right-to-left
    - `700000₈` terminates
    - The runtime must implement an outline renderer that interprets these codes relative to the ship's current heading (using the rotation matrix components).
 
-6. **Document central star rendering for runtime implementers**: The `blp` routine (L522–539) renders the central star as a random burst of dots when SW6 is not set. Random position via PRNG, scaled random brightness. The `bpt` routine (L541–561) renders additional scattered dots around the central star (flicker effect). This is a runtime visual — reproduce the aesthetic, exact PRNG-driven placement is optional.
+6. **Document central star rendering for runtime implementers**: ✅ See `06_runtime_rendering_contract.md` §7. The `blp` routine (L522–539) renders the central star as a random burst of dots when SW6 is not set. Random position via PRNG, scaled random brightness. The `bpt` routine (L541–561) renders additional scattered dots around the central star (flicker effect). PRNG-driven placement is deterministic and must be faithfully reproduced.
 
 ### Edge Cases
 

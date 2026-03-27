@@ -1,6 +1,6 @@
 # spacewar:star_catalog + spacewar:star_entry — Expensive Planetarium
 #
-# Peter Samson's star catalog: ~478 real stars from the night sky,
+# Peter Samson's star catalog: 469 real stars from the night sky,
 # organized into 4 brightness tiers.
 #
 # Source: L1371-1870 of spacewar3.1_complete.txt
@@ -18,7 +18,7 @@ record spacewar:star_catalog
 
   fields:
     stars:                        spacewar:star_entry[]
-      # 478 entries across 4 brightness tiers (9+10+82+377).
+      # 469 entries across 4 brightness tiers (9+9+81+370).
       # Source: L1385-1866.
 
 record spacewar:star_entry

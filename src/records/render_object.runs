@@ -37,6 +37,18 @@ record spacewar:render_object
       # From nth[i]. Used by runtime for outline rotation.
       default: 0
 
+    sin_heading:                  spacewar:fixed18
+      # sin(angle), pre-computed by rotation_update.
+      # Used by runtime to construct outline rotation matrix.
+      # See 06_runtime_rendering_contract.md §2a.
+      # Only meaningful when object_type == ship.
+      default: 0
+
+    cos_heading:                  spacewar:fixed18
+      # cos(angle), pre-computed by rotation_update.
+      # Only meaningful when object_type == ship.
+      default: 0
+
     outline_data:                 spacewar:outline_word[]
       # Ship shape data. Only meaningful when object_type == ship.
       # Array of octal words; 700000₈ = terminator.
@@ -59,6 +71,17 @@ record spacewar:render_object
       # Number of explosion particles.
       # Only meaningful when object_type == explosion.
       # From the scale loop at L961: sub (140.
+      default: 0
+
+    star_seed:                    spacewar:fixed18
+      # PRNG state at start of central star burst generation.
+      # Only meaningful when object_type == central_star.
+      # The runtime reproduces the exact star pattern by replaying
+      # the PRNG from this seed per 06_runtime_rendering_contract.md §7.
+      #
+      # TODO: Not yet populated. Requires a separate Processor (or
+      # PRNG input to build_render_list) to capture the PRNG state
+      # before the central star rendering calls advance it.
       default: 0
 
     flame_length:                 int

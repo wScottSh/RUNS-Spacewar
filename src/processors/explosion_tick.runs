@@ -38,8 +38,6 @@ processor spacewar:explosion_tick
   outputs:
     object:         spacewar:object
     prng:           spacewar:prng_state
-    particle_seed:  spacewar:fixed18
-    particle_count: int
 
   preconditions:
     object.state == spacewar:exploding
@@ -86,8 +84,11 @@ processor spacewar:explosion_tick
   #
   # The renderer reproduces the exact particle pattern from the
   # saved seed by replaying the same PRNG sequence.
-  output particle_seed = prng.state
-  output particle_count = pcount
+  # particle_seed and particle_count are written to the object Record
+  # rather than output as phantom inter-Processor fields.
+  # build_render_list reads them from object when projecting to render_object.
+  let seed = prng.state
+  let count = pcount
 
   # Advance PRNG by 2 × particle_count steps.
   # (The original renders inline; RUNS defers display to the renderer.)
@@ -116,6 +117,6 @@ processor spacewar:explosion_tick
   let drifted = object with { position_x = ix.position, position_y = iy.position, velocity_x = ix.velocity, velocity_y = iy.velocity }
 
   if life > 0:
-    output object = drifted with { state = spacewar:empty, collidable = false, lifetime = 0 }
+    output object = drifted with { state = spacewar:empty, collidable = false, lifetime = 0, particle_seed = seed, particle_count = count }
   else:
-    output object = drifted with { lifetime = life }
+    output object = drifted with { lifetime = life, particle_seed = seed, particle_count = count }

@@ -35,14 +35,20 @@ processor spacewar:build_render_list
   # Source: L938-939: jsp blp — called unconditionally at end of main loop.
   # The central star is displayed regardless of entity state, after all
   # entity handling and the Expensive Planetarium background.
+  # TODO: star_seed is not yet populated. Requires a separate Processor
+  # (e.g., render_star) to capture PRNG state before advancing it.
+  # See 06_runtime_rendering_contract.md §7.
   output render_list = [{
     object_type = central_star,
     position_x = 0,
     position_y = 0,
     angle = 0,
+    sin_heading = 0,
+    cos_heading = 0,
     brightness = 0,
     particle_seed = 0,
     particle_count = 0,
+    star_seed = 0,
     flame_length = 0
   }]
 
@@ -73,11 +79,14 @@ processor spacewar:build_render_list
         position_x = obj.position_x,
         position_y = obj.position_y,
         angle = obj.angle,
+        sin_heading = obj.sin_heading,
+        cos_heading = obj.cos_heading,
         outline_data = configs[obj.outline_ref].outline_data,
         brightness = 0,
         particle_seed = 0,
         particle_count = 0,
-        flame_length = 0
+        star_seed = 0,
+        flame_length = obj.flame_length
       }]
 
     elif obj.state == spacewar:torpedo:
@@ -90,9 +99,12 @@ processor spacewar:build_render_list
         position_x = obj.position_x,
         position_y = obj.position_y,
         angle = 0,
+        sin_heading = 0,
+        cos_heading = 0,
         brightness = 1,
         particle_seed = 0,
         particle_count = 0,
+        star_seed = 0,
         flame_length = 0
       }]
 
@@ -118,9 +130,12 @@ processor spacewar:build_render_list
         position_x = obj.position_x,
         position_y = obj.position_y,
         angle = 0,
+        sin_heading = 0,
+        cos_heading = 0,
         brightness = 0,
-        particle_seed = 0,
-        particle_count = 0,
+        particle_seed = obj.particle_seed,
+        particle_count = obj.particle_count,
+        star_seed = 0,
         flame_length = 0
       }]
 
@@ -138,19 +153,20 @@ processor spacewar:build_render_list
       # mtb[i] = hp3 — no sign bit (collidable during breakout).
       # L1075: lac i mx1           — load x position
       # L1076: dispt i, i my1, 2  — display at intensity 2 (reduced brightness)
-      # The ship is visible as a single point with reduced brightness
-      # during the breakout phase, before returning to full ship display.
-      # The outline is also rendered since the ship is transitioning back
-      # to normal state.
+      # The PDP-1 renders ONLY a single dot during breakout, NOT the
+      # ship outline. The outline is not drawn until the entity state
+      # transitions back to spacewar:ship.
       output render_list = render_list ++ [{
-        object_type = ship,
+        object_type = hyperspace_dot,
         position_x = obj.position_x,
         position_y = obj.position_y,
-        angle = obj.angle,
-        outline_data = configs[obj.outline_ref].outline_data,
+        angle = 0,
+        sin_heading = 0,
+        cos_heading = 0,
         brightness = 2,
         particle_seed = 0,
         particle_count = 0,
+        star_seed = 0,
         flame_length = 0
       }]
 

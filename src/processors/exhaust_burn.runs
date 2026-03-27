@@ -1,0 +1,64 @@
+#! runs-prim 1.0
+
+# spacewar:exhaust_burn — Exhaust Flame Length + Fuel Consumption
+#
+# Computes the exhaust flame length and burns fuel per dot drawn.
+# This Processor covers the game logic portion of the exhaust
+# rendering loop; the visual rendering (dot drawing) is a runtime
+# concern.
+#
+# Source: L1217-1231 (sq6 through sq9)
+#   L1217: ioh              — interact with IO hardware (display sync)
+#   L1218: ranct sar 9s, sar 4s, \src — random flame length
+#          ranct macro (L179-187): random; S; SS; sma; cma; dac C
+#          Expanding: random >> 9 >> 4 = random >> 13, absolute value
+#          Max value: 131071 >> 13 = 15. Range: [0, 15].
+#   L1219: lio \scw          — load control word
+#   L1220: ril 2s            — rotate left 2 (thrust bit → sign position)
+#   L1221: spi i             — skip if IO < 0 (thrust bit SET)
+#   L1222: jmp sq9           — not thrusting → skip flame entirely
+#   L1223: scale \sn, 8s, \ssn — sin >> 8 for exhaust dot direction
+#   L1224: scale \cs, 8s, \scn — cos >> 8
+#   L1225: count i \mfu, st2 — burn 1 fuel unit per dot
+#   L1226: dzm i \mfu        — fuel exhausted → zero (count-around)
+#   L1227: jmp sq9           — no more fuel → exit flame loop
+#   L1229: st2, yincr ...    — draw a dot (runtime)
+#   L1230: dispt ...         — display the dot (runtime)
+#   L1231: count \src, sq7   — loop until flame_length exhausted
+#
+# Game logic: flame_length = min(random_count, remaining_fuel).
+# Fuel burned = flame_length (one unit per dot drawn).
+#
+# Masswerk Part 5: "the length of the flame... is randomized by each
+# frame... both the number of dots and the count being derived from
+# random numbers"
+
+processor spacewar:exhaust_burn
+  inputs:
+    object:   spacewar:object
+    prng:     spacewar:prng_state
+  outputs:
+    object:   spacewar:object
+    prng:     spacewar:prng_state
+  preconditions:
+    object.state == spacewar:ship
+
+  # ═══════════════════════════════════════════════════════════════
+  # TODO: This processor body needs a full /write-digs-processor
+  # pass for bit-exact verification against L1217-1231.
+  #
+  # The algorithm outline is:
+  #   1. Generate random flame length via ranct (random >> 13, abs)
+  #   2. If not thrust_enabled: flame_length = 0, no fuel change
+  #   3. If thrusting: actual_length = min(random_length, abs(fuel))
+  #   4. Burn fuel: fuel += actual_length (counts toward 0)
+  #   5. Count-around prevention: if fuel >= 0 then fuel = 0
+  #   6. Write flame_length and updated fuel to object
+  #
+  # The ranct macro requires advancing the PRNG by 1 step even
+  # when not thrusting (the random call at L1218 executes
+  # unconditionally before the thrust check at L1221).
+  # ═══════════════════════════════════════════════════════════════
+
+  output object = object
+  output prng = prng

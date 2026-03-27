@@ -29,9 +29,6 @@ processor spacewar:rotation_update
     consts:     spacewar:game_constants
   outputs:
     object:         spacewar:object
-    sin_heading:    spacewar:fixed18    # sin(angle) for downstream use
-    cos_heading:    spacewar:fixed18    # cos(angle) for downstream use
-    thrust_enabled: bool                # Whether thrust should fire this frame
   preconditions:
     object.state == spacewar:ship
 
@@ -122,10 +119,13 @@ processor spacewar:rotation_update
   let trig = spacewar:sin(angle_final)
 
   # ── Outputs ────────────────────────────────────────────────────
-  output sin_heading = trig.sin
-  output cos_heading = trig.cos
-  output thrust_enabled = can_thrust
+  # sin_heading, cos_heading, and thrust_enabled are written to the
+  # object Record rather than output as phantom inter-Processor fields.
+  # Downstream Processors (thrust, torpedo_launch) read them from object.
   output object = object with {
     angular_velocity = stored_omega,
-    angle = angle_final
+    angle = angle_final,
+    sin_heading = trig.sin,
+    cos_heading = trig.cos,
+    thrust_enabled = can_thrust
   }

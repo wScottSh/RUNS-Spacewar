@@ -23,7 +23,7 @@
 processor spacewar:process_spawns
   inputs:
     objects:        spacewar:object[24]
-    spawn_requests: spacewar:spawn_request[]
+    spawn_requests: spacewar:spawn_request[2]
     consts:         spacewar:game_constants
   outputs:
     objects:        spacewar:object[24]

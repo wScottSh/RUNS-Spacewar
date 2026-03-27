@@ -43,11 +43,6 @@
 processor spacewar:thrust
   inputs:
     object:         spacewar:object
-    sin_heading:    spacewar:fixed18     # sin(angle), from jda sin
-    cos_heading:    spacewar:fixed18     # cos(angle), from jda cos
-    gravity_x:      spacewar:fixed18     # \bx from gravity processor
-    gravity_y:      spacewar:fixed18     # \by from gravity processor
-    thrust_enabled: bool                 # flag 6: thrust button AND fuel > 0
     consts:         spacewar:game_constants
   outputs:
     object:         spacewar:object
@@ -58,16 +53,16 @@ processor spacewar:thrust
   # cos >> 9 >> sac (sac = 4): total shift 13
   # If thrusting, accel_y = (cos >> 13) + gravity_y
   # If not thrusting, accel_y = gravity_y
-  let cos_thrust = cos_heading >> 9 >> consts.thrust_scale_shift
-  let accel_y = if thrust_enabled then cos_thrust + gravity_y else gravity_y
+  let cos_thrust = object.cos_heading >> 9 >> consts.thrust_scale_shift
+  let accel_y = if object.thrust_enabled then cos_thrust + object.gravity_y else object.gravity_y
 
   # ── X-axis acceleration (L1179-1185) ───────────────────────────
   # sin >> 9 >> sac, then cma (negate): thrust along X is -sin
   # This is because the ship thrusts nose-first, and in the PDP-1
   # coordinate system, X position decreases as the ship moves in
   # the direction of sin(angle).
-  let sin_thrust = -(sin_heading >> 9 >> consts.thrust_scale_shift)
-  let accel_x = if thrust_enabled then sin_thrust + gravity_x else gravity_x
+  let sin_thrust = -(object.sin_heading >> 9 >> consts.thrust_scale_shift)
+  let accel_x = if object.thrust_enabled then sin_thrust + object.gravity_x else object.gravity_x
 
   # ── Velocity/position integration (L1178, L1186) ──────────────
   # diff macro: vel += accel; pos += vel >> 3

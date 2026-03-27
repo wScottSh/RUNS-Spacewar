@@ -1,0 +1,51 @@
+# spacewar:spawn_request — Torpedo Spawn Intent
+#
+# Inter-phase communication Record: entity-level processing (Phase 4)
+# produces spawn requests, system-level processing (Phase 5) consumes
+# them to allocate new torpedo entities.
+#
+# In the PDP-1 source, torpedo spawning is a direct subroutine call
+# from the ship routine (L1245-1288). In RUNS, the decomposition into
+# separate Processors (torpedo_launch → process_spawns) requires an
+# intermediary Record to carry the spawn intent — this is the
+# Petri net place between those two transitions.
+#
+# Source: torpedo_launch (L1260-1284) produces the parameters;
+#         process_spawns (L1245-1258) consumes them.
+# Cross-reference: 04_conversion_phases.md § Phase 4 work item 6,
+#                  § Phase 5 work item 2.
+
+record spacewar:spawn_request
+  scope:     internal
+  instances: 2          # At most one spawn request per ship per tick
+
+  fields:
+
+    active:                       bool
+      # Whether this spawn request should be processed.
+      # false = no torpedo spawn this tick from this ship.
+      default: false
+
+    spawn_x:                      spacewar:fixed18
+      # Torpedo initial position X: ship nose.
+      # Computed as: position_x - 2×(sin_heading >> 5).
+      # Source: L1260/1264 (\stx = \sx1 - \ssn).
+      default: 0
+
+    spawn_y:                      spacewar:fixed18
+      # Torpedo initial position Y: ship nose.
+      # Computed as: position_y + 2×(cos_heading >> 5).
+      # Source: L1260/1264 (\sty = \sy1 + \scn).
+      default: 0
+
+    spawn_dx:                     spacewar:fixed18
+      # Torpedo initial velocity X.
+      # Computed as: -(sin_heading >> tvl) + ship.velocity_x.
+      # Source: L1274-1278.
+      default: 0
+
+    spawn_dy:                     spacewar:fixed18
+      # Torpedo initial velocity Y.
+      # Computed as: (cos_heading >> tvl) + ship.velocity_y.
+      # Source: L1279-1282.
+      default: 0

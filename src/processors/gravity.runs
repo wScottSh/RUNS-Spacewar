@@ -34,8 +34,6 @@ processor spacewar:gravity
     config:   spacewar:game_config
     consts:   spacewar:game_constants
   outputs:
-    gravity_x:    spacewar:fixed18
-    gravity_y:    spacewar:fixed18
     object:       spacewar:object
   preconditions:
     object.state == spacewar:ship
@@ -45,9 +43,7 @@ processor spacewar:gravity
   # L1122: szs 60 — skip next if SW6 is OFF
   # L1123: jmp bsg — SW6 ON → jump past gravity (no star)
   if config.disable_gravity:
-    output gravity_x = 0
-    output gravity_y = 0
-    output object = object
+    output object = object with { gravity_x = 0, gravity_y = 0 }
   else:
     # ── Compute r² (scaled) ───────────────────────────────────
     # L1124-1130: x component
@@ -120,18 +116,14 @@ processor spacewar:gravity
         # L1321-1323: Teleport to far corner
         # lac (377777; dac i mx1; dac i my1
         # 377777₈ = 131071₁₀ = max positive 18-bit value
-        output gravity_x = 0
-        output gravity_y = 0
-        output object = zeroed with { position_x = 131071, position_y = 131071 }
+        output object = zeroed with { position_x = 131071, position_y = 131071, gravity_x = 0, gravity_y = 0 }
       else:
         # L1329-1332: Explode (po1)
         # lac (mex 400000 — set explosion handler + non-collidable flag
         # dac i ml1       — store as control word
         # law i 10        — load -8₁₀ (octal 10 = decimal 8)
         # dac i ma1       — store as explosion countdown
-        output gravity_x = 0
-        output gravity_y = 0
-        output object = zeroed with { state = spacewar:exploding, collidable = false, lifetime = -8 }
+        output object = zeroed with { state = spacewar:exploding, collidable = false, lifetime = -8, gravity_x = 0, gravity_y = 0 }
     else:
       # ── Compute gravity divisor ─────────────────────────────
       # L1143: add str — restore full r² (add capture radius back)
@@ -175,9 +167,7 @@ processor spacewar:gravity
       # the product overflowed and we skip gravity entirely.
       # In DIGS we model this with a zero-divisor guard.
       if div == 0:
-        output gravity_x = 0
-        output gravity_y = 0
-        output object = object
+        output object = object with { gravity_x = 0, gravity_y = 0 }
       else:
         # ── Compute gravity vector ──────────────────────────────
         # L1154: dio \t1 — store divisor (IO value) in \t1
@@ -195,6 +185,7 @@ processor spacewar:gravity
         # The idv routine divides a single 18-bit integer by the divisor.
         # The unshifted position is divided, so gravity_x is in the same
         # scale as velocity (added directly to \mdx via diff macro).
-        output gravity_x = (0 - object.position_x) / div
-        output gravity_y = (0 - object.position_y) / div
-        output object = object
+        output object = object with {
+          gravity_x = (0 - object.position_x) / div,
+          gravity_y = (0 - object.position_y) / div
+        }
