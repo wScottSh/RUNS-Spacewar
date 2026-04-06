@@ -26,9 +26,9 @@ network spacewar:game_tick
   # ──────────────────────────────────────────────────
 
   produces:
-    render_list:  spacewar:render_object[]     # Visual projection for rendering
-    match:        spacewar:match_result        # Scores, lifecycle, restart timer
-    starfield:    spacewar:starfield_state     # Scroll state for star background
+    render_list:    spacewar:render_object[]     # Visual projection for rendering
+    match:          spacewar:match_result        # Scores, lifecycle, restart timer
+    visible_stars:  spacewar:visible_star_list   # Projected visible star positions
 
   # ──────────────────────────────────────────────────
   # Persistent State (carried between ticks)
@@ -39,6 +39,7 @@ network spacewar:game_tick
     prng:         spacewar:prng_state          # Pseudo-random number generator
     result:       spacewar:match_result        # Scores and match lifecycle
     starfield:    spacewar:starfield_state     # Starfield scroll counters
+    star_catalog: spacewar:star_catalog        # Peter Samson's Expensive Planetarium (read-only)
     configs:      spacewar:ship_config[2]      # Ship outlines (Needle + Wedge)
     consts:       spacewar:game_constants      # Gameplay constants (read-only)
     config:       spacewar:game_config         # Sense switch configuration
@@ -124,10 +125,11 @@ network spacewar:game_tick
 
     # ── Phase 6: Output Projection ───────────────────
     #
-    # Pure data projection — reads game state, writes render_object[].
+    # Pure data projection — reads game state, writes outbound Records.
     # No gameplay decisions flow backward.
 
     - processor: spacewar:build_render_list(objects, configs)
+    - processor: spacewar:display_starfield(star_catalog, starfield, config)
 
   # ──────────────────────────────────────────────────
   # Match Lifecycle (runtime-driven, NOT a Network)
@@ -137,7 +139,7 @@ network spacewar:game_tick
   #
   #   1. On launch:  runtime calls spacewar:match_initialize(state:)
   #   2. Each frame: runtime calls spacewar:game_tick (this Network)
-  #   3. On reinit:  if update_scores sets trigger_reinit = true,
+  #   3. On reinit:  if result.trigger_reinit == true,
   #                  runtime calls spacewar:match_initialize(state:)
   #                  before the next game_tick
   #   4. On match end: result.state == match_over → runtime stops

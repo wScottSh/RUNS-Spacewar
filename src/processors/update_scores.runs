@@ -23,7 +23,6 @@ processor spacewar:update_scores
     result:   spacewar:match_result
   outputs:
     result:           spacewar:match_result
-    trigger_reinit:   bool
 
   # L738: count \ntd, ml1 — isp \ntd; jmp ml1
   # isp increments \ntd. If result <= 0, jump to ml1 (no scoring).
@@ -34,14 +33,12 @@ processor spacewar:update_scores
     # No restart pending (timer inactive). Normal gameplay frame.
     # In PDP-1: \ntd is reset to -2×torpedo_life every normal frame
     # by md1 (L733-736), so we never reach mdn when timer == 0.
-    output result = result
-    output trigger_reinit = false
+    output result = result with { trigger_reinit = false }
 
   elif timer < 0:
     # L738: isp fired but result still negative → jmp ml1
     # Still counting down. Update timer only.
-    output result = result with { restart_timer = timer }
-    output trigger_reinit = false
+    output result = result with { restart_timer = timer, trigger_reinit = false }
 
   else:
     # Timer crossed to positive → scoring time.
@@ -62,5 +59,4 @@ processor spacewar:update_scores
 
     # L753: clf 2 (flag cleanup — no DIGS equivalent)
     # L754: jmp a (jump to game restart logic)
-    output result = result with { score_1 = s1, score_2 = s2, restart_timer = 0 }
-    output trigger_reinit = true
+    output result = result with { score_1 = s1, score_2 = s2, restart_timer = 0, trigger_reinit = true }

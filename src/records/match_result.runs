@@ -1,11 +1,14 @@
 # spacewar:match_result — Match State and Scores
 #
-# Outbound boundary Record: game logic produces AFTER each tick.
+# Dual-use Record: internal persistent state AND outbound boundary.
+# Appears in both state: and produces: in game_tick.runs.
+# Game logic Processors read/write it; the runtime also reads it
+# after each tick for scoring and lifecycle display.
 #
 # Source: 02_record_definitions.md § spacewar:match_result
 
 record spacewar:match_result
-  scope:     outbound boundary
+  scope:     state + outbound boundary
   instances: 1
 
   fields:
@@ -38,3 +41,10 @@ record spacewar:match_result
       # Source: \ntd (L735, L738).
       # Set to 2 × torpedo_lifetime on round end.
       default: 0
+
+    trigger_reinit:               bool
+      # If true, the runtime must call match_initialize before
+      # the next game_tick. Set by update_scores when the restart
+      # timer crosses from negative to positive.
+      # Source: L754 (jmp a — jump to restart logic).
+      default: false

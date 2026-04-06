@@ -1,8 +1,13 @@
 # spacewar:ship_update — Ship Per-Frame Update Pipeline
 #
 # Sub-Network bundling the sequential ship update chain.
-# Each Processor's output feeds the next. This pipeline runs
-# once per ship per frame (slot 0 then slot 1).
+# Each Processor reads from and writes to the object Record.
+# This pipeline runs once per ship per frame (slot 0 then slot 1).
+#
+# Data flow: all inter-Processor values (sin_heading, cos_heading,
+# thrust_enabled, gravity_x, gravity_y) are fields on the object
+# Record. Each Processor reads them from object and writes updated
+# values back via `output object = object with { ... }`.
 #
 # Source: L1079-1309 (ss1/ss2 → sr0 → ... → srt)
 
@@ -17,34 +22,27 @@ network spacewar:ship_update
     object:       spacewar:object
     prng:         spacewar:prng_state
     spawn_request: spacewar:spawn_request     # Torpedo spawn intent (if any)
-    flame_length:  int                        # For render: exhaust length
 
   phases:
     # 1. Rotation: read controls → update angular_velocity, angle, trig cache
+    #    Writes to object: sin_heading, cos_heading, thrust_enabled, angle, angular_velocity
     - processor: spacewar:rotation_update(object, controls, config, consts)
-      binds:
-        sin_heading: .sin_heading
-        cos_heading: .cos_heading
-        thrust_enabled: .thrust_enabled
 
     # 2. Gravity: compute gravitational pull toward origin (or handle star capture)
+    #    Writes to object: gravity_x, gravity_y (and possibly state/velocity on capture)
     - processor: spacewar:gravity(object, config, consts)
-      binds:
-        gravity_x: .gravity_x
-        gravity_y: .gravity_y
 
     # 3. Thrust + integration: apply engine thrust + gravity → velocity → position
-    - processor: spacewar:thrust(object, sin_heading, cos_heading, gravity_x, gravity_y, thrust_enabled, consts)
-      binds:
-        flame_length: .flame_length
+    #    Reads from object: sin_heading, cos_heading, thrust_enabled, gravity_x, gravity_y
+    #    Writes to object: position_x, position_y, velocity_x, velocity_y
+    - processor: spacewar:thrust(object, consts)
 
     # 4. Wrap: toroidal position wrapping (explicit PDP-1 overflow)
     - processor: spacewar:wrap_position(object.position_x, object.position_y)
 
     # 5. Torpedo: check fire intent, edge-detect, ammo, spawn request
-    - processor: spacewar:torpedo_launch(object, controls, config, consts, sin_heading, cos_heading)
-      binds:
-        spawn_request: .spawn_torpedo ? spawn_request : null
+    #    Reads from object: sin_heading, cos_heading (for torpedo spawn direction)
+    - processor: spacewar:torpedo_launch(object, controls, config, consts)
 
     # 6. Hyperspace: check entry intent (chord / dedicated button)
-    - processor: spacewar:hyperspace_check(object, controls)
+    - processor: spacewar:hyperspace_check(object, controls, consts)
