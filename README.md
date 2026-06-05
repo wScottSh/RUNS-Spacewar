@@ -7,7 +7,7 @@
 · 📦 **[AEMS](https://github.com/enduring-game-standard/aems-schema)**
 · 🎼 **[MAPS](https://github.com/enduring-game-standard/maps-notation)**
 
-> **Status**: Source complete. Awaiting first runtime.
+> **Status**: Source complete. Hand-compiled to PICO-8 (asserted, unverified). Awaiting a verifying runtime.
 
 ---
 
@@ -24,9 +24,9 @@ Every line of the original 1,870-line PDP-1 assembly has been mapped to a RUNS e
 ```
 src/
 ├── types/        1 file    18-bit fixed-point type specification
-├── records/     12 files   Game state, entity schema, boundary interface
+├── records/     14 files   Game state, entity schema, boundary interface
 ├── enums/        3 files   Entity states, match lifecycle, render types
-├── processors/  24 files   6 math · 11 entity · 7 system
+├── processors/  26 files   6 math · 12 entity · 7 system · 1 lifecycle
 ├── networks/     2 files   Game tick topology + ship update pipeline
 ├── aems/         2 files   3 Entity events + 4 Manifestation events
 ├── data/         4 files   Star catalog (469 stars) · init values · ship outlines
@@ -34,7 +34,7 @@ src/
 └── tests/        1 file    Verification report + test vectors
 ```
 
-**51 files. 24 Processors. 2 Networks. All game logic. Zero runtime code.**
+**55 files. 26 Processors. 2 Networks. All game logic, no compiler.**
 
 ## How It Works
 
@@ -74,7 +74,7 @@ The `conversion/` directory contains the complete scholarly analysis:
 
 ## What's Needed: A Runtime
 
-This repo contains all game logic but zero executable code. To play Spacewar!, someone must build a RUNS runtime — a program that:
+This repo's `src/` is all game logic and no executable code. A prior session *hand-compiled* it into a PICO-8 cartridge (`runtime/pico8/spacewar.p8`) — proof the source can produce a playable game, but an AI's *asserted* translation, not a *verified* compile (no Processor has been checked against PDP-1 test vectors yet). To play Spacewar! *faithfully*, someone must build a RUNS runtime — a program that:
 
 1. **Parses** `.runs` source files
 2. **Compiles** the expression language into executable form
