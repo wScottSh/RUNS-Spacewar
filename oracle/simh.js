@@ -8,6 +8,7 @@ import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
 const execFileAsync = promisify(execFile);
 
@@ -42,7 +43,7 @@ export const PDP1 = resolvePdp1();
  */
 export async function runPdp1(scriptLines, { timeout = 30_000 } = {}) {
   const script = scriptLines.join('\n') + '\n';
-  const tmp = join(tmpdir(), `pdp1-${Date.now()}.simh`);
+  const tmp = join(tmpdir(), `pdp1-${randomUUID()}.simh`);
   await writeFile(tmp, script);
   try {
     const { stdout, stderr } = await execFileAsync(PDP1, [tmp], {
