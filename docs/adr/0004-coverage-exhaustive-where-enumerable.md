@@ -1,8 +1,11 @@
 # Coverage is exhaustive where the input domain is enumerable, branch-complete elsewhere
 
-Status: accepted
+Status: accepted (the region→strength mapping *under* ADR-0012; ADR-0012 is the coverage
+spine and the definition of "done", this ADR records how that bar is met per region)
 
-"100% coverage" is defined objectively by each routine's **input-domain cardinality** (set by
+ADR-0012 fixes the bar — every reachable branch of Ground Truth, observed both ways, measured
+from SIMH execution traces. This ADR records the **strength achievable per region** under
+that bar, set objectively by each routine's **input-domain cardinality** (fixed by
 instruction width), not by judgement:
 
 - **Unary routines** — a single input ≤18 bits (`sqt`, `sin`/`cos`, `random`) — are vectored
@@ -15,7 +18,7 @@ instruction width), not by judgement:
   mechanically from SIMH traces) **plus a defined structured/boundary sample**: sign
   combinations, zero, ±max, carry/overflow edges, iteration extremes.
 - **State routines** — `ss1`, `tcr`, `mex`, `hp1`/`hp3`, and inline integration — have unbounded
-  state; covered by **branch coverage + frame Traces** (Plan B).
+  state; covered by **branch coverage + frame Traces**, the primary instrument (ADR-0012).
 
 ## Why
 

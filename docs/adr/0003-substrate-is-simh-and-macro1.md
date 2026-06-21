@@ -16,8 +16,9 @@ technology, so there is no stack to honour). On that test SIMH wins outright:
 
 - It is the most-validated PDP-1 simulator — hardened specifically to run Spacewar — so it is
   the *accuracy* choice, not merely the convenient one.
-- It ships, built in, the exact harness primitives Plan A needs: `examine`/`deposit` (read
-  state / inject inputs), breakpoints (run-until-return), single-step. MIT-style licensed.
+- It ships, built in, the exact harness primitives the Oracle needs — for Vectors and Traces
+  alike: `examine`/`deposit` (read state / inject inputs), breakpoints (run-until-return),
+  single-step. MIT-style licensed.
 - `macro1.c` is its native partner, assembles *this* source, and emits a symbol-resolved
   listing — the addresses the harness needs to drive `sqt`, pin `ran`, set up object slots.
 

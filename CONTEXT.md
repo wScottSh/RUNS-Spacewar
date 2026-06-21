@@ -34,12 +34,12 @@ _Avoid_: binary (unqualified), tape, ROM
 A RUNS/DIGS expression of the game. The *subject* of the Oracle, never its source. The thing being verified.
 _Avoid_: port, conversion, implementation, the source (when it risks meaning Ground Truth)
 
-**Vector** _(Plan A — gates a Processor)_:
-A recorded input→output pair for a single original routine, *observed* from the Substrate (never hand-derived). A Realization's Processor is done when it reproduces its routine's Vectors over every branch.
+**Vector**:
+A recorded input→output pair for a single original routine, *observed* from the Substrate (never hand-derived). The instrument for the **pure-math island** — the `jda` subroutines (`sqt`, `sin`/`cos`, `mpy`/`imp`, `idv`/`dvd`) — whose branches are reached by enumerating inputs at the entry point, exhaustively where the domain is ≤2¹⁸. Not the instrument for the entangled majority. (ADR-0012.)
 _Avoid_: test case, fixture, sample
 
-**Trace** _(Plan B — integration backstop)_:
-A full object-table snapshot per frame, captured from a scripted, fixed-seed, fixed-input match. Catches integration and slot-order behaviour that isolated Vectors hide. Built after Vectors.
+**Trace** _(the primary instrument)_:
+A full object-table snapshot per frame, captured from a scripted, pinned, fixed-seed match. The instrument for the **entangled majority** — every routine whose branches are reachable only by playing the game (`ss1`, `tcr`, `mex`, hyperspace, gravity, the collision test, the main loop's self-modification). The match is constructed to drive a target branch; the per-frame snapshot *is* the characterization. Coverage is measured on the union of all matches' traces. (ADR-0012.)
 _Avoid_: log, dump, replay
 
 **Pinned inputs**:
@@ -47,7 +47,7 @@ The fixed conditions a Trace (or any reproducible run) requires: the `ran` PRNG 
 _Avoid_: config, settings
 
 **Coverage**:
-Objective completeness of the Oracle, fixed by the size of the *game-exercised* input domain (ADR 0007), not by the Substrate's total input space and not by judgement. **Exhaustive** (every input enumerated) where the domain is ≤2¹⁸ and enumerable; **branch-complete + boundary-sampled** where it is ~2³⁶; **branch-complete + Traces** for unbounded state. Always *measured* from SIMH execution traces — uncovered paths self-identify as named missing Vectors. (See ADR 0004.)
+Objective completeness of the Oracle: **every reachable branch of Ground Truth, observed both ways, over the game-scoped input domain (ADR-0007), measured mechanically from SIMH execution traces** — never the Substrate's total input space, never judgement. One definition, *instrument-independent*, measured on the union of every scenario's trace; uncovered branches self-identify as named missing scenarios. Driven to **exhaustive** (every input enumerated) on the pure-math island where the domain is ≤2¹⁸; **branch-complete + boundary sample** where it is ~2³⁶; **branch-complete via Traces** for unbounded state. (ADR-0012 is the spine; ADR-0004 the region→strength mapping.)
 _Avoid_: test coverage, percent done
 
 ## Flagged ambiguities
@@ -62,4 +62,4 @@ _Avoid_: test coverage, percent done
 > **Dev:** I read the masswerk gravity page and it matches what that says.
 > **Expert:** That's the Translator, not Ground Truth. The Translator can be wrong. Done means the Substrate ran the original gravity routine on pinned inputs and your Processor reproduced those observed outputs — every branch.
 > **Dev:** And if I can't isolate the routine to get a Vector?
-> **Expert:** Then it's not an A-problem yet. We capture it in a Trace once the pieces exist. But we don't promote a reading of the Translator to a green test. Ever.
+> **Expert:** Most routines you don't — only the pure-math `jda` island gets Vectors. Everything entangled is characterized by a Trace: a pinned, fixed-seed match driven to walk the routine's branches, with the object table snapshotted each frame. What you never do is promote a reading of the Translator to a green test. Ever.

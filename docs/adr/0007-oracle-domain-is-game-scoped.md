@@ -20,8 +20,9 @@ The game's bound is **not** taken from the source comment `/largest input number
 static derivation (reading the nth-order consequences of un-executed assembly is
 itself an act of interpretation the creed distrusts). It is established by
 **confluence**: the comment, a static reading of gravity's `str` computation, the
-masswerk account, and — once Plan B Traces exist — empirically observed entry values,
-all converging on the same ceiling. Consensus across independent paths is the witness;
+masswerk account, and — once Traces exist (the primary instrument, ADR-0012) —
+empirically observed entry values, all converging on the same ceiling. Consensus across
+independent paths is the witness;
 no single source is the authority.
 
 ## Why
