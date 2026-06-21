@@ -22,6 +22,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runPdp1, pdp1Version } from './simh.js';
+import { sha256File } from './vectors.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -62,7 +63,7 @@ export function parseStarMapFromListing(listingText) {
 
 /**
  * Parse SIMH `examine <start>-<end>` output into {addr, word} pairs.
- * SIMH format: "AAAAA:\tWWWWWW" (decimal addr digits, colon, tab, octal word).
+ * SIMH format: "AAAAA:\tWWWWWW" (octal addr, colon, tab, octal word).
  * SIMH prints addresses in the same octal base as the deposit/examine input.
  */
 function parseSimhExamine(lines) {
@@ -207,9 +208,7 @@ test('star map listing↔core identity: all 938 words match (ADR-0006)', { timeo
 
 test('star map witness manifest written', { timeout: 30_000 }, async () => {
   const version = await pdp1Version();
-  const rimBytes = await readFile(RIM_PATH);
-  const { createHash } = await import('node:crypto');
-  const rimSha256 = createHash('sha256').update(rimBytes).digest('hex');
+  const rimSha256 = await sha256File(RIM_PATH);
 
   const manifest = {
     witness: 'T-STARMAP',
