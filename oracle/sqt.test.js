@@ -27,10 +27,10 @@ const ROOT = join(HERE, '..');
 
 // ── constants ────────────────────────────────────────────────────────────────
 
-const SQT_ADDR   = 0o0246;   // sqt entry point from listing
-const INCELL     = 0o7700;   // free memory cell for the input
-const STUB_START = 0o7701;   // address of lac incell
-const HLT_ADDR   = 0o7703;   // address of hlt (stub+2)
+const SQT_ADDR   = 0o0246;       // sqt entry point from listing
+const INCELL     = 0o7700;       // free memory cell for the input
+const STUB_START = 0o7701;       // address of lac incell (first of 3 stub instructions)
+const HLT_ADDR   = STUB_START + 2; // hlt is the third stub instruction
 
 // Instruction encodings (PDP-1, big-endian 18-bit words in octal)
 const LAC_INCELL = 0o207700; // lac 07700
@@ -43,7 +43,7 @@ const INPUT_OCTAL = 4;       // 04 octal = 4 decimal
 //   √4 = 2 → 2 × 2^9 = 1024 = 02000 octal
 const EXPECTED_AC = 0o2000;
 // Expected halt-PC: stub+3 (SIMH increments PC in fetch, so PC is past hlt)
-const EXPECTED_PC = 0o7704;
+const EXPECTED_PC = STUB_START + 3;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
