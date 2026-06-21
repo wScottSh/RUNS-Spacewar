@@ -13,3 +13,7 @@ build/
 # Sandcastle host harness (npm deps for .sandcastle/main.ts)
 node_modules/
 package-lock.json
+
+# Sandcastle harness state: secrets (.env), logs, and per-issue git worktrees.
+# Never commit — contains credentials and nested worktrees, not deliverables.
+.sandcastle/
