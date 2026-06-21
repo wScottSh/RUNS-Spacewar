@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test oracle/**/*.test.js",
-    "typecheck": "node tools/typecheck.mjs"
+    "typecheck": "node tools/typecheck.mjs",
+    "sandcastle": "npx tsx .sandcastle/main.ts"
   },
   "engines": {
     "node": ">=18"
