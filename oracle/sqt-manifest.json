@@ -2,7 +2,7 @@
   "routine": "sqt",
   "entry_pc_octal": "0246",
   "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
-  "listing_core_status": "verified — byte-for-byte match confirmed in commit d0cd028 (feat: stand up the Spacewar! oracle toolchain)",
+  "listing_core_status": "verified — listing↔core gate: 847 assigned addresses match core after load (image.js gateListingVsCore; rim sha256 8744e9c9c854...)",
   "domain": {
     "range_octal": "000000..177777",
     "cardinality": 65536,
@@ -53,7 +53,7 @@
   "tool_versions": {
     "simh_pdp1": "PDP-1 simulator Open SIMH V4.1-0 Current",
     "macro1": "macro1.c — canonical PDP-1 Macro assembler (tools/macro1)",
-    "node": "v24.15.0"
+    "node": "v22.23.0"
   },
   "vector_file": "sqt-vectors.jsonl",
   "vector_count": 65536
