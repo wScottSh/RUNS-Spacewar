@@ -6,12 +6,31 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const execFileAsync = promisify(execFile);
 
-// Path to the pdp1 binary built from open-simh source
-export const PDP1 = '/tmp/simh-sparse/pdp1';
+/**
+ * Locate the SIMH pdp1 Substrate binary.
+ *
+ * The binary is a gitignored build artifact, so its path differs per host:
+ * the repo-local build lives at tools/pdp1[.exe], while a CI/sandbox build may
+ * live anywhere. Resolution order:
+ *   1. $PDP1 — explicit override for any host (e.g. the Sandcastle harness).
+ *   2. tools/pdp1.exe (win32) or tools/pdp1 (POSIX), relative to this repo.
+ *
+ * No host-specific absolute path is baked into the source.
+ */
+function resolvePdp1() {
+  if (process.env.PDP1) return process.env.PDP1;
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const exe = process.platform === 'win32' ? 'pdp1.exe' : 'pdp1';
+  return join(repoRoot, 'tools', exe);
+}
+
+// Path to the pdp1 binary that runs the Substrate (see resolvePdp1).
+export const PDP1 = resolvePdp1();
 
 /**
  * Run a SIMH pdp1 session with the given script lines.
