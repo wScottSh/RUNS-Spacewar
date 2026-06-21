@@ -9,3 +9,7 @@ tools/simh/
 
 # Assembly + simulator build artifacts (regenerate via tools/assemble.cmd)
 build/
+
+# Sandcastle host harness (npm deps for .sandcastle/main.ts)
+node_modules/
+package-lock.json
