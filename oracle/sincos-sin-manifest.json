@@ -1,0 +1,37 @@
+{
+  "routine": "sin",
+  "entry_pc_octal": "0074",
+  "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
+  "listing_core_status": "verified — byte-for-byte match confirmed in commit d0cd028 (feat: stand up the Spacewar! oracle toolchain)",
+  "domain": {
+    "range_octal": "000000..777777",
+    "cardinality": 262144,
+    "coverage": "exhaustive — every 18-bit input enumerated (ADR-0004); enumeration is the coverage witness, every in-domain branch necessarily observed",
+    "confluence_witnesses": [
+      "source header L191-193: 'argument is between .+2 pi, with binary point to right of bit 3' (Translator-class)",
+      "ADR-0004: unary routines with domain ≤2^18 are vectored exhaustively",
+      "ADR-0007: game-scoped domain; caller at L1118 (jda sin) and L1171 (jda cos)"
+    ]
+  },
+  "calling_convention": {
+    "source": "revealed by calibration and listing (sincos.test.js)",
+    "jda_Y": "M[Y] ← AC (angle); AC ← PC (return address); PC ← Y+1",
+    "sin_entry_flow": "jda sin → M[0074]=angle, AC=return_PC, PC=0075; dap csx patches return address; lac sin loads angle; quadrant reduction via si1/si2/si3; result in AC on return via patched csx: jmp .",
+    "input_format": "18-bit signed angle (1's complement), binary point right of bit 3, spanning ±2π",
+    "output_format": "18-bit signed result (1's complement), binary point right of bit 0; scale = 2^17"
+  },
+  "calibration": {
+    "input_octal": "000000",
+    "machine_ac_octal": "000000",
+    "interpretation": "sin(0) = 0 — exact zero, confirmed from live Substrate",
+    "halt_pc_octal": "007704"
+  },
+  "tool_versions": {
+    "simh_pdp1": "PDP-1 simulator Open SIMH V4.1-0 Current",
+    "macro1": "macro1.c — canonical PDP-1 Macro assembler (tools/macro1)",
+    "node": "v22.23.0"
+  },
+  "vector_file": "sincos-sin-vectors.jsonl",
+  "vector_count": 262144,
+  "strength": "exhaustive / proof (ADR-0004, ADR-0012)"
+}
