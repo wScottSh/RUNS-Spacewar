@@ -32,8 +32,9 @@ export async function runPdp1(scriptLines) {
 }
 
 /**
- * Parse SIMH "NAME:\tVALUE" examine output lines into a Map of name→octal string.
- * e.g. "AC:\t002000" → { AC: '002000' }
+ * Parse SIMH "NAME:\tVALUE" examine output lines into an object of name→octal string.
+ * Names are upper-cased and leading zeros are stripped from values.
+ * e.g. "AC:\t002000" → { AC: '2000' }
  */
 export function parseExamine(lines) {
   const out = {};

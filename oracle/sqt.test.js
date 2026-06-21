@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runPdp1, parseExamine } from './simh.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -51,7 +52,6 @@ const EXPECTED_PC = 0o7704;
  * Returns { ac, pc, sqtCell } as integer values.
  */
 async function runSqtCalibration(inputOctal) {
-  const { runPdp1, parseExamine } = await import('./simh.js');
   const rimPath = join(ROOT, 'build/spacewar31.rim');
   const script = [
     `load ${rimPath}`,
@@ -70,7 +70,7 @@ async function runSqtCalibration(inputOctal) {
   return {
     ac: parseInt(regs['AC'] ?? '0', 8),
     pc: parseInt(regs['PC'] ?? '0', 8),
-    sqtCell: parseInt(regs[SQT_ADDR.toString(8).toUpperCase()] ?? (regs['246'] ?? '0'), 8),
+    sqtCell: parseInt(regs[SQT_ADDR.toString(8)] ?? '0', 8),
   };
 }
 
