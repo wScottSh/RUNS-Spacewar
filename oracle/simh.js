@@ -25,7 +25,8 @@ export async function runPdp1(scriptLines) {
     const { stdout, stderr } = await execFileAsync(PDP1, [tmp], {
       timeout: 30_000,
     });
-    return { stdout: stdout + stderr, lines: (stdout + stderr).split('\n') };
+    const output = stdout + stderr;
+    return { stdout: output, lines: output.split('\n') };
   } finally {
     await unlink(tmp).catch(() => {});
   }
