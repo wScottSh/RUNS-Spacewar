@@ -53,16 +53,19 @@ const EXPECTED_PC = 0o7704;
  */
 async function runSqtCalibration(inputOctal) {
   const rimPath = join(ROOT, 'build/spacewar31.rim');
+  // SIMH's default radix is octal, so addresses and values go in as octal strings.
+  const oct = (n) => n.toString(8);
+  const deposit = (addr, val) => `deposit ${oct(addr)} ${oct(val)}`;
   const script = [
     `load ${rimPath}`,
-    `deposit ${INCELL.toString(8)} ${inputOctal}`,
-    `deposit ${STUB_START.toString(8)} ${LAC_INCELL.toString(8)}`,
-    `deposit ${(STUB_START+1).toString(8)} ${JDA_SQT.toString(8)}`,
-    `deposit ${(STUB_START+2).toString(8)} ${HLT.toString(8)}`,
-    `run ${STUB_START.toString(8)}`,
+    deposit(INCELL, inputOctal),
+    deposit(STUB_START, LAC_INCELL),
+    deposit(STUB_START + 1, JDA_SQT),
+    deposit(STUB_START + 2, HLT),
+    `run ${oct(STUB_START)}`,
     'examine ac',
     'examine pc',
-    `examine ${SQT_ADDR.toString(8)}`,
+    `examine ${oct(SQT_ADDR)}`,
     'quit',
   ];
   const { lines } = await runPdp1(script);
@@ -70,7 +73,7 @@ async function runSqtCalibration(inputOctal) {
   return {
     ac: parseInt(regs['AC'] ?? '0', 8),
     pc: parseInt(regs['PC'] ?? '0', 8),
-    sqtCell: parseInt(regs[SQT_ADDR.toString(8)] ?? '0', 8),
+    sqtCell: parseInt(regs[oct(SQT_ADDR)] ?? '0', 8),
   };
 }
 
