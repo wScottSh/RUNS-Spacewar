@@ -10,6 +10,8 @@ SRC="$ROOT/source/spacewar3.1_complete.txt"
 WORK="$ROOT/build/spacewar31.mac"
 
 mkdir -p "$ROOT/build"
+# macro1 writes its .rim/.lst next to the input, so assemble a copy in build/
+# to keep source/ clean.
 cp "$SRC" "$WORK"
 "$MACRO1" -r -d "$WORK"
 echo "Assembled: $ROOT/build/spacewar31.rim"
