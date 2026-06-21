@@ -53,6 +53,11 @@ export const OT2_WORDS = [
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+const WORD_MAX = (1 << 18) - 1;  // PDP-1 words are 18 bits wide
+
+/** Format an integer as a zero-padded 6-digit octal string (one PDP-1 word). */
+const oct6 = (n) => n.toString(8).padStart(6, '0');
+
 /**
  * Load the RIM file in SIMH and examine each address in the list.
  * Returns a Map of integer-address → integer-word.
@@ -70,6 +75,33 @@ async function examineCore(addresses) {
     if (m) core.set(parseInt(m[1], 8), parseInt(m[2], 8));
   }
   return core;
+}
+
+/** Assert every word of a listing table lies in the 18-bit range. */
+function assertWordsFit18Bits(name, words) {
+  for (let i = 0; i < words.length; i++) {
+    assert.ok(
+      words[i] >= 0 && words[i] <= WORD_MAX,
+      `${name}[${i}] = ${words[i].toString(8)} out of range`
+    );
+  }
+}
+
+/**
+ * Assert each listing word equals the value loaded into core at addr+i.
+ * `core` is the Map returned by examineCore.
+ */
+function assertListingMatchesCore(name, addr, words, core) {
+  for (let i = 0; i < words.length; i++) {
+    const a = addr + i;
+    const actual = core.get(a);
+    assert.equal(
+      actual,
+      words[i],
+      `${name}[${i}] at ${oct6(a)}: expected ${oct6(words[i])} ` +
+      `got ${actual != null ? oct6(actual) : 'absent'}`
+    );
+  }
 }
 
 // ── unit tests (listing validation, no Substrate) ────────────────────────────
@@ -91,23 +123,11 @@ test('ot2 terminates with code 7 (700000)', () => {
 });
 
 test('all ot1 words fit in 18 bits', () => {
-  const WORD_MAX = (1 << 18) - 1;
-  for (let i = 0; i < OT1_WORDS.length; i++) {
-    assert.ok(
-      OT1_WORDS[i] >= 0 && OT1_WORDS[i] <= WORD_MAX,
-      `ot1[${i}] = ${OT1_WORDS[i].toString(8)} out of range`
-    );
-  }
+  assertWordsFit18Bits('ot1', OT1_WORDS);
 });
 
 test('all ot2 words fit in 18 bits', () => {
-  const WORD_MAX = (1 << 18) - 1;
-  for (let i = 0; i < OT2_WORDS.length; i++) {
-    assert.ok(
-      OT2_WORDS[i] >= 0 && OT2_WORDS[i] <= WORD_MAX,
-      `ot2[${i}] = ${OT2_WORDS[i].toString(8)} out of range`
-    );
-  }
+  assertWordsFit18Bits('ot2', OT2_WORDS);
 });
 
 test('ot1 assembled address matches listing symbol table (002735)', () => {
@@ -121,37 +141,13 @@ test('ot2 assembled address matches listing symbol table (002752)', () => {
 // ── integration: listing ↔ core identity (ADR-0006) ──────────────────────────
 
 test('ot1 listing words match core memory after load (ADR-0006 witness)', async () => {
-  const addresses = OT1_WORDS.map((_, i) => OT1_ADDR + i);
-  const core = await examineCore(addresses);
-  for (let i = 0; i < OT1_WORDS.length; i++) {
-    const addr = OT1_ADDR + i;
-    const expected = OT1_WORDS[i];
-    const actual = core.get(addr);
-    assert.equal(
-      actual,
-      expected,
-      `ot1[${i}] at ${addr.toString(8).padStart(6, '0')}: ` +
-      `expected ${expected.toString(8).padStart(6, '0')} ` +
-      `got ${actual != null ? actual.toString(8).padStart(6, '0') : 'absent'}`
-    );
-  }
+  const core = await examineCore(OT1_WORDS.map((_, i) => OT1_ADDR + i));
+  assertListingMatchesCore('ot1', OT1_ADDR, OT1_WORDS, core);
 });
 
 test('ot2 listing words match core memory after load (ADR-0006 witness)', async () => {
-  const addresses = OT2_WORDS.map((_, i) => OT2_ADDR + i);
-  const core = await examineCore(addresses);
-  for (let i = 0; i < OT2_WORDS.length; i++) {
-    const addr = OT2_ADDR + i;
-    const expected = OT2_WORDS[i];
-    const actual = core.get(addr);
-    assert.equal(
-      actual,
-      expected,
-      `ot2[${i}] at ${addr.toString(8).padStart(6, '0')}: ` +
-      `expected ${expected.toString(8).padStart(6, '0')} ` +
-      `got ${actual != null ? actual.toString(8).padStart(6, '0') : 'absent'}`
-    );
-  }
+  const core = await examineCore(OT2_WORDS.map((_, i) => OT2_ADDR + i));
+  assertListingMatchesCore('ot2', OT2_ADDR, OT2_WORDS, core);
 });
 
 // ── fixture: T-OC input ───────────────────────────────────────────────────────
@@ -162,12 +158,12 @@ test('ot1/ot2 fixture written for T-OC input (oracle/fixtures/ot-fixture.json)',
     adr: 'ADR-0006',
     source_lines: '1338-1355',
     ot1: {
-      addr_octal: OT1_ADDR.toString(8).padStart(6, '0'),
-      words_octal: OT1_WORDS.map((w) => w.toString(8).padStart(6, '0')),
+      addr_octal: oct6(OT1_ADDR),
+      words_octal: OT1_WORDS.map((w) => oct6(w)),
     },
     ot2: {
-      addr_octal: OT2_ADDR.toString(8).padStart(6, '0'),
-      words_octal: OT2_WORDS.map((w) => w.toString(8).padStart(6, '0')),
+      addr_octal: oct6(OT2_ADDR),
+      words_octal: OT2_WORDS.map((w) => oct6(w)),
     },
   };
   const path = join(HERE, 'fixtures/ot-fixture.json');
