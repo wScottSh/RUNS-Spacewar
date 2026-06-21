@@ -26,6 +26,14 @@ impossible. The standard is machine-computed from SIMH execution traces — ever
 executed, every conditional resolved both ways — so an uncovered path is a named, missing
 Vector, not a matter of opinion.
 
+This trace-measured standard governs the **branch-complete** routines (binary and state),
+where enumeration is impossible. For routines vectored **exhaustively**, full enumeration
+over the game domain already exercises every in-domain branch, so the enumeration *is* the
+coverage witness and no separate trace pass is required. And per ADR-0007 the
+"uncovered path = missing Vector" rule is bounded to the **game-exercised** domain: a
+conditional that resolves only one way across the entire in-domain enumeration (its other
+arm reachable solely by out-of-contract input) is *correctly* dead, not a gap.
+
 ## Revisit trigger
 
 If a Realization ever passes a binary routine's structured sample yet diverges from the

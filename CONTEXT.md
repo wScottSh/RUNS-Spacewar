@@ -47,7 +47,7 @@ The fixed conditions a Trace (or any reproducible run) requires: the `ran` PRNG 
 _Avoid_: config, settings
 
 **Coverage**:
-Objective completeness of the Oracle, fixed by input-domain size, not judgement. **Exhaustive** (every input enumerated) where the domain is ≤2¹⁸ and enumerable; **branch-complete + boundary-sampled** where it is ~2³⁶; **branch-complete + Traces** for unbounded state. Always *measured* from SIMH execution traces — uncovered paths self-identify as named missing Vectors. (See ADR 0004.)
+Objective completeness of the Oracle, fixed by the size of the *game-exercised* input domain (ADR 0007), not by the Substrate's total input space and not by judgement. **Exhaustive** (every input enumerated) where the domain is ≤2¹⁸ and enumerable; **branch-complete + boundary-sampled** where it is ~2³⁶; **branch-complete + Traces** for unbounded state. Always *measured* from SIMH execution traces — uncovered paths self-identify as named missing Vectors. (See ADR 0004.)
 _Avoid_: test coverage, percent done
 
 ## Flagged ambiguities
