@@ -1,0 +1,19 @@
+
+PDP-1 simulator Open SIMH V4.1-0 Current        git commit id: 0dc9deca
+
+HALT instruction, PC: 007704 (DCH 5000)
+AC:	001000
+PC:	007704
+Resetting all devices...  This may not have been your intention.
+The GO and CONTINUE commands do not reset devices.
+
+HALT instruction, PC: 007704 (DCH 5000)
+AC:	002000
+PC:	007704
+Resetting all devices...  This may not have been your intention.
+The GO and CONTINUE commands do not reset devices.
+
+HALT instruction, PC: 007704 (DCH 5000)
+AC:	003000
+PC:	007704
+Goodbye
