@@ -1,0 +1,13 @@
+{
+  "name": "spacewar-oracle",
+  "version": "0.1.0",
+  "description": "Characterization test suite for Spacewar! 3.1 on PDP-1",
+  "type": "module",
+  "scripts": {
+    "test": "node --test oracle/**/*.test.js",
+    "typecheck": "for f in oracle/*.js; do node --check \"$f\" || exit 1; done"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
