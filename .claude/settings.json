@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "Bash(cmd //c \"C:\\Users\\Scott\\repos\\egs\\RUNS-Spacewar\\tools\\build-pdp1.cmd\")",
+      "Bash(cmd //c \"C:\\Users\\Scott\\repos\\egs\\RUNS-Spacewar\\tools\\build-macro1.cmd\")"
+    ]
+  }
+}
