@@ -12,6 +12,7 @@ export const JDA_SQT    = 0o170246;  // jda sqt
 export const HLT        = 0o760400;
 export const HALT_PC    = 0o7704;    // SIMH increments PC during fetch; hlt at 07703
 export const MAX_INPUT  = 0o177777;  // 65535 — stated max input in sqt listing header
+export const ROOT_SCALE = 512;       // 2^9 — 9.9 fixed-point scale (integer root in upper 9 bits)
 
 /**
  * All {n, nsq} pairs where n² ≤ MAX_INPUT (0177777 = 65535).

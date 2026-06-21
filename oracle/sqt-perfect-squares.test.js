@@ -16,7 +16,7 @@ import {
   parseBatchOutput,
   perfectSquareInputs,
   runBatch,
-  STUB_START, LAC_INCELL, JDA_SQT, HLT, INCELL, HALT_PC,
+  STUB_START, LAC_INCELL, JDA_SQT, HLT, INCELL, HALT_PC, ROOT_SCALE,
 } from './substrate.js';
 import { gatePerfectSquares } from './gate.js';
 
@@ -99,14 +99,14 @@ test('parseBatchOutput: throws if AC/PC pair is incomplete', () => {
 
 test('gate: passes when all records have exact roots', () => {
   const records = perfectSquareInputs().map(({ n, nsq }) => ({
-    n, nsq, ac: n * 512, pc: HALT_PC,
+    n, nsq, ac: n * ROOT_SCALE, pc: HALT_PC,
   }));
   assert.doesNotThrow(() => gatePerfectSquares(records));
 });
 
 test('gate: fails with witnessing case when one root is wrong', () => {
   const records = perfectSquareInputs().map(({ n, nsq }) => ({
-    n, nsq, ac: n * 512, pc: HALT_PC,
+    n, nsq, ac: n * ROOT_SCALE, pc: HALT_PC,
   }));
   records[5].ac += 1; // corrupt n=5
   assert.throws(() => gatePerfectSquares(records), /gate FAIL.*n=5/);
@@ -114,7 +114,7 @@ test('gate: fails with witnessing case when one root is wrong', () => {
 
 test('gate: fails with witnessing case when halt-PC is wrong', () => {
   const records = perfectSquareInputs().map(({ n, nsq }) => ({
-    n, nsq, ac: n * 512, pc: HALT_PC,
+    n, nsq, ac: n * ROOT_SCALE, pc: HALT_PC,
   }));
   records[3].pc = 0o7703; // wrong PC for n=3
   assert.throws(() => gatePerfectSquares(records), /gate FAIL.*n=3/);
