@@ -34,23 +34,19 @@ const WITNESS_PATH = join(HERE, 'starmap-witness.json');
 const STAR_MAP_START = 0o6077;
 const STAR_MAP_END   = 0o7750;
 const EXPECTED_WORDS = STAR_MAP_END - STAR_MAP_START + 1; // 938
+const RESULT_MESSAGE = `PASS — all ${EXPECTED_WORDS} assembled words match core`;
 
 // ── listing parser ────────────────────────────────────────────────────────────
 
 /**
- * Parse the macro1 listing file and return an array of {addr, word} pairs
- * (both as integers) for all assembled words in the star map address range.
- *
- * Listing format for assembled words:
- *   "      AAAAA WWWWWW"  (6 leading spaces, 5-digit octal addr, space, 6-digit octal word)
- *
- * Intermediate macro-expansion values have no address (no 5-digit prefix) and
- * are filtered out. Page-header/source lines are filtered by the same regex.
+ * Extract {addr, word} pairs (both integers) from every line matching `pattern`,
+ * keeping only the addresses inside the star map range. `pattern` must capture
+ * the octal address in group 1 and the octal word in group 2.
  */
-export function parseStarMapFromListing(listingText) {
+function parseAddrWordPairs(lines, pattern) {
   const entries = [];
-  for (const line of listingText.split('\n')) {
-    const m = line.match(/^ {6}([0-7]{5}) ([0-7]{6})/);
+  for (const line of lines) {
+    const m = line.match(pattern);
     if (!m) continue;
     const addr = parseInt(m[1], 8);
     const word = parseInt(m[2], 8);
@@ -62,22 +58,26 @@ export function parseStarMapFromListing(listingText) {
 }
 
 /**
+ * Parse the macro1 listing file and return the assembled {addr, word} pairs in
+ * the star map address range.
+ *
+ * Listing format for assembled words:
+ *   "      AAAAA WWWWWW"  (6 leading spaces, 5-digit octal addr, space, 6-digit octal word)
+ *
+ * Intermediate macro-expansion values have no address (no 5-digit prefix) and
+ * are filtered out. Page-header/source lines are filtered by the same regex.
+ */
+export function parseStarMapFromListing(listingText) {
+  return parseAddrWordPairs(listingText.split('\n'), /^ {6}([0-7]{5}) ([0-7]{6})/);
+}
+
+/**
  * Parse SIMH `examine <start>-<end>` output into {addr, word} pairs.
  * SIMH format: "AAAAA:\tWWWWWW" (octal addr, colon, tab, octal word).
  * SIMH prints addresses in the same octal base as the deposit/examine input.
  */
 function parseSimhExamine(lines) {
-  const entries = [];
-  for (const line of lines) {
-    const m = line.match(/^([0-7]+):\s+([0-7]+)/);
-    if (!m) continue;
-    const addr = parseInt(m[1], 8);
-    const word = parseInt(m[2], 8);
-    if (addr >= STAR_MAP_START && addr <= STAR_MAP_END) {
-      entries.push({ addr, word });
-    }
-  }
-  return entries;
+  return parseAddrWordPairs(lines, /^([0-7]+):\s+([0-7]+)/);
 }
 
 // ── mark formula ──────────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ test('star map witness manifest written', { timeout: 30_000 }, async () => {
     listing_file: 'build/spacewar31.lst',
     rim_sha256: rimSha256,
     substrate_version: version,
-    result: 'PASS — all 938 assembled words match core',
+    result: RESULT_MESSAGE,
     note: 'Each mark X,Y entry assembles two words: (8192-X) at addr[0], Y×256 at addr[1]. Y×256 is a PDP-1 1s-complement 18-bit value.',
   };
 
@@ -231,5 +231,5 @@ test('star map witness manifest written', { timeout: 30_000 }, async () => {
   const written = JSON.parse(await readFile(WITNESS_PATH, 'utf8'));
   assert.strictEqual(written.witness, 'T-STARMAP');
   assert.strictEqual(written.word_count, EXPECTED_WORDS);
-  assert.strictEqual(written.result, 'PASS — all 938 assembled words match core');
+  assert.strictEqual(written.result, RESULT_MESSAGE);
 });
