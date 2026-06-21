@@ -1,0 +1,19 @@
+diff --git a/node_modules/@ai-hero/sandcastle/dist/chunk-NSFQW6ML.js b/node_modules/@ai-hero/sandcastle/dist/chunk-NSFQW6ML.js
+index e20fc1d..8ae01dd 100644
+--- a/node_modules/@ai-hero/sandcastle/dist/chunk-NSFQW6ML.js
++++ b/node_modules/@ai-hero/sandcastle/dist/chunk-NSFQW6ML.js
+@@ -220,6 +220,14 @@ var docker = (options) => {
+               ]
+             });
+             if (opts?.stdin !== void 0) {
++              // A benign EOF/EPIPE on the stdin pipe — the child closed its end
++              // before we finished writing the payload, common under heavy
++              // concurrency on Windows named pipes — must not be fatal. Without
++              // a listener here, Node re-throws the pipe's 'error' as an
++              // uncaught exception and tears down the whole orchestrator,
++              // killing every other in-flight sandbox pipeline. Swallow it and
++              // let the child's exit code (via 'close') decide success.
++              proc.stdin.on("error", () => {});
+               proc.stdin.write(opts.stdin);
+               proc.stdin.end();
+             }

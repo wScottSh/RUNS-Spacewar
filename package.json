@@ -6,9 +6,16 @@
   "scripts": {
     "test": "node --test oracle/**/*.test.js",
     "typecheck": "node tools/typecheck.mjs",
-    "sandcastle": "npx tsx .sandcastle/main.ts"
+    "sandcastle": "npx tsx .sandcastle/main.ts",
+    "postinstall": "patch-package"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "@ai-hero/sandcastle": "^0.10.0",
+    "patch-package": "^8.0.1",
+    "tsx": "^4.22.4",
+    "zod": "^4.4.3"
   }
 }
