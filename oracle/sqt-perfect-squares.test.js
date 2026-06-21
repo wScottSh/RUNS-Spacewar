@@ -40,8 +40,8 @@ test('perfectSquareInputs enumerates n=0..255 (256 cases)', () => {
 // ── substrate: buildBatchScript ───────────────────────────────────────────────
 
 test('buildBatchScript: starts with load, deposits stub once, then per-case blocks', () => {
-  const cases = [{ n: 1, nsq: 1 }, { n: 2, nsq: 4 }];
-  const script = buildBatchScript('/tmp/test.rim', cases);
+  const inputs = [1, 4]; // perfect squares 1²=1, 2²=4
+  const script = buildBatchScript('/tmp/test.rim', inputs);
 
   assert.equal(script[0], 'load /tmp/test.rim');
   assert.equal(script[1], `deposit ${STUB_START.toString(8)} ${LAC_INCELL.toString(8)}`);
@@ -61,8 +61,8 @@ test('buildBatchScript: starts with load, deposits stub once, then per-case bloc
   assert.equal(script[11], 'examine pc');
 
   assert.equal(script[script.length - 1], 'quit');
-  // total: 4 header + 4*numCases + 1 quit
-  assert.equal(script.length, 4 + 4 * cases.length + 1);
+  // total: 4 header + 4*numInputs + 1 quit
+  assert.equal(script.length, 4 + 4 * inputs.length + 1);
 });
 
 // ── substrate: parseBatchOutput ───────────────────────────────────────────────

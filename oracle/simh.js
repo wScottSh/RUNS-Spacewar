@@ -35,20 +35,35 @@ export const PDP1 = resolvePdp1();
 /**
  * Run a SIMH pdp1 session with the given script lines.
  * Returns { stdout, lines } where lines is the raw output split on newlines.
+ *
+ * `timeout` (ms) guards against a routine that loops instead of halting; the
+ * full-domain capture needs a longer guard than a single calibration call, so
+ * the bound is a parameter rather than a baked-in constant.
  */
-export async function runPdp1(scriptLines) {
+export async function runPdp1(scriptLines, { timeout = 30_000 } = {}) {
   const script = scriptLines.join('\n') + '\n';
   const tmp = join(tmpdir(), `pdp1-${Date.now()}.simh`);
   await writeFile(tmp, script);
   try {
     const { stdout, stderr } = await execFileAsync(PDP1, [tmp], {
-      timeout: 30_000,
+      timeout,
+      maxBuffer: 256 * 1024 * 1024,
     });
     const output = stdout + stderr;
     return { stdout: output, lines: output.split('\n') };
   } finally {
     await unlink(tmp).catch(() => {});
   }
+}
+
+/**
+ * Probe the SIMH pdp1 Substrate's version banner (for the provenance manifest).
+ * Returns the first banner line, e.g. "PDP-1 simulator Open SIMH V4.1-0 Current".
+ */
+export async function pdp1Version() {
+  const { lines } = await runPdp1(['show version', 'quit']);
+  const banner = lines.find((l) => /simulator/i.test(l));
+  return banner ? banner.trim() : 'unknown';
 }
 
 /**

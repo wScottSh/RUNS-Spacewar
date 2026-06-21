@@ -27,18 +27,29 @@ export function perfectSquareInputs() {
 }
 
 /**
- * Build a SIMH batch script that runs sqt for each case in a single process.
- * Stub instructions are deposited once; each case deposits its input then runs.
+ * Every input sqt can be handed in-game: 0..MAX_INPUT (0177777 = 65535),
+ * enumerated exhaustively per ADR-0004/0007. Returns 65,536 integers.
  */
-export function buildBatchScript(rimPath, cases) {
+export function fullDomainInputs() {
+  const inputs = new Array(MAX_INPUT + 1);
+  for (let i = 0; i <= MAX_INPUT; i++) inputs[i] = i;
+  return inputs;
+}
+
+/**
+ * Build a SIMH batch script that runs sqt for each input in a single process.
+ * Stub instructions are deposited once; each input is deposited then run.
+ * `inputs` is an array of integer inputs (the value handed to sqt).
+ */
+export function buildBatchScript(rimPath, inputs) {
   const lines = [
     `load ${rimPath}`,
     `deposit ${STUB_START.toString(8)} ${LAC_INCELL.toString(8)}`,
     `deposit ${(STUB_START + 1).toString(8)} ${JDA_SQT.toString(8)}`,
     `deposit ${(STUB_START + 2).toString(8)} ${HLT.toString(8)}`,
   ];
-  for (const { nsq } of cases) {
-    lines.push(`deposit ${INCELL.toString(8)} ${nsq.toString(8)}`);
+  for (const input of inputs) {
+    lines.push(`deposit ${INCELL.toString(8)} ${input.toString(8)}`);
     lines.push(`run ${STUB_START.toString(8)}`);
     lines.push('examine ac');
     lines.push('examine pc');
@@ -74,11 +85,24 @@ export function parseBatchOutput(lines, numCases) {
 }
 
 /**
- * Run the full set of cases through SIMH and return {n, nsq, ac, pc} records.
+ * Run the perfect-square cases through SIMH and return {n, nsq, ac, pc} records.
+ * The deposited input is each case's nsq (the perfect square handed to sqt).
  */
 export async function runBatch(rimPath, cases) {
-  const script = buildBatchScript(rimPath, cases);
+  const script = buildBatchScript(rimPath, cases.map((c) => c.nsq));
   const { lines } = await runPdp1(script);
   const raw = parseBatchOutput(lines, cases.length);
   return cases.map(({ n, nsq }, i) => ({ n, nsq, ac: raw[i].ac, pc: raw[i].pc }));
+}
+
+/**
+ * Run a list of raw integer inputs through SIMH in a single process and return
+ * {in, ac, pc} records (the raw-word Vector shape, ADR-0008).
+ * `timeout` (ms) guards the whole batch against a non-halting call.
+ */
+export async function runDomainBatch(rimPath, inputs, { timeout } = {}) {
+  const script = buildBatchScript(rimPath, inputs);
+  const { lines } = await runPdp1(script, { timeout });
+  const raw = parseBatchOutput(lines, inputs.length);
+  return inputs.map((input, i) => ({ in: input, ac: raw[i].ac, pc: raw[i].pc }));
 }

@@ -1,0 +1,60 @@
+{
+  "routine": "sqt",
+  "entry_pc_octal": "0246",
+  "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
+  "listing_core_status": "verified — byte-for-byte match confirmed in commit d0cd028 (feat: stand up the Spacewar! oracle toolchain)",
+  "domain": {
+    "range_octal": "000000..177777",
+    "cardinality": 65536,
+    "coverage": "exhaustive — every input enumerated (ADR-0004); enumeration is the coverage witness, no trace instrumentation built",
+    "confluence_witnesses": [
+      "source comment '/largest input number = 177777' (Translator-class, not authoritative alone)",
+      "static reading of gravity str computation (sole caller, jda sqt at L1145)",
+      "masswerk account of sqt input range"
+    ],
+    "out_of_contract_note": "sqt is total over all 2^18 words; values for negatives and inputs above the band are out of the game's reach and not pinned here (ADR-0007)"
+  },
+  "calling_convention": {
+    "source": "revealed by executing jda sqt via SIMH pdp1 (open-simh V4.1-0); confirmed by pdp1_cpu.c case 007",
+    "jda_Y": "M[Y] ← AC (input); AC ← PC (return address); PC ← Y+1",
+    "sqt_entry_flow": "jda sqt → M[0246]=input, AC=return_PC, PC=0247; then: dap sqx patches sqx with return_PC; lio sqt loads input into IO; dzm sqt clears M[0246]; algorithm runs; lac sq2 puts result in AC; sqx: jmp <return_PC>",
+    "input_format": "18-bit integer in AC, binary point right of bit 17 (pure integer)",
+    "output_format": "9.9 fixed-point in AC: integer part in bits 0-8, fractional part in bits 9-17"
+  },
+  "calibration": {
+    "stub_layout": {
+      "incell_addr_octal": "07700",
+      "stub_start_octal": "07701",
+      "instructions_octal": [
+        "207700",
+        "170246",
+        "760400"
+      ],
+      "mnemonics": [
+        "lac 07700",
+        "jda sqt",
+        "hlt"
+      ]
+    },
+    "input_octal": "000004",
+    "input_decimal": 4,
+    "machine_ac_octal": "002000",
+    "machine_ac_decimal": 1024,
+    "halt_pc_octal": "007704",
+    "halt_pc_note": "SIMH increments PC during fetch; hlt is at 07703, PC=07704 after halt",
+    "sqt_cell_after_call": "000000",
+    "three_way_confluence": {
+      "machine_ac": "002000",
+      "hand_computed": "floor(sqrt(4)) * 2^9 = 2 * 512 = 1024 = 002000 octal",
+      "masswerk_format_check": "integer part = AC >> 9 = 2; fractional part = AC & 0777 = 0; consistent with Translator: 'answer in ac with binary point between bits 8 and 9'",
+      "status": "PASS — all three agree"
+    }
+  },
+  "tool_versions": {
+    "simh_pdp1": "PDP-1 simulator Open SIMH V4.1-0 Current",
+    "macro1": "macro1.c — canonical PDP-1 Macro assembler (tools/macro1)",
+    "node": "v24.15.0"
+  },
+  "vector_file": "sqt-vectors.jsonl",
+  "vector_count": 65536
+}
