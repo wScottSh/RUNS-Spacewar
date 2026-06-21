@@ -2,9 +2,9 @@
  * T-CONST: Witness the tunable constants tno…ran (source lines 70–97)
  * by listing↔core byte identity (ADR-0006, ADR-0012 class D — Witness).
  *
- * No branches are exercised here. xct-reached instruction-constants (tvl,
- * sac, the, tno, mhs, hd1, rlt, tlf) are witnessed as words only; their
- * effect is exercised in the routines that xct them.
+ * No branches are exercised here. xct-reached instruction-constants (tno,
+ * tvl, rlt, tlf, sac, the, mhs, hd1, hd2, hd3, hr1, hr2) are witnessed as
+ * words only; their effect is exercised in the routines that xct them.
  *
  * Closes issue #10.
  */
@@ -38,18 +38,18 @@ test('T-CONST: constant table covers exactly tno…ran (20 cells, addrs 6–31 o
 });
 
 test('T-CONST: xct-instruction cells are flagged and data cells are not', () => {
-  const xctNames = CONSTANTS.filter((c) => c.xct).map((c) => c.name);
-  assert.ok(xctNames.includes('tno'), 'tno is xct-reached');
-  assert.ok(xctNames.includes('tvl'), 'tvl is xct-reached');
-  assert.ok(xctNames.includes('rlt'), 'rlt is xct-reached');
-  assert.ok(xctNames.includes('tlf'), 'tlf is xct-reached');
-  assert.ok(xctNames.includes('sac'), 'sac is xct-reached');
-  assert.ok(xctNames.includes('the'), 'the is xct-reached');
-  assert.ok(xctNames.includes('mhs'), 'mhs is xct-reached');
-  assert.ok(xctNames.includes('hd1'), 'hd1 is xct-reached');
-  // data cells are not flagged
-  assert.ok(!CONSTANTS.find((c) => c.name === 'foo')?.xct, 'foo is data, not xct');
-  assert.ok(!CONSTANTS.find((c) => c.name === 'ran')?.xct, 'ran is data, not xct');
+  // The cells whose word is an instruction reached via `xct` in a consuming
+  // routine — each xct-only, never read as a data operand (build/spacewar31.lst).
+  const XCT_REACHED = ['tno', 'tvl', 'rlt', 'tlf', 'sac', 'the', 'mhs', 'hd1', 'hd2', 'hd3', 'hr1', 'hr2'];
+  // The remaining cells are plain data values, carrying no xct flag.
+  const DATA_CELLS = ['foo', 'maa', 'str', 'me1', 'me2', 'ddd', 'hur', 'ran'];
+
+  const flagged = CONSTANTS.filter((c) => c.xct).map((c) => c.name);
+  assert.deepEqual([...flagged].sort(), [...XCT_REACHED].sort(), 'xct cells match the listing');
+
+  for (const name of DATA_CELLS) {
+    assert.ok(!CONSTANTS.find((c) => c.name === name)?.xct, `${name} is data, not xct`);
+  }
 });
 
 test('T-CONST: each constant cell — listing word matches core (ADR-0006)', async (t) => {

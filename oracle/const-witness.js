@@ -5,7 +5,8 @@
  * addr and word are JS integers (use .toString(8) for octal display).
  *
  * xct=true: the cell holds an instruction executed via `xct` in consuming
- * routines (tvl, sac, the, tno, mhs, hd1, rlt, tlf). Their effect is
+ * routines (tno, tvl, rlt, tlf, sac, the, mhs, hd1, hd2, hd3, hr1, hr2 — each
+ * reached only via xct, never read as a data operand). Their effect is
  * exercised by the Traces that xct them, not here. Witnessed as words only.
  *
  * Values are taken verbatim from the macro1 listing (build/spacewar31.lst).
@@ -27,10 +28,10 @@ export const CONSTANTS = [
   { name: 'the', addr: 0o021, word: 0o675777, xct: true,  note: 'sar 9s    — torpedo space warpage (null under default)' },
   { name: 'mhs', addr: 0o022, word: 0o710010, xct: true,  note: 'law i 10  — number of hyperspace shots' },
   { name: 'hd1', addr: 0o023, word: 0o710040, xct: true,  note: 'law i 40  — time in hyperspace before breakout' },
-  { name: 'hd2', addr: 0o024, word: 0o710100, xct: false, note: 'law i 100 — time in hyperspace breakout' },
-  { name: 'hd3', addr: 0o025, word: 0o710200, xct: false, note: 'law i 200 — time to recharge hyperfield generators' },
-  { name: 'hr1', addr: 0o026, word: 0o667777, xct: false, note: 'scl 9s    — scale on hyperspatial displacement' },
-  { name: 'hr2', addr: 0o027, word: 0o667017, xct: false, note: 'scl 4s    — scale on hyperspatially induced velocity' },
+  { name: 'hd2', addr: 0o024, word: 0o710100, xct: true,  note: 'law i 100 — time in hyperspace breakout' },
+  { name: 'hd3', addr: 0o025, word: 0o710200, xct: true,  note: 'law i 200 — time to recharge hyperfield generators' },
+  { name: 'hr1', addr: 0o026, word: 0o667777, xct: true,  note: 'scl 9s    — scale on hyperspatial displacement' },
+  { name: 'hr2', addr: 0o027, word: 0o667017, xct: true,  note: 'scl 4s    — scale on hyperspatially induced velocity' },
   { name: 'hur', addr: 0o030, word: 0o040000, xct: false, note: '40000     — hyperspatial uncertainty' },
   { name: 'ran', addr: 0o031, word: 0o000000, xct: false, note: '0         — PRNG seed (initial value)' },
 ];
