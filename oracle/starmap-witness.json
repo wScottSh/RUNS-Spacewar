@@ -1,0 +1,15 @@
+{
+  "witness": "T-STARMAP",
+  "issue": 12,
+  "method": "listing↔core identity (ADR-0006)",
+  "gate_class": "Witness — no branch obligation (all data, no skips)",
+  "source_lines": "1385–1866",
+  "address_range_octal": "6077..7750",
+  "word_count": 938,
+  "mark_entry_count": 469,
+  "listing_file": "build/spacewar31.lst",
+  "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
+  "substrate_version": "PDP-1 simulator Open SIMH V4.1-0 Current",
+  "result": "PASS — all 938 assembled words match core",
+  "note": "Each mark X,Y entry assembles two words: (8192-X) at addr[0], Y×256 at addr[1]. Y×256 is a PDP-1 1s-complement 18-bit value."
+}
