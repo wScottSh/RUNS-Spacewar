@@ -12,16 +12,22 @@ import { BOUNDARY_CASES, HALT_PC, SIGN_BIT } from './mpy-substrate.js';
 
 const oct = (v) => v.toString(8).padStart(6, '0');
 
+// ── shared property checks ────────────────────────────────────────────────────
+// mpy and imp run the same checks; they differ only by the message `tag` and a
+// couple of routine-specific extras (the L289 detail text, and whether IO is
+// checked for the zero case). The exported gateMpy*/gateImp* wrappers below bind
+// those parameters.
+
 /**
  * Property 1 — boundary complete: every expected {f1, f2} pair is present in records.
  * Witnesses all four sign combinations + zero + max magnitude per the issue spec.
  */
-export function gateMpyBoundaryComplete(records) {
+function checkBoundaryComplete(records, tag) {
   for (const expected of BOUNDARY_CASES) {
     const r = records.find((r) => r.f1 === expected.f1 && r.f2 === expected.f2);
     if (!r) {
       throw new Error(
-        `gate FAIL (boundary complete): missing case f1=${oct(expected.f1)} f2=${oct(expected.f2)}`
+        `gate FAIL ${tag}(boundary complete): missing case f1=${oct(expected.f1)} f2=${oct(expected.f2)}`
       );
     }
   }
@@ -30,11 +36,11 @@ export function gateMpyBoundaryComplete(records) {
 /**
  * Property 2 — halt-PC: every case returned to the caller stub (no infinite loop).
  */
-export function gateMpyHaltPc(records, haltPc = HALT_PC) {
+function checkHaltPc(records, haltPc, tag) {
   for (const r of records) {
     if (r.pc !== haltPc) {
       throw new Error(
-        `gate FAIL (halt-PC): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
+        `gate FAIL ${tag}(halt-PC): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
           `expected PC=${haltPc.toString(8)} got ${r.pc.toString(8)}`
       );
     }
@@ -44,19 +50,20 @@ export function gateMpyHaltPc(records, haltPc = HALT_PC) {
 /**
  * Property 3 — branch coverage (L276 spa, L281 spa, L289 sma observed both ways).
  * Structural: verifies the BOUNDARY_CASES span the required sign combinations.
+ * `l289` carries the routine-specific detail appended to the L289 messages.
  */
-export function gateMpyBranchCoverage(records) {
+function checkBranchCoverage(records, tag, l289) {
   // L276 spa: f1 non-negative → skip cma (++/+- cases); f1 negative → cma (-+/-- cases)
   const hasF1Pos = records.some((r) => (r.f1 & SIGN_BIT) === 0);
   const hasF1Neg = records.some((r) => (r.f1 & SIGN_BIT) !== 0);
-  if (!hasF1Pos) throw new Error('gate FAIL (L276 spa): no case with f1 non-negative');
-  if (!hasF1Neg) throw new Error('gate FAIL (L276 spa): no case with f1 negative');
+  if (!hasF1Pos) throw new Error(`gate FAIL ${tag}(L276 spa): no case with f1 non-negative`);
+  if (!hasF1Neg) throw new Error(`gate FAIL ${tag}(L276 spa): no case with f1 negative`);
 
   // L281 spa: f2 non-negative → skip cma (++/-+ cases); f2 negative → cma (+-/-- cases)
   const hasF2Pos = records.some((r) => (r.f2 & SIGN_BIT) === 0);
   const hasF2Neg = records.some((r) => (r.f2 & SIGN_BIT) !== 0);
-  if (!hasF2Pos) throw new Error('gate FAIL (L281 spa): no case with f2 non-negative');
-  if (!hasF2Neg) throw new Error('gate FAIL (L281 spa): no case with f2 negative');
+  if (!hasF2Pos) throw new Error(`gate FAIL ${tag}(L281 spa): no case with f2 non-negative`);
+  if (!hasF2Neg) throw new Error(`gate FAIL ${tag}(L281 spa): no case with f2 negative`);
 
   // L289 sma: same-sign → positive result, jmp mp3 (++/-- and zero cases);
   //           diff-sign → sma skips, negate code path (+- and -+ cases)
@@ -70,8 +77,8 @@ export function gateMpyBranchCoverage(records) {
     const f2Neg = (r.f2 & SIGN_BIT) !== 0;
     return f1Neg !== f2Neg;
   });
-  if (!hasSameSign) throw new Error('gate FAIL (L289 sma): no same-sign case (positive-result path not observed)');
-  if (!hasDiffSign) throw new Error('gate FAIL (L289 sma): no diff-sign case (negate path not observed)');
+  if (!hasSameSign) throw new Error(`gate FAIL ${tag}(L289 sma): no same-sign case${l289.sameSign}`);
+  if (!hasDiffSign) throw new Error(`gate FAIL ${tag}(L289 sma): no diff-sign case${l289.diffSign}`);
 }
 
 /**
@@ -79,7 +86,7 @@ export function gateMpyBranchCoverage(records) {
  * combination. Pure mathematical: same-sign → positive result; diff-sign → negative.
  * Zero products are excluded from the sign check (0 is non-negative in ones'-complement).
  */
-export function gateMpySignCorrectness(records) {
+function checkSignCorrectness(records, tag) {
   for (const r of records) {
     if (r.f1 === 0 || r.f2 === 0) continue; // zero product — sign inapplicable
     const f1Neg = (r.f1 & SIGN_BIT) !== 0;
@@ -88,13 +95,13 @@ export function gateMpySignCorrectness(records) {
     const acNeg = (r.ac & SIGN_BIT) !== 0;
     if (sameSign && acNeg) {
       throw new Error(
-        `gate FAIL (sign correctness): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
+        `gate FAIL ${tag}(sign correctness): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
           `same-sign but AC has negative sign bit: AC=${oct(r.ac)}`
       );
     }
     if (!sameSign && !acNeg) {
       throw new Error(
-        `gate FAIL (sign correctness): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
+        `gate FAIL ${tag}(sign correctness): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
           `diff-sign but AC has non-negative sign bit: AC=${oct(r.ac)}`
       );
     }
@@ -102,17 +109,44 @@ export function gateMpySignCorrectness(records) {
 }
 
 /**
- * Property 5 — zero product: 0 × 0 yields AC = 0 and IO = 0 for mpy.
+ * Property 5 — zero product: 0 × 0 yields AC = 0 (and, for mpy, IO = 0).
  */
-export function gateMpyZero(records) {
+function checkZero(records, tag, checkIo) {
   const r = records.find((r) => r.f1 === 0 && r.f2 === 0);
-  if (!r) throw new Error('gate FAIL (zero): no record for f1=0 f2=0');
+  if (!r) throw new Error(`gate FAIL ${tag}(zero): no record for f1=0 f2=0`);
   if (r.ac !== 0) {
-    throw new Error(`gate FAIL (zero): 0×0 expected AC=000000 got ${oct(r.ac)}`);
+    throw new Error(`gate FAIL ${tag}(zero): 0×0 expected AC=000000 got ${oct(r.ac)}`);
   }
-  if (r.io !== 0) {
-    throw new Error(`gate FAIL (zero): 0×0 expected IO=000000 got ${oct(r.io)}`);
+  if (checkIo && r.io !== 0) {
+    throw new Error(`gate FAIL ${tag}(zero): 0×0 expected IO=000000 got ${oct(r.io)}`);
   }
+}
+
+// ── mpy gate ──────────────────────────────────────────────────────────────────
+
+const MPY_L289_DETAIL = {
+  sameSign: ' (positive-result path not observed)',
+  diffSign: ' (negate path not observed)',
+};
+
+export function gateMpyBoundaryComplete(records) {
+  checkBoundaryComplete(records, '');
+}
+
+export function gateMpyHaltPc(records, haltPc = HALT_PC) {
+  checkHaltPc(records, haltPc, '');
+}
+
+export function gateMpyBranchCoverage(records) {
+  checkBranchCoverage(records, '', MPY_L289_DETAIL);
+}
+
+export function gateMpySignCorrectness(records) {
+  checkSignCorrectness(records, '');
+}
+
+export function gateMpyZero(records) {
+  checkZero(records, '', true);
 }
 
 /**
@@ -163,96 +197,28 @@ export function gateMpy(records, manifest) {
 
 // ── imp gate ──────────────────────────────────────────────────────────────────
 
-/**
- * Property 1 — boundary complete (imp): same as mpy; same BOUNDARY_CASES.
- */
+// imp runs the same property checks as mpy (imp delegates to mpy), differing only
+// in the `[imp]` message tag and that imp returns a single-precision AC with no IO.
+const IMP_L289_DETAIL = { sameSign: '', diffSign: '' };
+
 export function gateImpBoundaryComplete(records) {
-  for (const expected of BOUNDARY_CASES) {
-    const r = records.find((r) => r.f1 === expected.f1 && r.f2 === expected.f2);
-    if (!r) {
-      throw new Error(
-        `gate FAIL [imp] (boundary complete): missing case f1=${oct(expected.f1)} f2=${oct(expected.f2)}`
-      );
-    }
-  }
+  checkBoundaryComplete(records, '[imp] ');
 }
 
-/**
- * Property 2 — halt-PC (imp).
- */
 export function gateImpHaltPc(records, haltPc = HALT_PC) {
-  for (const r of records) {
-    if (r.pc !== haltPc) {
-      throw new Error(
-        `gate FAIL [imp] (halt-PC): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
-          `expected PC=${haltPc.toString(8)} got ${r.pc.toString(8)}`
-      );
-    }
-  }
+  checkHaltPc(records, haltPc, '[imp] ');
 }
 
-/**
- * Property 3 — branch coverage (imp): same sign-handling skips as mpy (imp delegates to mpy).
- */
 export function gateImpBranchCoverage(records) {
-  const hasF1Pos = records.some((r) => (r.f1 & SIGN_BIT) === 0);
-  const hasF1Neg = records.some((r) => (r.f1 & SIGN_BIT) !== 0);
-  if (!hasF1Pos) throw new Error('gate FAIL [imp] (L276 spa): no case with f1 non-negative');
-  if (!hasF1Neg) throw new Error('gate FAIL [imp] (L276 spa): no case with f1 negative');
-
-  const hasF2Pos = records.some((r) => (r.f2 & SIGN_BIT) === 0);
-  const hasF2Neg = records.some((r) => (r.f2 & SIGN_BIT) !== 0);
-  if (!hasF2Pos) throw new Error('gate FAIL [imp] (L281 spa): no case with f2 non-negative');
-  if (!hasF2Neg) throw new Error('gate FAIL [imp] (L281 spa): no case with f2 negative');
-
-  const hasSameSign = records.some((r) => {
-    const f1Neg = (r.f1 & SIGN_BIT) !== 0;
-    const f2Neg = (r.f2 & SIGN_BIT) !== 0;
-    return f1Neg === f2Neg;
-  });
-  const hasDiffSign = records.some((r) => {
-    const f1Neg = (r.f1 & SIGN_BIT) !== 0;
-    const f2Neg = (r.f2 & SIGN_BIT) !== 0;
-    return f1Neg !== f2Neg;
-  });
-  if (!hasSameSign) throw new Error('gate FAIL [imp] (L289 sma): no same-sign case');
-  if (!hasDiffSign) throw new Error('gate FAIL [imp] (L289 sma): no diff-sign case');
+  checkBranchCoverage(records, '[imp] ', IMP_L289_DETAIL);
 }
 
-/**
- * Property 4 — sign correctness (imp): same-sign → AC bit 17 clear; diff-sign → AC bit 17 set.
- */
 export function gateImpSignCorrectness(records) {
-  for (const r of records) {
-    if (r.f1 === 0 || r.f2 === 0) continue;
-    const f1Neg = (r.f1 & SIGN_BIT) !== 0;
-    const f2Neg = (r.f2 & SIGN_BIT) !== 0;
-    const sameSign = f1Neg === f2Neg;
-    const acNeg = (r.ac & SIGN_BIT) !== 0;
-    if (sameSign && acNeg) {
-      throw new Error(
-        `gate FAIL [imp] (sign correctness): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
-          `same-sign but AC has negative sign bit: AC=${oct(r.ac)}`
-      );
-    }
-    if (!sameSign && !acNeg) {
-      throw new Error(
-        `gate FAIL [imp] (sign correctness): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
-          `diff-sign but AC has non-negative sign bit: AC=${oct(r.ac)}`
-      );
-    }
-  }
+  checkSignCorrectness(records, '[imp] ');
 }
 
-/**
- * Property 5 — zero product (imp): 0 × 0 → AC = 0.
- */
 export function gateImpZero(records) {
-  const r = records.find((r) => r.f1 === 0 && r.f2 === 0);
-  if (!r) throw new Error('gate FAIL [imp] (zero): no record for f1=0 f2=0');
-  if (r.ac !== 0) {
-    throw new Error(`gate FAIL [imp] (zero): 0×0 expected AC=000000 got ${oct(r.ac)}`);
-  }
+  checkZero(records, '[imp] ', false);
 }
 
 /**

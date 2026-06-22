@@ -66,14 +66,16 @@ const oct = (v) => v.toString(8).padStart(6, '0');
 // ── batch script builders ─────────────────────────────────────────────────────
 
 /**
- * Build a SIMH batch script that runs mpy for each {f1, f2} case in one process.
- * Each run emits: examine ac; examine io; examine pc.
+ * Build a SIMH batch script that runs the routine entered via `jda` for each
+ * {f1, f2} case in one process. The 4-word stub is deposited once; each case
+ * deposits both factors, runs, and examines the result registers. mpy needs
+ * AC, IO, and PC; imp needs only AC and PC (`examineIo` selects between them).
  */
-export function buildMpyBatchScript(rimPath, cases) {
+function buildBatchScript(rimPath, cases, { jda, examineIo }) {
   const lines = [
     `load ${rimPath}`,
     `deposit ${STUB_START.toString(8)} ${LAC_INCELL1.toString(8)}`,
-    `deposit ${(STUB_START + 1).toString(8)} ${JDA_MPY.toString(8)}`,
+    `deposit ${(STUB_START + 1).toString(8)} ${jda.toString(8)}`,
     `deposit ${(STUB_START + 2).toString(8)} ${LAC_INCELL2.toString(8)}`,
     `deposit ${(STUB_START + 3).toString(8)} ${HLT.toString(8)}`,
   ];
@@ -82,11 +84,19 @@ export function buildMpyBatchScript(rimPath, cases) {
     lines.push(`deposit ${INCELL2.toString(8)} ${f2.toString(8)}`);
     lines.push(`run ${STUB_START.toString(8)}`);
     lines.push('examine ac');
-    lines.push('examine io');
+    if (examineIo) lines.push('examine io');
     lines.push('examine pc');
   }
   lines.push('quit');
   return lines;
+}
+
+/**
+ * Build a SIMH batch script that runs mpy for each {f1, f2} case in one process.
+ * Each run emits: examine ac; examine io; examine pc.
+ */
+export function buildMpyBatchScript(rimPath, cases) {
+  return buildBatchScript(rimPath, cases, { jda: JDA_MPY, examineIo: true });
 }
 
 /**
@@ -94,52 +104,50 @@ export function buildMpyBatchScript(rimPath, cases) {
  * Each run emits: examine ac; examine pc.
  */
 export function buildImpBatchScript(rimPath, cases) {
-  const lines = [
-    `load ${rimPath}`,
-    `deposit ${STUB_START.toString(8)} ${LAC_INCELL1.toString(8)}`,
-    `deposit ${(STUB_START + 1).toString(8)} ${JDA_IMP.toString(8)}`,
-    `deposit ${(STUB_START + 2).toString(8)} ${LAC_INCELL2.toString(8)}`,
-    `deposit ${(STUB_START + 3).toString(8)} ${HLT.toString(8)}`,
-  ];
-  for (const { f1, f2 } of cases) {
-    lines.push(`deposit ${INCELL1.toString(8)} ${f1.toString(8)}`);
-    lines.push(`deposit ${INCELL2.toString(8)} ${f2.toString(8)}`);
-    lines.push(`run ${STUB_START.toString(8)}`);
-    lines.push('examine ac');
-    lines.push('examine pc');
-  }
-  lines.push('quit');
-  return lines;
+  return buildBatchScript(rimPath, cases, { jda: JDA_IMP, examineIo: false });
 }
 
 // ── output parsers ────────────────────────────────────────────────────────────
+
+/**
+ * Parse SIMH batch output into per-case records, pulling the named `registers`
+ * (e.g. ['AC', 'IO', 'PC']) in order for each case. Each register name becomes a
+ * lowercase field holding its integer value. `label` names the caller in the
+ * error thrown when an expected register is missing or out of order.
+ */
+function parseBatchOutput(lines, numCases, registers, label) {
+  const wanted = new Set(registers);
+  const values = [];
+  for (const line of lines) {
+    const m = line.match(/^([A-Za-z0-9]+):\s+([0-7]+)/);
+    if (m) {
+      const name = m[1].toUpperCase();
+      if (wanted.has(name)) values.push({ name, value: parseInt(m[2], 8) });
+    }
+  }
+  const stride = registers.length;
+  const records = [];
+  for (let i = 0; i < numCases; i++) {
+    const record = {};
+    for (let j = 0; j < stride; j++) {
+      const expected = registers[j];
+      const slot = values[i * stride + j];
+      if (!slot || slot.name !== expected) {
+        throw new Error(`${label}: missing ${expected} at case ${i}`);
+      }
+      record[expected.toLowerCase()] = slot.value;
+    }
+    records.push(record);
+  }
+  return records;
+}
 
 /**
  * Parse SIMH batch output for mpy: extract AC, IO, PC triplets in order.
  * Returns array of {ac, io, pc} as JS integers.
  */
 export function parseMpyBatchOutput(lines, numCases) {
-  const values = [];
-  for (const line of lines) {
-    const m = line.match(/^([A-Za-z0-9]+):\s+([0-7]+)/);
-    if (m) {
-      const name = m[1].toUpperCase();
-      if (name === 'AC' || name === 'IO' || name === 'PC') {
-        values.push({ name, value: parseInt(m[2], 8) });
-      }
-    }
-  }
-  const records = [];
-  for (let i = 0; i < numCases; i++) {
-    const ac = values[i * 3];
-    const io = values[i * 3 + 1];
-    const pc = values[i * 3 + 2];
-    if (!ac || ac.name !== 'AC') throw new Error(`parseMpyBatchOutput: missing AC at case ${i}`);
-    if (!io || io.name !== 'IO') throw new Error(`parseMpyBatchOutput: missing IO at case ${i}`);
-    if (!pc || pc.name !== 'PC') throw new Error(`parseMpyBatchOutput: missing PC at case ${i}`);
-    records.push({ ac: ac.value, io: io.value, pc: pc.value });
-  }
-  return records;
+  return parseBatchOutput(lines, numCases, ['AC', 'IO', 'PC'], 'parseMpyBatchOutput');
 }
 
 /**
@@ -147,25 +155,7 @@ export function parseMpyBatchOutput(lines, numCases) {
  * Returns array of {ac, pc} as JS integers.
  */
 export function parseImpBatchOutput(lines, numCases) {
-  const values = [];
-  for (const line of lines) {
-    const m = line.match(/^([A-Za-z0-9]+):\s+([0-7]+)/);
-    if (m) {
-      const name = m[1].toUpperCase();
-      if (name === 'AC' || name === 'PC') {
-        values.push({ name, value: parseInt(m[2], 8) });
-      }
-    }
-  }
-  const records = [];
-  for (let i = 0; i < numCases; i++) {
-    const ac = values[i * 2];
-    const pc = values[i * 2 + 1];
-    if (!ac || ac.name !== 'AC') throw new Error(`parseImpBatchOutput: missing AC at case ${i}`);
-    if (!pc || pc.name !== 'PC') throw new Error(`parseImpBatchOutput: missing PC at case ${i}`);
-    records.push({ ac: ac.value, pc: pc.value });
-  }
-  return records;
+  return parseBatchOutput(lines, numCases, ['AC', 'PC'], 'parseImpBatchOutput');
 }
 
 // ── substrate runners ─────────────────────────────────────────────────────────
