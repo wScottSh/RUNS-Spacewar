@@ -15,11 +15,11 @@
  *   0o7705  hlt             ; overflow/÷0 return (1 × idx dv1 → 0o7705)
  *   0o7706  hlt             ; normal return (2 × idx dv1 → 0o7706)
  *
- * Stub layout for dvd (addresses 0o7710–0o7720):
- *   0o7710  lac HDIV_CELL   ; load hi-dividend → AC
- *   0o7711  lio LDIV_CELL   ; load lo-dividend → IO
- *   0o7712  jda dvd         ; call (M[dvd]=hi-div, AC=return-PC=0o7713)
- *   0o7713  lac DSOR_CELL   ; ← xct'd by dv1; loads divisor into AC
+ * Stub layout for dvd (instructions at 0o7713–0o7720; data cells precede them):
+ *   0o7713  lac HDIV_CELL   ; load hi-dividend → AC
+ *   0o7714  lio LDIV_CELL   ; load lo-dividend → IO
+ *   0o7715  jda dvd         ; call (M[dvd]=hi-div, AC=return-PC=0o7716)
+ *   0o7716  lac DSOR_CELL   ; ← xct'd by dv1; loads divisor into AC
  *   0o7717  hlt             ; overflow/÷0 return (1 × idx dv1 → 0o7717, PC=0o7720)
  *   0o7720  hlt             ; normal return (2 × idx dv1 → 0o7720, PC=0o7721)
  *

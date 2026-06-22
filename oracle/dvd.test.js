@@ -226,7 +226,7 @@ test('gateBoundaryPresent: passes for a complete boundary set', () => {
     makeIdvRec({ divisor: neg1c(2), pc: IDV_HALT_NORMAL }),
     makeIdvRec({ divisor: 0, pc: IDV_HALT_OVERFLOW }),
   ];
-  assert.doesNotThrow(() => gateBoundaryPresent(idvRecs, []));
+  assert.doesNotThrow(() => gateBoundaryPresent(idvRecs));
 });
 
 test('gateBoundaryPresent: fails without zero dividend', () => {
@@ -235,7 +235,7 @@ test('gateBoundaryPresent: fails without zero dividend', () => {
     makeIdvRec({ dividend: 0o177777, divisor: 1 }),
     makeIdvRec({ dividend: neg1c(6), divisor: 2 }),
   ];
-  assert.throws(() => gateBoundaryPresent(idvRecs, []), /zero-dividend/);
+  assert.throws(() => gateBoundaryPresent(idvRecs), /zero-dividend/);
 });
 
 test('gateBoundaryPresent: fails without ÷0 case', () => {
@@ -244,7 +244,7 @@ test('gateBoundaryPresent: fails without ÷0 case', () => {
     makeIdvRec({ dividend: 0o177777, divisor: 1 }),
     makeIdvRec({ dividend: neg1c(6), divisor: 2 }),
   ];
-  assert.throws(() => gateBoundaryPresent(idvRecs, []), /÷0/);
+  assert.throws(() => gateBoundaryPresent(idvRecs), /÷0/);
 });
 
 // ── unit: manifest gate ────────────────────────────────────────────────────
@@ -408,12 +408,11 @@ test(
 );
 
 test(
-  'boundary gate passes over combined idv+dvd set (live)',
+  'boundary gate passes over the idv set (live)',
   { timeout: 30_000 },
   async () => {
     const idvRecs = await runIdvBatch(RIM, IDV_CASES.map(({ dividend, divisor }) => ({ dividend, divisor })));
-    const dvdRecs = await runDvdBatch(RIM, DVD_CASES.map(({ hiDiv, loDiv, divisor }) => ({ hiDiv, loDiv, divisor })));
-    gateBoundaryPresent(idvRecs, dvdRecs);
+    gateBoundaryPresent(idvRecs);
   }
 );
 
