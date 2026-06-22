@@ -11,6 +11,11 @@ import { fileURLToPath } from 'node:url';
 
 const execFileAsync = promisify(execFile);
 
+// Monotonic counter making each script file name unique within this process,
+// so concurrent runPdp1 calls (the test runner spawns files in parallel) never
+// collide on a Date.now()-only name and unlink each other's script mid-run.
+let scriptSeq = 0;
+
 /**
  * Locate the SIMH pdp1 Substrate binary.
  *
@@ -42,7 +47,7 @@ export const PDP1 = resolvePdp1();
  */
 export async function runPdp1(scriptLines, { timeout = 30_000 } = {}) {
   const script = scriptLines.join('\n') + '\n';
-  const tmp = join(tmpdir(), `pdp1-${Date.now()}.simh`);
+  const tmp = join(tmpdir(), `pdp1-${process.pid}-${scriptSeq++}.simh`);
   await writeFile(tmp, script);
   try {
     const { stdout, stderr } = await execFileAsync(PDP1, [tmp], {
