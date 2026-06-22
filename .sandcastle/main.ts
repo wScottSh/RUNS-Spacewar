@@ -165,26 +165,51 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
   const settled = await Promise.allSettled(
     issues.map(async (issue) => {
-      const sandbox = await sandcastle.createSandbox({
-        branch: issue.branch,
-        sandbox: docker(),
-        hooks,
-      });
+      // Create the sandbox. If even that fails (e.g. a corrupt reused worktree),
+      // we can't run agents — but the branch may already hold mergeable work
+      // from a prior run, so fall back to the host's view instead of discarding
+      // it.
+      let sandbox: Awaited<ReturnType<typeof sandcastle.createSandbox>>;
+      try {
+        sandbox = await sandcastle.createSandbox({
+          branch: issue.branch,
+          sandbox: docker(),
+          hooks,
+        });
+      } catch (err) {
+        console.error(
+          `  ✗ ${issue.id} (${issue.branch}): could not create sandbox: ${errMsg(err)}`,
+        );
+        if (isCorruptWorktreeError(err)) {
+          console.error(
+            "     Looks like a corrupt worktree — run `git worktree prune` and " +
+              "remove stale dirs under .sandcastle/worktrees, then re-run.",
+          );
+        }
+        return { mergeable: unmergedCount(integrationBranch, issue.branch) > 0 };
+      }
 
       try {
-        // Run the implementer
-        await sandbox.run({
-          name: "implementer",
-          maxIterations: 100,
-          // Sonnet for writing code: fast, capable implementer.
-          agent: sandcastle.claudeCode("claude-sonnet-4-6"),
-          promptFile: "./.sandcastle/implement-prompt.md",
-          promptArgs: {
-            TASK_ID: issue.id,
-            ISSUE_TITLE: issue.title,
-            BRANCH: issue.branch,
-          },
-        });
+        // Run the implementer. A failure here — including the agent's 10MB
+        // stdin limit, or any crash — must NOT discard work already committed
+        // to the branch, so we log it and fall through to the branch-state
+        // check below rather than letting the pipeline reject.
+        try {
+          await sandbox.run({
+            name: "implementer",
+            maxIterations: 100,
+            // Sonnet for writing code: fast, capable implementer.
+            agent: sandcastle.claudeCode("claude-sonnet-4-6"),
+            promptFile: "./.sandcastle/implement-prompt.md",
+            promptArgs: {
+              TASK_ID: issue.id,
+              ISSUE_TITLE: issue.title,
+              BRANCH: issue.branch,
+            },
+          });
+        } catch (err) {
+          logAgentFailure("implementer", issue.id, err);
+        }
 
         // A branch is mergeable when it carries work not yet on the integration
         // branch — NOT merely when the implementer committed in THIS run. A
@@ -194,17 +219,24 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         // re-select the still-open issue every iteration, forever.
         const mergeable = unmergedCount(integrationBranch, issue.branch) > 0;
 
-        // Review any branch with unmerged work (whether authored now or earlier).
+        // Review is optional polish. If it fails — most commonly because the
+        // diff is too large for the agent's 10MB stdin limit (e.g. a branch
+        // that commits huge generated fixtures) — keep the implementer's
+        // mergeable work and merge it without review rather than losing it.
         if (mergeable) {
-          await sandbox.run({
-            name: "reviewer",
-            maxIterations: 1,
-            agent: sandcastle.claudeCode("claude-opus-4-8"),
-            promptFile: "./.sandcastle/review-prompt.md",
-            promptArgs: {
-              BRANCH: issue.branch,
-            },
-          });
+          try {
+            await sandbox.run({
+              name: "reviewer",
+              maxIterations: 1,
+              agent: sandcastle.claudeCode("claude-opus-4-8"),
+              promptFile: "./.sandcastle/review-prompt.md",
+              promptArgs: {
+                BRANCH: issue.branch,
+              },
+            });
+          } catch (err) {
+            logAgentFailure("review", issue.id, err, "merging without review");
+          }
         }
 
         return { mergeable };
@@ -407,6 +439,45 @@ function run(cmd: string): void {
 function errMsg(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+// The agent rejects a prompt whose piped stdin exceeds 10MB. This happens when
+// a prompt embeds large command output — e.g. the reviewer's `git diff` on a
+// branch that commits big generated fixtures (sin/cos vector tables, star maps).
+function isStdinTooLargeError(err: unknown): boolean {
+  const m = errMsg(err).toLowerCase();
+  return m.includes("stdin input exceeds") || (m.includes("stdin") && m.includes("10mb"));
+}
+
+// A reused git worktree whose admin files are corrupt (the recurring
+// "failed to read .git/worktrees/.../commondir" on concurrent Windows runs).
+function isCorruptWorktreeError(err: unknown): boolean {
+  const m = errMsg(err).toLowerCase();
+  return m.includes("commondir") || m.includes("worktree");
+}
+
+// Report an agent (implementer/reviewer) failure without discarding the
+// branch's work. The 10MB-stdin case is common and actionable, so it gets a
+// specific, non-alarming message and a fix hint; anything else is a plain error.
+function logAgentFailure(
+  phase: string,
+  issueId: string,
+  err: unknown,
+  fallbackNote?: string,
+): void {
+  const tail = fallbackNote ? ` — ${fallbackNote}` : "";
+  if (isStdinTooLargeError(err)) {
+    console.warn(
+      `  ! ${phase} for #${issueId} hit the agent's 10MB stdin limit ` +
+        `(embedded prompt content too large)${tail}.`,
+    );
+    console.warn(
+      "     Trim what the prompt embeds for this branch (e.g. exclude generated " +
+        "fixtures from the diff in review-prompt.md).",
+    );
+  } else {
+    console.error(`  ! ${phase} for #${issueId} failed: ${errMsg(err)}${tail}.`);
+  }
 }
 
 // How many commits `branch` has that `base` does not. > 0 means the branch
