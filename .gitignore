@@ -1,6 +1,7 @@
 # Built binaries (produced by tools/build-*.cmd)
 tools/macro1/macro1.exe
 tools/macro1/macro1
+tools/pdp1
 tools/pdp1.exe
 *.obj
 
