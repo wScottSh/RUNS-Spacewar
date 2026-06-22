@@ -8,7 +8,7 @@
     "imp": "0156"
   },
   "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
-  "listing_core_status": "verified — byte-for-byte match confirmed in commit d0cd028 (feat: stand up the Spacewar! oracle toolchain)",
+  "listing_core_status": "verified — listing↔core gate: 847 assigned addresses match core after load (image.js gateListingVsCore; rim sha256 8744e9c9c854...)",
   "domain": {
     "cardinality": "~2^36 operand pairs (binary; not enumerable)",
     "strength": "branch-complete + boundary sample (ADR-0004)",
