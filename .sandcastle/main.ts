@@ -257,87 +257,117 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     console.log(`  ${branch}`);
   }
 
-  // Track forward progress. Identical plan key two iterations running tells us
-  // the issue set never changed (nothing closed).
+  // Identical plan key two iterations running tells us the issue set never
+  // changed — used only to enrich the stall message.
   const planKey = issues.map((i) => i.id).sort().join(",");
   const samePlanAsLast = planKey === lastPlanKey;
   lastPlanKey = planKey;
 
+  // -------------------------------------------------------------------------
+  // Phase 3: Merge (only when something has unmerged work this cycle)
+  //
+  // One agent merges all completed branches into the integration branch,
+  // resolving conflicts and running tests to confirm everything works.
+  // -------------------------------------------------------------------------
+  let landedAny = false;
   if (completedBranches.length === 0) {
-    // Every pipeline ran but left nothing ahead of the integration branch —
-    // nothing to merge this cycle.
-    console.log("No unmerged work produced. Nothing to merge.");
-    if (++stalledIterations >= MAX_STALLED_ITERATIONS) {
-      console.warn(
-        `\nNo forward progress for ${stalledIterations} iteration(s) in a row` +
-          (samePlanAsLast ? ` on the same plan (issues ${planKey})` : "") +
-          " — stopping early to avoid spinning to the iteration cap.",
-      );
-      console.warn(
-        "Likely causes: the work is already done but issues aren't being " +
-          "closed (gh token needs Issues:write), or every remaining issue is " +
-          "blocked. Check the merger log and `gh issue list`.",
-      );
-      break;
-    }
-    continue;
-  }
-
-  // -------------------------------------------------------------------------
-  // Phase 3: Merge
-  //
-  // One agent merges all completed branches into the current branch,
-  // resolving any conflicts and running tests to confirm everything works.
-  //
-  // The {{BRANCHES}} and {{ISSUES}} prompt arguments are lists that the agent
-  // uses to know which branches to merge and which issues to close.
-  // -------------------------------------------------------------------------
-  try {
-    await sandcastle.run({
-      hooks,
-      sandbox: docker(),
-      name: "merger",
-      maxIterations: 1,
-      agent: sandcastle.claudeCode("claude-opus-4-8"),
-      promptFile: "./.sandcastle/merge-prompt.md",
-      promptArgs: {
-        // A markdown list of branch names, one per line.
-        BRANCHES: completedBranches.map((b) => `- ${b}`).join("\n"),
-        // A markdown list of issue IDs and titles, one per line.
-        ISSUES: completedIssues.map((i) => `- ${i.id}: ${i.title}`).join("\n"),
-      },
-    });
-  } catch (err) {
-    // A failed merge isn't fatal: the branches still hold their work, so a
-    // later iteration can retry. Count it as a stalled iteration so we don't
-    // retry forever.
-    console.error(`\nMerge phase failed: ${errMsg(err)}`);
-    console.error("Branches are left in place; a later iteration can retry.");
-    if (++stalledIterations >= MAX_STALLED_ITERATIONS) {
-      console.error(
-        `Merge failed ${stalledIterations} iteration(s) in a row — stopping.`,
-      );
-      break;
-    }
-    continue;
-  }
-
-  // Verify the merges actually landed. The merger agent can report success yet
-  // leave a branch unmerged (conflict it couldn't resolve, a skipped branch).
-  const notLanded = completedBranches.filter(
-    (b) => unmergedCount(integrationBranch, b) > 0,
-  );
-  if (notLanded.length > 0) {
-    console.warn(
-      `\nWarning: still unmerged after the merge phase: ${notLanded.join(", ")}. ` +
-        "These will be retried next iteration — see the merger log.",
-    );
+    console.log("No unmerged work produced. Nothing to merge this cycle.");
   } else {
-    console.log("\nBranches merged.");
+    let mergeFailed = false;
+    try {
+      await sandcastle.run({
+        hooks,
+        sandbox: docker(),
+        name: "merger",
+        maxIterations: 1,
+        agent: sandcastle.claudeCode("claude-opus-4-8"),
+        promptFile: "./.sandcastle/merge-prompt.md",
+        promptArgs: {
+          // A markdown list of branch names, one per line.
+          BRANCHES: completedBranches.map((b) => `- ${b}`).join("\n"),
+          // A markdown list of issue IDs and titles, one per line.
+          ISSUES: completedIssues.map((i) => `- ${i.id}: ${i.title}`).join("\n"),
+        },
+      });
+    } catch (err) {
+      // A failed merge isn't fatal: the branches still hold their work, so a
+      // later iteration can retry. The stall guard below stops us if it keeps
+      // happening.
+      console.error(`\nMerge phase failed: ${errMsg(err)}`);
+      console.error("Branches are left in place; a later iteration can retry.");
+      mergeFailed = true;
+    }
+
+    if (!mergeFailed) {
+      // Verify the merges actually landed. The merger agent can report success
+      // yet leave a branch unmerged (a conflict it couldn't resolve, a skip).
+      const notLanded = completedBranches.filter(
+        (b) => unmergedCount(integrationBranch, b) > 0,
+      );
+      landedAny = notLanded.length < completedBranches.length;
+      if (notLanded.length > 0) {
+        console.warn(
+          `\nWarning: still unmerged after the merge phase: ${notLanded.join(", ")}. ` +
+            "These will be retried next iteration — see the merger log.",
+        );
+      } else {
+        console.log("\nBranches merged.");
+      }
+    }
   }
 
-  // Real progress this iteration — reset the stall guard.
-  stalledIterations = 0;
+  // -------------------------------------------------------------------------
+  // Phase 3.5: Close finished issues — from the HOST.
+  //
+  // Closing is what lets the planner stop re-selecting finished work. We do it
+  // here, not in the merger, because the merger runs in a sandbox whose
+  // GH_TOKEN may be read-only for Issues — and when it is, the agent merges
+  // fine, narrates a close failure in prose, and still returns success, so the
+  // orchestrator never noticed (the original silent failure). The host process
+  // runs under the user's own gh auth, the authoritative place to close.
+  //
+  // We sweep ALL planned issues whose branch is already merged into the
+  // integration branch — whether that happened this cycle or in a prior run —
+  // so issues left merged-but-open by an earlier run also get cleaned up. A
+  // close that fails here is the real, loop-blocking problem: surface it and
+  // stop, rather than spinning through every remaining iteration re-planning
+  // issues that can never close.
+  const { closed, failed } = closeMergedDoneIssues(issues, integrationBranch);
+
+  if (failed.length > 0) {
+    console.error(
+      `\n✗ Merged work but could NOT close ${failed.length} issue(s) from the host:`,
+    );
+    for (const f of failed) console.error(`    #${f.id}: ${f.detail}`);
+    console.error(
+      "\nThis is the real blocker: until these issues close, the planner will " +
+        "re-select them every iteration and the run can never converge. The host " +
+        "`gh` needs Issues:write on this repo (a classic token with `repo` scope, " +
+        "or a fine-grained token with Issues:write). Fix the token, or close the " +
+        "issues manually, then re-run. Stopping now.",
+    );
+    process.exitCode = 1;
+    break;
+  }
+
+  // -------------------------------------------------------------------------
+  // Progress accounting / stall guard. Progress = something merged or an issue
+  // closed. No progress two iterations running means we're spinning — stop.
+  // -------------------------------------------------------------------------
+  if (landedAny || closed.length > 0) {
+    stalledIterations = 0;
+  } else if (++stalledIterations >= MAX_STALLED_ITERATIONS) {
+    console.warn(
+      `\nNo forward progress for ${stalledIterations} iteration(s) in a row` +
+        (samePlanAsLast ? ` on the same plan (issues ${planKey})` : "") +
+        " — stopping early to avoid spinning to the iteration cap.",
+    );
+    console.warn(
+      "Likely every remaining issue is blocked, or the agents can't make " +
+        "progress on them. Check the logs and `gh issue list`.",
+    );
+    break;
+  }
 }
 
   console.log("\nAll done.");
@@ -389,6 +419,85 @@ function unmergedCount(base: string, branch: string): number {
   } catch {
     return 0;
   }
+}
+
+// Is the GitHub issue still open? Returns false if the state can't be read
+// (treat unknown as "not ours to close" rather than erroring the run).
+function isIssueOpen(id: string): boolean {
+  try {
+    return cap(`gh issue view ${id} --json state --jq .state`).trim() === "OPEN";
+  } catch {
+    return false;
+  }
+}
+
+// A copy of the host env with GH_TOKEN/GITHUB_TOKEN removed, so gh falls back to
+// the user's stored keyring login (from `gh auth login`). Sandcastle loads
+// .sandcastle/.env for the *sandboxes*, and if those vars also land in the host
+// process, gh would otherwise prefer the .env PAT — which may be read-only for
+// Issues. The keyring login is the user's real, write-capable credential.
+function envWithoutGhToken(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.GH_TOKEN;
+  delete env.GITHUB_TOKEN;
+  return env;
+}
+
+// Close an issue using the host's gh auth. `2>&1` folds stderr into stdout so
+// the failure detail is captured for surfacing. To maximize the chance of a
+// write-capable credential, we try the keyring login first, then any GH_TOKEN;
+// and within each, a close-with-comment first, then a bare close (in case only
+// the addComment mutation is blocked). Idempotent: the caller pre-checks state.
+function closeIssueFromHost(id: string): { ok: boolean; detail: string } {
+  const creds: { label: string; env: NodeJS.ProcessEnv }[] = [
+    { label: "keyring", env: envWithoutGhToken() },
+    { label: "GH_TOKEN", env: process.env },
+  ];
+  const commands = [
+    `gh issue close ${id} --comment "Completed by Sandcastle" 2>&1`,
+    `gh issue close ${id} 2>&1`,
+  ];
+  let lastDetail = "unknown error";
+  for (const cred of creds) {
+    for (const cmd of commands) {
+      try {
+        execSync(cmd, { encoding: "utf8", env: cred.env });
+        return { ok: true, detail: `closed (${cred.label})` };
+      } catch (err) {
+        const e = err as { stdout?: string; message?: string };
+        lastDetail = (e.stdout || e.message || String(err)).trim();
+      }
+    }
+  }
+  return { ok: false, detail: lastDetail };
+}
+
+// Close every planned issue whose work is already merged into `base` — work
+// done this cycle or in a prior run. "Merged and done" means the branch is
+// fully contained in `base` (nothing ahead) AND `base` has advanced beyond it
+// (so it's a real merged branch, not a freshly-created branch sitting at the
+// base's tip with no work of its own — that distinction is what stops us from
+// closing not-started issues). Returns the IDs closed and any that failed.
+function closeMergedDoneIssues(
+  plannedIssues: { id: string; branch: string }[],
+  base: string,
+): { closed: string[]; failed: { id: string; detail: string }[] } {
+  const closed: string[] = [];
+  const failed: { id: string; detail: string }[] = [];
+  for (const issue of plannedIssues) {
+    const fullyMerged = unmergedCount(base, issue.branch) === 0;
+    const baseAdvancedBeyond = unmergedCount(issue.branch, base) > 0;
+    if (!fullyMerged || !baseAdvancedBeyond) continue;
+    if (!isIssueOpen(issue.id)) continue; // already closed
+    const r = closeIssueFromHost(issue.id);
+    if (r.ok) {
+      console.log(`  ✓ closed #${issue.id}`);
+      closed.push(issue.id);
+    } else {
+      failed.push({ id: issue.id, detail: r.detail });
+    }
+  }
+  return { closed, failed };
 }
 
 // sandcastle's noSandbox provider runs host commands via `spawn("sh", ...)`.

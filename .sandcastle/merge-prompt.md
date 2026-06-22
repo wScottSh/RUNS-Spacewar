@@ -13,13 +13,12 @@ For each branch:
 
 After all branches are merged, make a single commit summarizing the merge.
 
-# CLOSE ISSUES
+# CLOSING ISSUES
 
-For each branch that was merged, close its issue using the following command:
+Do NOT close any GitHub issues. The host orchestrator closes them after it
+verifies each merge landed, using its own gh auth. Your job is only to merge.
 
-`gh issue close <ID> --comment "Completed by Sandcastle"`
-
-Here are all the issues:
+For reference, the issues these branches correspond to:
 
 {{ISSUES}}
 
