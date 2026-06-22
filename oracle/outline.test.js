@@ -82,7 +82,7 @@ function assertWordsFit18Bits(name, words) {
   for (let i = 0; i < words.length; i++) {
     assert.ok(
       words[i] >= 0 && words[i] <= WORD_MAX,
-      `${name}[${i}] = ${words[i].toString(8)} out of range`
+      `${name}[${i}] = ${oct6(words[i])} out of range`
     );
   }
 }
