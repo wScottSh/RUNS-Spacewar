@@ -1,0 +1,70 @@
+{
+  "routine": "idv/dvd",
+  "entries": [
+    "idv",
+    "dvd"
+  ],
+  "entry_pcs_octal": {
+    "idv": "0306",
+    "dvd": "0315"
+  },
+  "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
+  "listing_core_status": "verified — byte-for-byte match confirmed in commit d0cd028 (feat: stand up the Spacewar! oracle toolchain)",
+  "domain": {
+    "description": "branch-complete + boundary sample; binary space ~2^36 (36-bit dividend × 18-bit divisor) so exhaustive enumeration is out of contract (ADR-0004)",
+    "idv_cases": 7,
+    "dvd_cases": 4,
+    "confluence_witnesses": [
+      "source comment L346-348: calling convention and return contract",
+      "listing symbol table confirms idv=0306, dvd=0315, dv1=0317 (build/spacewar31.lst)",
+      "game calls jda idv at L1157 (0o2416) and L1163 (0o2424) — gravity calc",
+      "halt-PC distinguishes normal (2×idx dv1) from overflow (1×idx dv1)"
+    ]
+  },
+  "calling_convention": {
+    "source": "revealed by source comment L348 and tracing jda+dap+xct through SIMH",
+    "jda_Y": "M[Y] ← AC (hi-dividend / dividend); AC ← return-PC; PC ← Y+1",
+    "idv_entry": "dividend in AC; jda idv; lac divisor (at return address, xct'd by dv1)",
+    "dvd_entry": "lac hi-dividend; lio lo-dividend; jda dvd; lac divisor",
+    "returns": "quotient in AC, remainder in IO",
+    "dv1_mechanism": "dap dv1 patches the xct slot with return-PC; dv1 executes lac divisor to load divisor into AC; idx dv1 twice (normal) or once (overflow/dve) advances return target",
+    "overflow_path": "dve fires when hi-div - |divisor| ≥ 0 (quotient would not fit 18 bits); also fires for ÷0; returns 0 in AC for ÷0 (game gravity ÷0 produces 0, per EPIC §Final Note)"
+  },
+  "strength": "branch-complete + boundary sample (ADR-0004)",
+  "branch_coverage": {
+    "L362_0o320_spa_divisor_sign": {
+      "taken": "positive divisor — skip cma, |divisor|=divisor",
+      "not_taken": "negative divisor — cma, |divisor|=~divisor",
+      "witness": "idv cases A (div=2) and B (div=-2)"
+    },
+    "L366_0o324_sma_hi_dividend_sign": {
+      "taken": "hi-dividend negative — adjustment code (cma+rcr×4)",
+      "not_taken": "hi-dividend ≥ 0 — jmp dv2 directly",
+      "witness": "dvd cases H (hi=0) and I (hi=-1)"
+    },
+    "L375_0o335_sma_overflow_test": {
+      "taken": "dv2-adjusted - |divisor| < 0 — normal 22-step dis division",
+      "not_taken": "dv2-adjusted - |divisor| ≥ 0 — jmp dve (overflow/÷0)",
+      "witness": "idv case C (÷0→overflow), dvd cases J+K (hi≥divisor)"
+    },
+    "L383_0o366_spi_quotient_sign": {
+      "taken": "IO ≥ 0 at L383 — skip cma (positive quotient direction)",
+      "not_taken": "IO < 0 at L383 — cma (negative quotient direction)",
+      "witness": "dvd cases H (hi=0→IO=0 at L383) and I (hi=-1→IO negative at L383)"
+    },
+    "L393_0o400_spi_at_dve": {
+      "taken": "IO ≥ 0 at dve — positive lo-dividend",
+      "not_taken": "IO < 0 at dve — negative lo-dividend",
+      "witness": "dvd cases J (lo=0) and K (lo=-1)"
+    }
+  },
+  "idv_vector_file": "dvd-idv-vectors.jsonl",
+  "dvd_vector_file": "dvd-dvd-vectors.jsonl",
+  "idv_vector_count": 7,
+  "dvd_vector_count": 4,
+  "tool_versions": {
+    "simh_pdp1": "PDP-1 simulator Open SIMH V4.1-0 Current",
+    "macro1": "macro1.c — canonical PDP-1 Macro assembler (tools/macro1)",
+    "node": "v22.23.0"
+  }
+}
