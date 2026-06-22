@@ -25,11 +25,11 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   IDV_ADDR, DVD_ADDR,
-  IDIV_CELL, IDSOR_CELL, IDV_STUB,
+  IDIV_CELL, IDSOR_CELL,
   IDV_HALT_NORMAL, IDV_HALT_OVERFLOW,
-  HDIV_CELL, LDIV_CELL, DSOR_CELL, DVD_STUB,
+  HDIV_CELL, LDIV_CELL, DSOR_CELL,
   DVD_HALT_NORMAL, DVD_HALT_OVERFLOW,
-  WORD_MASK, SIGN_BIT,
+  WORD_MASK,
   buildIdvScript, buildDvdScript, parseBatch,
   runIdvBatch, runDvdBatch,
 } from './dvd-substrate.js';
@@ -37,7 +37,7 @@ import {
   gateIdvBranchComplete, gateDvdBranchComplete,
   gateBoundaryPresent, gateDvdManifestComplete,
 } from './dvd-gate.js';
-import { pdp1Version, parseExamine } from './simh.js';
+import { pdp1Version } from './simh.js';
 import { sha256File } from './vectors.js';
 
 const HERE  = dirname(fileURLToPath(import.meta.url));

@@ -14,8 +14,8 @@
  * Halt-PC distinguishes paths:
  *   idv normal    = IDV_HALT_NORMAL   (0o7707)
  *   idv overflow  = IDV_HALT_OVERFLOW (0o7706)
- *   dvd normal    = DVD_HALT_NORMAL   (0o7716)
- *   dvd overflow  = DVD_HALT_OVERFLOW (0o7715)
+ *   dvd normal    = DVD_HALT_NORMAL   (0o7721)
+ *   dvd overflow  = DVD_HALT_OVERFLOW (0o7720)
  */
 import {
   IDV_HALT_NORMAL,
