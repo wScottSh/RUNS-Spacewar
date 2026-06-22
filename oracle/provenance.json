@@ -2,7 +2,7 @@
   "routine": "sqt",
   "entry_pc_octal": "0246",
   "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
-  "listing_core_status": "verified — byte-for-byte match confirmed in commit d0cd028 (feat: stand up the Spacewar! oracle toolchain)",
+  "listing_core_status": "verified — listing↔core gate: 847 assigned addresses match core after load (image.js gateListingVsCore; rim sha256 8744e9c9c854...)",
   "calling_convention": {
     "source": "revealed by executing jda sqt via SIMH pdp1 (open-simh V4.1-0); confirmed by pdp1_cpu.c case 007",
     "jda_Y": "M[Y] ← AC (input); AC ← PC (return address); PC ← Y+1",
@@ -14,8 +14,16 @@
     "stub_layout": {
       "incell_addr_octal": "07700",
       "stub_start_octal": "07701",
-      "instructions_octal": ["207700", "170246", "760400"],
-      "mnemonics": ["lac 07700", "jda sqt", "hlt"]
+      "instructions_octal": [
+        "207700",
+        "170246",
+        "760400"
+      ],
+      "mnemonics": [
+        "lac 07700",
+        "jda sqt",
+        "hlt"
+      ]
     },
     "input_octal": "000004",
     "input_decimal": 4,

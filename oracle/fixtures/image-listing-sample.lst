@@ -1,0 +1,15 @@
+
+      macro fio-dec system . june 1963                                    Page 1
+
+
+    1                   macro fio-dec system . june 1963
+    3       640500      	szm=sza sma-szf
+    4       650500      	spq=szm i
+    5       761200      	clc=cma+cla-opr
+
+   68 00004 601561      	jmp a40
+   69 00005 601556      	jmp a1
+   77 00006 710041      tno,  6,	law i 41
+   78 00007 675017      tvl,  7,	sar 4s
+  309 00246 000000      sqt,	0
+
