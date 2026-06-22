@@ -1,0 +1,65 @@
+{
+  "routines": [
+    "mpy",
+    "imp"
+  ],
+  "entry_pc_octal": {
+    "mpy": "0171",
+    "imp": "0156"
+  },
+  "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
+  "listing_core_status": "verified — byte-for-byte match confirmed in commit d0cd028 (feat: stand up the Spacewar! oracle toolchain)",
+  "domain": {
+    "cardinality": "~2^36 operand pairs (binary; not enumerable)",
+    "strength": "branch-complete + boundary sample (ADR-0004)",
+    "residual": "untested operand classes beyond the boundary sample",
+    "sample_classes": [
+      "zero: both factors zero (0, 0)",
+      "sign combinations ++/+-/-+/-- with small values (1, -1)",
+      "max magnitude (0o177777 / 0o600000) with all four sign combinations"
+    ],
+    "branch_witness": {
+      "L276_spa_f1_sign": "observed both ways: f1≥0 in ++ and +- cases; f1<0 in -+ and -- cases",
+      "L281_spa_f2_sign": "observed both ways: f2≥0 in ++ and -+ cases; f2<0 in +- and -- cases",
+      "L289_sma_result_sign": "observed both ways: positive result (++ and --); negative result (+- and -+)"
+    },
+    "confluence_witnesses": [
+      "source header L257-258: \"BBN multiply subroutine; Call_. lac one factor, jda mpy or imp, lac other factor.\"",
+      "source L260: \"imp, returns low 17 bits and sign in ac\"; L273: \"mpy, returns 34 bits and 2 signs\"",
+      "listing symbol table: imp @ 000156, mpy @ 000171 (tools/build/spacewar31.lst)",
+      "masswerk pt6 §Multiplication: mus step algorithm, imp = single-precision derivative of mpy"
+    ]
+  },
+  "calling_convention": {
+    "stub": "lac INCELL1; jda entry; lac INCELL2 (xct'd by routine for second factor)",
+    "mpy_returns": "34-bit product: AC = high word (sign + high-17), IO = low word (sign + low-17)",
+    "imp_returns": "low-17 bits + sign in AC (single-precision derivative via mpy)",
+    "source": "spacewar3.1_complete.txt L257-258"
+  },
+  "calibration": {
+    "mpy_1x1": {
+      "f1": "000001",
+      "f2": "000001",
+      "ac": "000000",
+      "io": "000002",
+      "pc": "007704",
+      "note": "1×1: both factors positive; observed AC and IO are the raw machine words"
+    },
+    "imp_1x1": {
+      "f1": "000001",
+      "f2": "000001",
+      "ac": "000001",
+      "pc": "007704",
+      "note": "imp(1,1) = low-17 bits of +1 product; sign non-negative"
+    }
+  },
+  "tool_versions": {
+    "simh_pdp1": "PDP-1 simulator Open SIMH V4.1-0 Current",
+    "macro1": "macro1.c — canonical PDP-1 Macro assembler (tools/macro1)",
+    "node": "v22.23.0"
+  },
+  "mpy_vector_file": "mpy-vectors.jsonl",
+  "imp_vector_file": "imp-vectors.jsonl",
+  "mpy_case_count": 9,
+  "imp_case_count": 9
+}
