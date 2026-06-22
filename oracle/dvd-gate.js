@@ -145,12 +145,14 @@ export function gateDvdBranchComplete(records) {
 // ── boundary gate ──────────────────────────────────────────────────────────
 
 /**
- * Verify that boundary operands are present in the combined idv+dvd sets.
+ * Verify that boundary operands are present in the idv set.
  *
- * Required by the acceptance criteria:
- *   zero dividend, ÷0 (zero divisor), max positive magnitude, negative dividend.
+ * Required by the acceptance criteria: zero dividend, ÷0 (zero divisor),
+ * max positive magnitude, negative dividend. These are all single-word
+ * dividend properties, so they live in idv — dvd splits the dividend into
+ * hi/lo words and carries no single dividend operand to check.
  */
-export function gateBoundaryPresent(idvRecords, dvdRecords) {
+export function gateBoundaryPresent(idvRecords) {
   const MAX_POS = 0o177777;  // largest positive 18-bit ones-complement value
 
   if (!idvRecords.some((r) => r.dividend === 0)) {
