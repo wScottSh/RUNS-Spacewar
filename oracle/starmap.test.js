@@ -67,7 +67,7 @@ function parseAddrWordPairs(lines, pattern) {
  * Intermediate macro-expansion values have no address (no 5-digit prefix) and
  * are filtered out. Page-header/source lines are filtered by the same regex.
  */
-export function parseStarMapFromListing(listingText) {
+function parseStarMapFromListing(listingText) {
   return parseAddrWordPairs(listingText.split('\n'), /^ {6}([0-7]{5}) ([0-7]{6})/);
 }
 
