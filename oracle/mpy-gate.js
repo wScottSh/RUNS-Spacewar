@@ -12,6 +12,9 @@ import { BOUNDARY_CASES, HALT_PC, SIGN_BIT } from './mpy-substrate.js';
 
 const oct = (v) => v.toString(8).padStart(6, '0');
 
+// A PDP-1 word is negative when its ones'-complement sign bit (bit 17) is set.
+const isNeg = (word) => (word & SIGN_BIT) !== 0;
+
 // ── shared property checks ────────────────────────────────────────────────────
 // mpy and imp run the same checks; they differ only by the message `tag` and a
 // couple of routine-specific extras (the L289 detail text, and whether IO is
@@ -54,29 +57,21 @@ function checkHaltPc(records, haltPc, tag) {
  */
 function checkBranchCoverage(records, tag, l289) {
   // L276 spa: f1 non-negative → skip cma (++/+- cases); f1 negative → cma (-+/-- cases)
-  const hasF1Pos = records.some((r) => (r.f1 & SIGN_BIT) === 0);
-  const hasF1Neg = records.some((r) => (r.f1 & SIGN_BIT) !== 0);
+  const hasF1Pos = records.some((r) => !isNeg(r.f1));
+  const hasF1Neg = records.some((r) => isNeg(r.f1));
   if (!hasF1Pos) throw new Error(`gate FAIL ${tag}(L276 spa): no case with f1 non-negative`);
   if (!hasF1Neg) throw new Error(`gate FAIL ${tag}(L276 spa): no case with f1 negative`);
 
   // L281 spa: f2 non-negative → skip cma (++/-+ cases); f2 negative → cma (+-/-- cases)
-  const hasF2Pos = records.some((r) => (r.f2 & SIGN_BIT) === 0);
-  const hasF2Neg = records.some((r) => (r.f2 & SIGN_BIT) !== 0);
+  const hasF2Pos = records.some((r) => !isNeg(r.f2));
+  const hasF2Neg = records.some((r) => isNeg(r.f2));
   if (!hasF2Pos) throw new Error(`gate FAIL ${tag}(L281 spa): no case with f2 non-negative`);
   if (!hasF2Neg) throw new Error(`gate FAIL ${tag}(L281 spa): no case with f2 negative`);
 
   // L289 sma: same-sign → positive result, jmp mp3 (++/-- and zero cases);
   //           diff-sign → sma skips, negate code path (+- and -+ cases)
-  const hasSameSign = records.some((r) => {
-    const f1Neg = (r.f1 & SIGN_BIT) !== 0;
-    const f2Neg = (r.f2 & SIGN_BIT) !== 0;
-    return f1Neg === f2Neg; // includes the 0×0 case (both non-negative)
-  });
-  const hasDiffSign = records.some((r) => {
-    const f1Neg = (r.f1 & SIGN_BIT) !== 0;
-    const f2Neg = (r.f2 & SIGN_BIT) !== 0;
-    return f1Neg !== f2Neg;
-  });
+  const hasSameSign = records.some((r) => isNeg(r.f1) === isNeg(r.f2)); // includes 0×0 (both non-negative)
+  const hasDiffSign = records.some((r) => isNeg(r.f1) !== isNeg(r.f2));
   if (!hasSameSign) throw new Error(`gate FAIL ${tag}(L289 sma): no same-sign case${l289.sameSign}`);
   if (!hasDiffSign) throw new Error(`gate FAIL ${tag}(L289 sma): no diff-sign case${l289.diffSign}`);
 }
@@ -89,10 +84,8 @@ function checkBranchCoverage(records, tag, l289) {
 function checkSignCorrectness(records, tag) {
   for (const r of records) {
     if (r.f1 === 0 || r.f2 === 0) continue; // zero product — sign inapplicable
-    const f1Neg = (r.f1 & SIGN_BIT) !== 0;
-    const f2Neg = (r.f2 & SIGN_BIT) !== 0;
-    const sameSign = f1Neg === f2Neg;
-    const acNeg = (r.ac & SIGN_BIT) !== 0;
+    const sameSign = isNeg(r.f1) === isNeg(r.f2);
+    const acNeg = isNeg(r.ac);
     if (sameSign && acNeg) {
       throw new Error(
         `gate FAIL ${tag}(sign correctness): f1=${oct(r.f1)} f2=${oct(r.f2)} ` +
