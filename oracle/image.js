@@ -64,8 +64,9 @@ export function buildImageExamineScript(rimPath, entries) {
 export function parseImageExamineOutput(lines, count) {
   const values = [];
   for (const line of lines) {
-    const m = line.match(/^([0-7]+):\s+([0-7]+)/);
-    if (m) values.push(parseInt(m[2], 8));
+    // Address is positional (examines run in order), so only the value is captured.
+    const m = line.match(/^[0-7]+:\s+([0-7]+)/);
+    if (m) values.push(parseInt(m[1], 8));
   }
   if (values.length !== count) {
     throw new Error(
