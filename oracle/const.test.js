@@ -45,11 +45,9 @@ test('T-CONST: xct-instruction cells are flagged and data cells are not', () => 
   const DATA_CELLS = ['foo', 'maa', 'str', 'me1', 'me2', 'ddd', 'hur', 'ran'];
 
   const flagged = CONSTANTS.filter((c) => c.xct).map((c) => c.name);
-  assert.deepEqual([...flagged].sort(), [...XCT_REACHED].sort(), 'xct cells match the listing');
-
-  for (const name of DATA_CELLS) {
-    assert.ok(!CONSTANTS.find((c) => c.name === name)?.xct, `${name} is data, not xct`);
-  }
+  const data = CONSTANTS.filter((c) => !c.xct).map((c) => c.name);
+  assert.deepEqual(flagged.sort(), [...XCT_REACHED].sort(), 'xct cells match the listing');
+  assert.deepEqual(data.sort(), [...DATA_CELLS].sort(), 'data cells carry no xct flag');
 });
 
 test('T-CONST: each constant cell — listing word matches core (ADR-0006)', async (t) => {
