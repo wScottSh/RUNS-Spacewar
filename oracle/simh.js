@@ -42,7 +42,7 @@ export const PDP1 = resolvePdp1();
  */
 export async function runPdp1(scriptLines, { timeout = 30_000 } = {}) {
   const script = scriptLines.join('\n') + '\n';
-  const tmp = join(tmpdir(), `pdp1-${Date.now()}.simh`);
+  const tmp = join(tmpdir(), `pdp1-${process.pid}-${Date.now()}.simh`);
   await writeFile(tmp, script);
   try {
     const { stdout, stderr } = await execFileAsync(PDP1, [tmp], {
