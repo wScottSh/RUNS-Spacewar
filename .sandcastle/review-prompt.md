@@ -4,13 +4,24 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 
 # CONTEXT
 
-## Branch diff
-
-!`git diff {{TARGET_BRANCH}}...{{BRANCH}}`
-
 ## Commits on this branch
 
-!`git log {{TARGET_BRANCH}}..{{BRANCH}} --oneline`
+{{COMMITS}}
+
+## Files changed (diffstat)
+
+{{DIFFSTAT}}
+
+## Branch diff
+
+The diff below is assembled by the harness from `{{TARGET_BRANCH}}...{{BRANCH}}`.
+Large generated/data files (fixtures, vector tables, manifests) are **summarized,
+not inlined** — for those, review structurally (line counts, schema, a few
+spot-checks), and if you need the full content run
+`git diff {{TARGET_BRANCH}}...{{BRANCH}} -- <file>` yourself in the sandbox. Never
+try to pull an entire large generated file into your context.
+
+{{DIFF}}
 
 # REVIEW PROCESS
 

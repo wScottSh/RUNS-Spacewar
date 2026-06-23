@@ -219,12 +219,15 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         // re-select the still-open issue every iteration, forever.
         const mergeable = unmergedCount(integrationBranch, issue.branch) > 0;
 
-        // Review is optional polish. If it fails — most commonly because the
-        // diff is too large for the agent's 10MB stdin limit (e.g. a branch
-        // that commits huge generated fixtures) — keep the implementer's
-        // mergeable work and merge it without review rather than losing it.
+        // Review any branch with unmerged work. The harness assembles the diff
+        // itself (buildReviewContext) and caps it: rogue large/generated files
+        // (a branch that commits 500k lines of vector tables) are summarized
+        // instead of inlined, so the prompt always stays well under the agent's
+        // 10MB stdin limit and the reviewer can ALWAYS run. The try/catch below
+        // is just a backstop — if review still fails, we don't lose the work.
         if (mergeable) {
           try {
+            const review = buildReviewContext(integrationBranch, issue.branch);
             await sandbox.run({
               name: "reviewer",
               maxIterations: 1,
@@ -232,6 +235,10 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
               promptFile: "./.sandcastle/review-prompt.md",
               promptArgs: {
                 BRANCH: issue.branch,
+                TARGET_BRANCH: integrationBranch,
+                COMMITS: review.commits,
+                DIFFSTAT: review.stat,
+                DIFF: review.diff,
               },
             });
           } catch (err) {
@@ -490,6 +497,79 @@ function unmergedCount(base: string, branch: string): number {
   } catch {
     return 0;
   }
+}
+
+// Capture command output, tolerant of large diffs (raised maxBuffer) and
+// non-zero exits (returns whatever was produced). Used to assemble review
+// context from git without ever throwing on a huge or empty diff.
+function gitCapture(cmd: string): string {
+  try {
+    return execSync(cmd, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+  } catch (err) {
+    const e = err as { stdout?: string };
+    return e.stdout ?? "";
+  }
+}
+
+// Per-file budget: a single file's diff larger than this is summarized, not
+// inlined. Total budget keeps the whole assembled diff far under the agent's
+// 10MB stdin limit even with several near-cap files.
+const REVIEW_PER_FILE_BYTES = 400_000;
+const REVIEW_TOTAL_BYTES = 2_000_000;
+
+// Assemble the review context for `base...branch` entirely on the host, with a
+// hard size cap. This is what makes review survive a rogue large file: instead
+// of inlining a 10MB generated fixture (which blows the agent's stdin limit and
+// makes the branch unreviewable), we replace any oversized file's diff with a
+// one-line summary + the exact command to inspect it. The reviewer therefore
+// ALWAYS gets a bounded, reviewable prompt — no human in the loop required.
+function buildReviewContext(
+  base: string,
+  branch: string,
+): { commits: string; stat: string; diff: string } {
+  const range = `${base}...${branch}`;
+  const commits =
+    gitCapture(`git log ${base}..${branch} --oneline --no-decorate`).trim() ||
+    "(no commits)";
+  const stat = gitCapture(`git diff --stat ${range}`).trim() || "(no changes)";
+  const files = gitCapture(`git diff --name-only ${range}`)
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const parts: string[] = [];
+  let total = 0;
+  let omitted = 0;
+  for (const file of files) {
+    const d = gitCapture(`git diff ${range} -- "${file}"`);
+    const tooBig = d.length > REVIEW_PER_FILE_BYTES;
+    const wouldOverflow = total + d.length > REVIEW_TOTAL_BYTES;
+    if (tooBig || wouldOverflow) {
+      const numstat = gitCapture(`git diff --numstat ${range} -- "${file}"`)
+        .trim()
+        .split(/\s+/);
+      const adds = numstat[0] ?? "?";
+      const dels = numstat[1] ?? "?";
+      parts.push(
+        `### ${file}\n[large/generated file — diff omitted to stay within the ` +
+          `agent input limit; +${adds}/-${dels}. Inspect with: ` +
+          `git diff ${range} -- "${file}"]`,
+      );
+      omitted++;
+    } else {
+      parts.push(d.trimEnd());
+      total += d.length;
+    }
+  }
+
+  let diff = parts.join("\n\n") || "(no diff)";
+  if (omitted > 0) {
+    diff =
+      `_${omitted} large/generated file(s) summarized rather than inlined — ` +
+      `review those structurally, not line-by-line._\n\n` +
+      diff;
+  }
+  return { commits, stat, diff };
 }
 
 // Is the GitHub issue still open? Returns false if the state can't be read
