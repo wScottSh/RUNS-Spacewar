@@ -1,0 +1,1 @@
+{"routine":"sin","in":"000000","sin_ac":"000000","cos_ac":"377774","pc":"007704","convention":"jda sin/cos: M[entry]←AC(angle); result in AC on return","sin_zero_confirmed":true,"cos_zero_confirmed":true}
