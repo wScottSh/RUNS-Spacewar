@@ -6,7 +6,11 @@ Merge the following branches into the current branch:
 
 For each branch:
 
-1. Run `git merge <branch> --no-edit`
+1. Run `git merge --no-ff <branch> --no-edit` (always create a merge commit —
+   never fast-forward, even when the branch is a straight line ahead; a
+   fast-forward leaves the integration branch pointing at the same commit as the
+   issue branch, which the host's close logic cannot distinguish from a
+   not-started branch)
 2. If there are merge conflicts, resolve them intelligently by reading both sides and choosing the correct resolution
 3. After resolving conflicts, run `npm run typecheck` and `npm run test` to verify everything works
 4. If tests fail, fix the issues before proceeding to the next branch

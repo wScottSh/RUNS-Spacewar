@@ -309,6 +309,14 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // resolving conflicts and running tests to confirm everything works.
   // -------------------------------------------------------------------------
   let landedAny = false;
+  // Branches whose work is provably on the integration branch as of this cycle.
+  // This is ground truth — we just merged them and re-checked — so it does NOT
+  // depend on merge topology. A fast-forward merge leaves base == branch (both
+  // unmergedCount directions read 0), which is indistinguishable from a
+  // not-started branch by git alone; recording the land here lets us close such
+  // issues anyway, instead of stranding them open for the planner to re-select
+  // every iteration (the "already done, never closed, burns tokens" failure).
+  const landedThisCycle = new Set<string>();
   if (completedBranches.length === 0) {
     console.log("No unmerged work produced. Nothing to merge this cycle.");
   } else {
@@ -343,6 +351,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       const notLanded = completedBranches.filter(
         (b) => unmergedCount(integrationBranch, b) > 0,
       );
+      for (const b of completedBranches) {
+        if (unmergedCount(integrationBranch, b) === 0) landedThisCycle.add(b);
+      }
       landedAny = notLanded.length < completedBranches.length;
       if (notLanded.length > 0) {
         console.warn(
@@ -371,7 +382,11 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // close that fails here is the real, loop-blocking problem: surface it and
   // stop, rather than spinning through every remaining iteration re-planning
   // issues that can never close.
-  const { closed, failed } = closeMergedDoneIssues(issues, integrationBranch);
+  const { closed, failed } = closeMergedDoneIssues(
+    issues,
+    integrationBranch,
+    landedThisCycle,
+  );
 
   if (failed.length > 0) {
     console.error(
@@ -624,21 +639,38 @@ function closeIssueFromHost(id: string): { ok: boolean; detail: string } {
 }
 
 // Close every planned issue whose work is already merged into `base` — work
-// done this cycle or in a prior run. "Merged and done" means the branch is
-// fully contained in `base` (nothing ahead) AND `base` has advanced beyond it
-// (so it's a real merged branch, not a freshly-created branch sitting at the
-// base's tip with no work of its own — that distinction is what stops us from
-// closing not-started issues). Returns the IDs closed and any that failed.
+// done this cycle or in a prior run.
+//
+// An issue is "merged and done" when its branch is fully contained in `base`
+// (nothing ahead) AND we can tell its work is genuinely on `base` rather than
+// the branch being a freshly-created, not-started branch sitting at the base's
+// tip. We establish the latter two ways:
+//
+//   1. `landedThisCycle` — ground truth that we merged this branch this cycle.
+//      This is authoritative and topology-independent, so it closes issues even
+//      when the merge fast-forwarded (base == branch, both rev-list directions
+//      0). Without this, a fast-forwarded merge looks identical to a not-started
+//      branch and would never close — leaving the issue open for the planner to
+//      re-select forever.
+//   2. `baseAdvancedBeyond` — `base` carries a commit the branch does not, i.e.
+//      a real merge commit from a prior run. With `--no-ff` merges (see
+//      merge-prompt.md) every genuine merge advances `base` beyond the branch,
+//      so this reliably backstops issues merged before this process started.
+//
+// A not-started branch satisfies neither, so it is never closed. Returns the
+// IDs closed and any that failed.
 function closeMergedDoneIssues(
   plannedIssues: { id: string; branch: string }[],
   base: string,
+  landedThisCycle: Set<string>,
 ): { closed: string[]; failed: { id: string; detail: string }[] } {
   const closed: string[] = [];
   const failed: { id: string; detail: string }[] = [];
   for (const issue of plannedIssues) {
     const fullyMerged = unmergedCount(base, issue.branch) === 0;
+    const landedNow = landedThisCycle.has(issue.branch);
     const baseAdvancedBeyond = unmergedCount(issue.branch, base) > 0;
-    if (!fullyMerged || !baseAdvancedBeyond) continue;
+    if (!fullyMerged || (!landedNow && !baseAdvancedBeyond)) continue;
     if (!isIssueOpen(issue.id)) continue; // already closed
     const r = closeIssueFromHost(issue.id);
     if (r.ok) {
