@@ -1,0 +1,24 @@
+{
+  "witness": "T-CWG",
+  "issue": 15,
+  "method": "Trace — branchless region; both control sources observed (ADR-0012)",
+  "gate_class": "Trace-E: no skip obligation; branchless dap/jmp indirection",
+  "source_lines": "830–842",
+  "region": {
+    "mg1": {
+      "addr_octal": "1672",
+      "key_pc_octal": "1674",
+      "key_instruction": "iot 11",
+      "boot_loc": 4
+    },
+    "mg2": {
+      "addr_octal": "1676",
+      "key_pc_octal": "1677",
+      "key_instruction": "lat",
+      "boot_loc": 5
+    }
+  },
+  "rim_sha256": "8744e9c9c8540cc5075c5cbb91c56745a4305fdf8e7afca43bea2e9e04ca4bdf",
+  "substrate_version": "PDP-1 simulator Open SIMH V4.1-0 Current",
+  "result": "PASS — mg1 (iot 11) observed via loc-4 trace; mg2 (lat) observed via loc-5 trace"
+}
