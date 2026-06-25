@@ -48,6 +48,49 @@ const planSchema = z.object({
 // Raise this if your backlog is large; lower it for a quick smoke-test run.
 const MAX_ITERATIONS = 10;
 
+// ---------------------------------------------------------------------------
+// Agent backend selection
+//
+// The template is swappable between Anthropic's Claude Code and a local,
+// network-hosted OpenAI-compatible model driven through the OpenCode CLI.
+// Pick the backend with the AGENT env var:
+//
+//   AGENT=claude    → sandcastle.claudeCode(...)  (the original behavior)
+//   AGENT=opencode  → sandcastle.opencode(...)    (local OpenAI-compatible model)
+//
+// For opencode, the endpoint + model live in opencode.json at the repo root
+// (provider id "local"); the model id below must match an entry there. A single
+// local model usually serves every phase, so OPENCODE_MODEL is shared across
+// roles — whereas Claude uses opus for reasoning-heavy phases and sonnet to
+// write code. See opencode.json and .sandcastle/.env.example.
+// ---------------------------------------------------------------------------
+const AGENT = (process.env.AGENT ?? "opencode").toLowerCase();
+
+// Model id passed to `opencode run --model`. Must resolve to a model declared in
+// opencode.json — by default "local/<model>", where "local" is the provider id
+// and "<model>" is the key under that provider's `models`.
+const OPENCODE_MODEL =
+  process.env.OPENCODE_MODEL ?? "local/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf";
+
+// The five workflow phases. Claude maps these onto two models (opus for
+// planning/review/merge/seed, sonnet for implementing); opencode maps them all
+// onto the one local model.
+type Role = "plan" | "implement" | "review" | "merge" | "seed";
+
+// Build the agent provider for a given phase, honoring the AGENT selector.
+function agentFor(role: Role): sandcastle.AgentProvider {
+  if (AGENT === "claude") {
+    const model = role === "implement" ? "claude-sonnet-4-6" : "claude-opus-4-8";
+    return sandcastle.claudeCode(model);
+  }
+  if (AGENT === "opencode") {
+    return sandcastle.opencode(OPENCODE_MODEL);
+  }
+  throw new Error(
+    `Unknown AGENT="${AGENT}". Set AGENT=opencode (local model) or AGENT=claude.`,
+  );
+}
+
 // Hooks run inside the sandbox before the agent starts each iteration.
 // npm install ensures the sandbox always has fresh dependencies.
 const hooks = {
@@ -118,8 +161,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       // One iteration is enough: the planner just needs to read and reason,
       // not write code. (Structured output requires maxIterations: 1.)
       maxIterations: 1,
-      // Opus for planning: dependency analysis benefits from deeper reasoning.
-      agent: sandcastle.claudeCode("claude-opus-4-8"),
+      // Planning benefits from the strongest available reasoning model.
+      agent: agentFor("plan"),
       promptFile: "./.sandcastle/plan-prompt.md",
       // Extract and validate the <plan> JSON into a typed object. Throws
       // StructuredOutputError if the tag is missing, the JSON is malformed, or
@@ -198,8 +241,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           await sandbox.run({
             name: "implementer",
             maxIterations: 100,
-            // Sonnet for writing code: fast, capable implementer.
-            agent: sandcastle.claudeCode("claude-sonnet-4-6"),
+            // The code-writing workhorse.
+            agent: agentFor("implement"),
             promptFile: "./.sandcastle/implement-prompt.md",
             promptArgs: {
               TASK_ID: issue.id,
@@ -231,6 +274,10 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             await sandbox.run({
               name: "reviewer",
               maxIterations: 1,
+              // Reviewer is pinned to Claude Opus regardless of AGENT — we want
+              // the strongest reviewer to catch subtle bugs in the local
+              // model's output. Requires ANTHROPIC_API_KEY in .sandcastle/.env
+              // and the Claude Code CLI in the image (the Dockerfile keeps it).
               agent: sandcastle.claudeCode("claude-opus-4-8"),
               promptFile: "./.sandcastle/review-prompt.md",
               promptArgs: {
@@ -327,7 +374,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         sandbox: docker(),
         name: "merger",
         maxIterations: 1,
-        agent: sandcastle.claudeCode("claude-opus-4-8"),
+        agent: agentFor("merge"),
         promptFile: "./.sandcastle/merge-prompt.md",
         promptArgs: {
           // A markdown list of branch names, one per line.
@@ -804,7 +851,7 @@ async function runImprove() {
     sandbox: noSandbox(),
     name: "seed",
     maxIterations: 50,
-    agent: sandcastle.claudeCode("claude-opus-4-8"),
+    agent: agentFor("seed"),
     promptFile: "./.sandcastle/improve-seed-prompt.md",
     promptArgs: { REPORT_PATH: reportPath },
   });

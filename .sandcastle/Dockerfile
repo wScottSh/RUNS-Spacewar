@@ -28,8 +28,14 @@ USER ${AGENT_UID}:${AGENT_GID}
 # Install Claude Code CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-# Add Claude to PATH
-ENV PATH="/home/agent/.local/bin:$PATH"
+# Install OpenCode CLI — drives the local OpenAI-compatible endpoint
+# (see opencode.json at the repo root). The installer drops the binary in
+# ~/.opencode/bin; OpenCode fetches the configured provider package
+# (@ai-sdk/openai-compatible) from npm on first run.
+RUN curl -fsSL https://opencode.ai/install | bash
+
+# Add Claude and OpenCode to PATH
+ENV PATH="/home/agent/.local/bin:/home/agent/.opencode/bin:$PATH"
 
 WORKDIR /home/agent
 
