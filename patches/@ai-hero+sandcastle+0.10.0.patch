@@ -17,3 +17,24 @@ index e20fc1d..8ae01dd 100644
                proc.stdin.write(opts.stdin);
                proc.stdin.end();
              }
+diff --git a/node_modules/@ai-hero/sandcastle/dist/index.js b/node_modules/@ai-hero/sandcastle/dist/index.js
+index 3a27c66..8610e48 100644
+--- a/node_modules/@ai-hero/sandcastle/dist/index.js
++++ b/node_modules/@ai-hero/sandcastle/dist/index.js
+@@ -3182,8 +3182,15 @@ var opencode = (model, options) => ({
+     const variantFlag = options?.variant ? ` --variant ${shellEscape(options.variant)}` : "";
+     const agentFlag = options?.agent ? ` --agent ${shellEscape(options.agent)}` : "";
+     const permissionsFlag = dangerouslySkipPermissions ? " --dangerously-skip-permissions" : "";
++    // Pipe the prompt via stdin instead of inlining it in argv. `opencode run`
++    // with no positional message reads the message from stdin, and the sandbox
++    // pipes PrintCommand.stdin to the child. Inlining a large prompt (e.g. the
++    // planner's expanded issue list) as a shell argument overflows Windows'
++    // ~32K CreateProcess command-line limit and fails with spawn ENAMETOOLONG —
++    // the same reason claudeCode/codex use stdin for the prompt.
+     return {
+-      command: `opencode run --format json --model ${shellEscape(model)}${variantFlag}${agentFlag}${permissionsFlag} ${shellEscape(prompt)}`
++      command: `opencode run --format json --model ${shellEscape(model)}${variantFlag}${agentFlag}${permissionsFlag}`,
++      stdin: prompt
+     };
+   },
+   buildInteractiveArgs({ prompt }) {
