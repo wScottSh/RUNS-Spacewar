@@ -91,10 +91,128 @@ function agentFor(role: Role): sandcastle.AgentProvider {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Dynamic concurrency
+//
+// The execute phase fans out one pipeline per unblocked issue. Firing every
+// pipeline at once overwhelms a capacity-limited backend: the local model
+// server advertises a fixed number of inference slots (llama.cpp's
+// `total_slots`), and N concurrent requests against S slots just queue
+// S-at-a-time anyway — while the simultaneous cold-start burst is exactly when
+// a transient backend hiccup can take down every in-flight pipeline together.
+//
+// So we size the pool to whatever the platform actually offers, discovered at
+// run time rather than hardcoded: 2 slots → 2 at a time; 100 slots → 100 at a
+// time. Escape hatch: SANDCASTLE_MAX_CONCURRENCY overrides discovery entirely.
+// ---------------------------------------------------------------------------
+
+// Conservative cap used only when the platform's capacity can't be probed
+// (network error, or a backend that doesn't expose slots). Unbounded fan-out is
+// the known-bad case for the local model, so we under-, not over-, commit.
+const FALLBACK_CONCURRENCY = 2;
+
+// Read the provider baseURL from opencode.json for the provider named in
+// OPENCODE_MODEL ("<provider>/<model>"), resolving any {env:VAR} placeholders.
+function opencodeBaseURL(): string | undefined {
+  try {
+    const cfg = JSON.parse(readFileSync("./opencode.json", "utf8"));
+    const providerId = OPENCODE_MODEL.split("/")[0];
+    const raw: unknown = cfg?.provider?.[providerId]?.options?.baseURL;
+    if (typeof raw !== "string" || raw.length === 0) return undefined;
+    return raw.replace(/\{env:([A-Z0-9_]+)\}/gi, (_, v) => process.env[v] ?? "");
+  } catch {
+    return undefined;
+  }
+}
+
+// Ask the backend how many inference slots it has. llama.cpp's OpenAI-compatible
+// server reports `total_slots` at /props (a sibling of the /v1 OpenAI routes,
+// hence resolving the path against the origin). Returns undefined if the
+// endpoint can't be reached or doesn't speak this dialect.
+async function discoverSlots(): Promise<number | undefined> {
+  const baseURL = opencodeBaseURL();
+  if (!baseURL) return undefined;
+  try {
+    const propsURL = new URL("/props", baseURL).toString();
+    const res = await fetch(propsURL, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return undefined;
+    const props = (await res.json()) as { total_slots?: unknown };
+    const slots = Number(props?.total_slots);
+    return Number.isFinite(slots) && slots > 0 ? slots : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+// Resolve how many issue pipelines to run at once this iteration, never
+// exceeding the number of issues we actually have to run.
+async function resolveConcurrency(issueCount: number): Promise<number> {
+  const cap = (n: number) => Math.max(1, Math.min(n, issueCount));
+
+  const override = Number(process.env.SANDCASTLE_MAX_CONCURRENCY);
+  if (Number.isFinite(override) && override > 0) {
+    console.log(
+      `Concurrency: ${cap(override)} (SANDCASTLE_MAX_CONCURRENCY override).`,
+    );
+    return cap(override);
+  }
+
+  if (AGENT === "opencode") {
+    const slots = await discoverSlots();
+    if (slots !== undefined) {
+      console.log(`Concurrency: ${cap(slots)} (backend advertises ${slots} slot(s)).`);
+      return cap(slots);
+    }
+    console.warn(
+      `Concurrency: ${cap(FALLBACK_CONCURRENCY)} (could not probe backend slots; ` +
+        `set SANDCASTLE_MAX_CONCURRENCY to override).`,
+    );
+    return cap(FALLBACK_CONCURRENCY);
+  }
+
+  // Cloud backends (claude) have no local slot count we can probe; run every
+  // pipeline and let the API's own rate limiting pace us.
+  console.log(`Concurrency: ${cap(issueCount)} (cloud backend; no slot limit).`);
+  return cap(issueCount);
+}
+
+// Promise.allSettled, but with at most `limit` workers running at once. Results
+// come back in input order with the same {status, value|reason} shape, so this
+// is a drop-in for Promise.allSettled at the call site.
+async function allSettledLimited<T, R>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let cursor = 0;
+  const run = async () => {
+    for (let i = cursor++; i < items.length; i = cursor++) {
+      try {
+        results[i] = { status: "fulfilled", value: await worker(items[i]!, i) };
+      } catch (reason) {
+        results[i] = { status: "rejected", reason };
+      }
+    }
+  };
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workerCount }, run));
+  return results;
+}
+
 // Hooks run inside the sandbox before the agent starts each iteration.
-// npm install ensures the sandbox always has fresh dependencies.
+// `npm install` populates dependencies; the explicit `npx patch-package` then
+// applies patches/ deterministically. We do NOT rely on npm's postinstall
+// lifecycle to run patch-package, because that is unreliable in the sandbox: a
+// reused worktree whose node_modules was installed before a patch landed gives a
+// no-op `npm install` that can leave the package unpatched, and any
+// --ignore-scripts/--omit=dev install skips postinstall entirely. When the
+// @ai-hero/sandcastle opencode patch is missing, the provider reverts to
+// inlining the prompt in argv and the planner dies with `spawn ENAMETOOLONG` on
+// Windows-length command lines. Running patch-package explicitly (idempotent —
+// a no-op when already applied) guarantees the patch is present every iteration.
 const hooks = {
-  sandbox: { onSandboxReady: [{ command: "npm install" }] },
+  sandbox: { onSandboxReady: [{ command: "npm install && npx patch-package" }] },
 };
 
 // NOTE: We intentionally do NOT use sandcastle's `copyToWorktree` to copy
@@ -161,8 +279,14 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       // One iteration is enough: the planner just needs to read and reason,
       // not write code. (Structured output requires maxIterations: 1.)
       maxIterations: 1,
-      // Planning benefits from the strongest available reasoning model.
-      agent: agentFor("plan"),
+      // Planning is pinned to Claude Opus regardless of AGENT — like the
+      // reviewer below. Planning is the phase that most needs faithful
+      // reasoning over the issue list, and a weak local model hallucinates the
+      // plan (selecting closed/nonexistent issues it was never given), so the
+      // strongest model earns its keep here. Requires ANTHROPIC_API_KEY in
+      // .sandcastle/.env and the Claude Code CLI in the image (the Dockerfile
+      // keeps it).
+      agent: sandcastle.claudeCode("claude-opus-4-8"),
       promptFile: "./.sandcastle/plan-prompt.md",
       // Extract and validate the <plan> JSON into a typed object. Throws
       // StructuredOutputError if the tag is missing, the JSON is malformed, or
@@ -183,8 +307,34 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     continue;
   }
 
+  // Re-validate the planner's OUTPUT against the live open set. The plan prompt
+  // feeds the model only open issues, but filtering the INPUT can't help if the
+  // model ignores it: a weak model can hallucinate a plan referencing
+  // already-closed or nonexistent issues (observed — a local model emitting
+  // #6–#11 when fed #14–#27). So we drop any selected issue that isn't a
+  // currently-open sandcastle issue, rather than spawning implementers on dead
+  // work. The check runs on the host (where gh is authed), one network call.
+  const openIds = openSandcastleIssues();
+  const validIssues = issues.filter((issue) => {
+    if (openIds.has(Number(issue.id))) return true;
+    console.warn(
+      `  ! Dropping planned issue #${issue.id} (${issue.title}): not a ` +
+        `currently-open sandcastle issue — the planner selected an issue that ` +
+        `is closed or was never in the open list it was given.`,
+    );
+    return false;
+  });
+  if (validIssues.length < issues.length) {
+    console.warn(
+      `  Planner proposed ${issues.length} issue(s); ${validIssues.length} ` +
+        `are open and will be worked.`,
+    );
+  }
+  issues = validIssues;
+
   if (issues.length === 0) {
-    // No unblocked work — either everything is done or everything is blocked.
+    // No unblocked work — either everything is done, everything is blocked, or
+    // the planner produced nothing that survived the open-issue validation.
     console.log("No unblocked issues to work on. Exiting.");
     break;
   }
@@ -206,8 +356,14 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // Promise.allSettled means one failing pipeline doesn't cancel the others.
   // -------------------------------------------------------------------------
 
-  const settled = await Promise.allSettled(
-    issues.map(async (issue) => {
+  // Size the fan-out to the backend's real capacity (see resolveConcurrency):
+  // queue pipelines through the available inference slots instead of bursting
+  // all of them at the platform at once.
+  const concurrency = await resolveConcurrency(issues.length);
+  const settled = await allSettledLimited(
+    issues,
+    concurrency,
+    async (issue) => {
       // Create the sandbox. If even that fails (e.g. a corrupt reused worktree),
       // we can't run agents — but the branch may already hold mergeable work
       // from a prior run, so fall back to the host's view instead of discarding
@@ -297,7 +453,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       } finally {
         await sandbox.close();
       }
-    }),
+    },
   );
 
   // Log any agents that threw (network error, sandbox crash, corrupt reused
@@ -423,12 +579,13 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // orchestrator never noticed (the original silent failure). The host process
   // runs under the user's own gh auth, the authoritative place to close.
   //
-  // We sweep ALL planned issues whose branch is already merged into the
-  // integration branch — whether that happened this cycle or in a prior run —
-  // so issues left merged-but-open by an earlier run also get cleaned up. A
-  // close that fails here is the real, loop-blocking problem: surface it and
-  // stop, rather than spinning through every remaining iteration re-planning
-  // issues that can never close.
+  // We close ONLY issues whose branch the merge phase actually landed this
+  // cycle (landedThisCycle) — closing is driven by a real merge, never by git
+  // topology that can't tell a merged branch from one that is simply behind the
+  // integration branch (which would close work that was never done). A close
+  // that fails here is the real, loop-blocking problem: surface it and stop,
+  // rather than spinning through every remaining iteration re-planning issues
+  // that can never close.
   const { closed, failed } = closeMergedDoneIssues(
     issues,
     integrationBranch,
@@ -685,27 +842,24 @@ function closeIssueFromHost(id: string): { ok: boolean; detail: string } {
   return { ok: false, detail: lastDetail };
 }
 
-// Close every planned issue whose work is already merged into `base` — work
-// done this cycle or in a prior run.
+// Close every planned issue whose branch the merge phase provably landed on
+// `base` THIS cycle. Closing is a consequence of MERGING and nothing else: an
+// issue closes because we just merged its work, never because of a guess about
+// git topology.
 //
-// An issue is "merged and done" when its branch is fully contained in `base`
-// (nothing ahead) AND we can tell its work is genuinely on `base` rather than
-// the branch being a freshly-created, not-started branch sitting at the base's
-// tip. We establish the latter two ways:
+// `landedThisCycle` is ground truth — the merge phase merged the branch and
+// re-checked that `base` now contains it (see Phase 3). It is authoritative and
+// topology-independent, so it also closes issues whose merge fast-forwarded
+// (base == branch, both rev-list directions read 0).
 //
-//   1. `landedThisCycle` — ground truth that we merged this branch this cycle.
-//      This is authoritative and topology-independent, so it closes issues even
-//      when the merge fast-forwarded (base == branch, both rev-list directions
-//      0). Without this, a fast-forwarded merge looks identical to a not-started
-//      branch and would never close — leaving the issue open for the planner to
-//      re-select forever.
-//   2. `baseAdvancedBeyond` — `base` carries a commit the branch does not, i.e.
-//      a real merge commit from a prior run. With `--no-ff` merges (see
-//      merge-prompt.md) every genuine merge advances `base` beyond the branch,
-//      so this reliably backstops issues merged before this process started.
-//
-// A not-started branch satisfies neither, so it is never closed. Returns the
-// IDs closed and any that failed.
+// We deliberately do NOT infer "done" from `base` being ahead of the branch
+// (the old `baseAdvancedBeyond` heuristic). A branch that is merely BEHIND
+// `base` — because it was never worked, or because `base` moved forward for
+// unrelated reasons — trivially looks "fully contained in base", so closing on
+// that basis closes tickets whose work was never done. That is the bug this
+// guards against: a cycle in which every implementer failed (nothing merged)
+// must close nothing, not sweep-close every planned issue. Returns the IDs
+// closed and any that failed.
 function closeMergedDoneIssues(
   plannedIssues: { id: string; branch: string }[],
   base: string,
@@ -714,10 +868,12 @@ function closeMergedDoneIssues(
   const closed: string[] = [];
   const failed: { id: string; detail: string }[] = [];
   for (const issue of plannedIssues) {
-    const fullyMerged = unmergedCount(base, issue.branch) === 0;
-    const landedNow = landedThisCycle.has(issue.branch);
-    const baseAdvancedBeyond = unmergedCount(issue.branch, base) > 0;
-    if (!fullyMerged || (!landedNow && !baseAdvancedBeyond)) continue;
+    // Only a branch the merge phase landed on `base` this cycle is eligible to
+    // close. The defensive re-check that nothing is still ahead of `base` guards
+    // against a branch that regressed after landing; it never broadens what
+    // closes (landedThisCycle already implies it).
+    if (!landedThisCycle.has(issue.branch)) continue;
+    if (unmergedCount(base, issue.branch) !== 0) continue;
     if (!isIssueOpen(issue.id)) continue; // already closed
     const r = closeIssueFromHost(issue.id);
     if (r.ok) {
