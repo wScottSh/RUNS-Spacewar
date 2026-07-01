@@ -37,6 +37,16 @@ RUN curl -fsSL https://opencode.ai/install | bash
 # Add Claude and OpenCode to PATH
 ENV PATH="/home/agent/.local/bin:/home/agent/.opencode/bin:$PATH"
 
+# Install the OpenCode provider config at OpenCode's GLOBAL path so the `local`
+# provider resolves no matter which branch the sandbox checks out. The
+# repo-tracked opencode.json is branch-scoped, but the implementer runs in
+# sandcastle/issue-* worktrees that were cut before opencode.json was added and
+# don't carry it. With no project config and no global config, OpenCode can't
+# resolve `local/<model>` and the implementer dies before reaching the model
+# with an opaque "Unexpected server error" (internally ProviderModelNotFoundError).
+# Copying it here (single source: the repo's opencode.json) makes it branch-independent.
+COPY --chown=${AGENT_UID}:${AGENT_GID} opencode.json /home/agent/.config/opencode/opencode.json
+
 WORKDIR /home/agent
 
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at ${SANDBOX_REPO_DIR}
