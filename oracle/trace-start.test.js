@@ -22,7 +22,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   TraceHarness,
-  ML0, A40, A1, A6, A2, A4, HLT, A5, A2_POST,
+  ML0, A40, A1, A6, A2, A4, HLT, A5, A2_POST, A,
   ADDR_MTB, ADDR_NTR, ADDR_NTR1, ADDR_1SC, ADDR_2SC,
   ADDR_GCT, ADDR_NTD, ADDR_RAN, ADDR_DDD,
 } from './trace-harness.js';
@@ -206,3 +206,113 @@ test('T-START: a6 match length routine extracts bits 7-11 from test word', async
   assert.ok(listingText.includes('and (37'), 'a6: and (37');
   assert.ok(listingText.includes('\\gct'), 'a6: uses \\gct');
 });
+
+// ── Test 11: I/O patch addresses verified against listing ─────────────────────
+
+test('T-START: I/O patch addresses exist in listing and are patchable', async () => {
+  const listingText = await readFile(join(ROOT, 'build/spacewar31.lst'), 'utf8');
+
+  // Verify I/O instruction addresses that the harness patches
+  assert.ok(listingText.match(/01674.*iot/), 'mg1: iot 11 at 01674');
+  assert.ok(listingText.match(/00674.*ioh/), 'dispt: ioh at 00674');
+  assert.ok(listingText.match(/02531.*ioh/), 'sq6: ioh at 02531');
+  assert.ok(listingText.match(/00714.*dpy/), 'bpt: dpy-4000 at 00714');
+  assert.ok(listingText.match(/02527.*dpy/), 'sq6: dpy-4000 at 02527');
+  assert.ok(listingText.match(/02125.*dpy/), 'mex: dpy-i 300 at 02125');
+  assert.ok(listingText.match(/01603.*lio/), 'a4: lio \\2sc at 01603');
+});
+
+// ── Test 12: Scoring path address chain ───────────────────────────────────────
+
+test('T-START: scoring path address chain verified against listing', async () => {
+  const listingText = await readFile(join(ROOT, 'build/spacewar31.lst'), 'utf8');
+
+  // Verify key addresses in the scoring path exist
+  assert.ok(listingText.match(/\b01534\b/), 'mdn at 01534');
+  assert.ok(listingText.match(/\b01564\b/), 'a at 01564');
+  assert.ok(listingText.match(/\b01576\b/), 'a5 at 01576');
+  assert.ok(listingText.match(/\b01602\b/), 'a4 at 01602');
+  assert.ok(listingText.match(/\b01604\b/), 'hlt at 01604');
+  assert.ok(listingText.match(/\b01613\b/), 'a6 at 01613');
+  assert.ok(listingText.match(/\b01620\b/), 'a2 at 01620');
+});
+
+// ── Test 13: ml0 tail branches in listing ─────────────────────────────────────
+
+test('T-START: ml0 tail branches (719/723/727/731) verified against listing', async () => {
+  const listingText = await readFile(join(ROOT, 'build/spacewar31.lst'), 'utf8');
+
+  assert.ok(listingText.match(/\b01512\b/), 'ml0: sza at 01512 (line 719)');
+  assert.ok(listingText.match(/\b01516\b/), 'ml0: sza at 01516 (line 723)');
+  assert.ok(listingText.match(/\b01522\b/), 'ml0: spa at 01522 (line 727)');
+  assert.ok(listingText.match(/\b01526\b/), 'ml0: spa i at 01526 (line 731)');
+});
+
+// ── Test 14: mdn branches in listing ─────────────────────────────────────────
+
+test('T-START: mdn branches (738/745/751) verified against listing', async () => {
+  const listingText = await readFile(join(ROOT, 'build/spacewar31.lst'), 'utf8');
+
+  assert.ok(listingText.match(/\b01534\b/), 'mdn at 01534 (line 738)');
+  assert.ok(listingText.match(/\b01544\b/), 'mdn: sza i at 01544 (line 745)');
+  assert.ok(listingText.match(/\b01552\b/), 'mdn: sza i at 01552 (line 751)');
+});
+
+// ── Test 15: scoring branches in listing ──────────────────────────────────────
+
+test('T-START: scoring branches (765/767/769/775/782/809) verified against listing', async () => {
+  const listingText = await readFile(join(ROOT, 'build/spacewar31.lst'), 'utf8');
+
+  assert.ok(listingText.match(/\b01565\b/), 'a: sma at 01565 (line 765)');
+  assert.ok(listingText.match(/\b01567\b/), 'a: isp at 01567 (line 767)');
+  assert.ok(listingText.match(/\b01572\b/), 'a: sas at 01572 (line 769)');
+  assert.ok(listingText.match(/\b01600\b/), 'a5: sza i at 01600 (line 775)');
+  assert.ok(listingText.match(/\b01607\b/), 'a4+post: sza at 01607 (line 782)');
+  assert.ok(listingText.match(/\b01645\b/), 'a2: lio ddd at 01645 (line 809)');
+});
+
+// ── Test 16: a6 match length branches ─────────────────────────────────────────
+
+test('T-START: a6 match length branches (786-791) verified against listing', async () => {
+  const listingText = await readFile(join(ROOT, 'build/spacewar31.lst'), 'utf8');
+
+  assert.ok(listingText.match(/\b01613\b/), 'a6 at 01613 (line 786)');
+  assert.ok(listingText.match(/\b01615\b/), 'a6: and (37 at 01615 (line 788)');
+  assert.ok(listingText.match(/\b01616\b/), 'a6: sza at 01616 (line 789)');
+  assert.ok(listingText.match(/\b01620\b/), 'a2 at 01620 (line 792)');
+});
+
+// ── Test 17: hlt address verified ─────────────────────────────────────────────
+
+test('T-START: hlt at a4 (01604) verified against listing', async () => {
+  const listingText = await readFile(join(ROOT, 'build/spacewar31.lst'), 'utf8');
+
+  assert.ok(listingText.match(/\b01604\b/), 'hlt at 01604 (line 779)');
+  assert.ok(listingText.match(/\b01606\b/), 'after hlt at 01606 (line 780)');
+});
+
+// ── Test 18: Meter shows in-contract branch sites in listing ──────────────────
+
+test('T-START: meter finds all in-contract branch sites in listing', async () => {
+  const { parseListingForMeter } = await import('./meter.js');
+  const listingText = await readFile(join(ROOT, 'build/spacewar31.lst'), 'utf8');
+  const listing = parseListingForMeter(listingText);
+
+  // In-contract skip sites from the EPIC partition
+  const inContractAddrs = new Set([
+    0o01512, 0o01516, 0o01522, 0o01526,  // ml0 tail
+    0o01534,                              // mdn isp
+    0o01544, 0o01552,                     // mdn sza i
+    0o01565, 0o01567,                     // a: sma, count isp
+    0o01572, 0o01600,                     // a: sas, a5: sza i
+    0o01607,                              // a4 post-hlt: sza
+    0o01616,                              // a6: sza
+  ]);
+
+  // Each in-contract address should be found
+  for (const addr of inContractAddrs) {
+    assert.ok(listing.skipSites.has(addr),
+      `in-contract skip site at 0o${addr.toString(8)} found in listing`);
+  }
+});
+

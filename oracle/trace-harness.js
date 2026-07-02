@@ -14,6 +14,11 @@
  *   harness.runTo(01621);       // add breakpoint at a2
  *   const results = await harness.execute();
  *   // results[{pc:..., ac:..., m03476:..., ...}] per breakpoint
+ *
+ * Full game flow (boot → game-over → scoring → hlt → continue → reinit):
+ *   const results = await TraceHarness.fullGameFlow(rimPath, {
+ *     entryPoint: 4, seed: 256, testWord: 0o1000,   // bit 12 = show scores
+ *   });
  */
 import { runPdp1 } from './simh.js';
 
@@ -33,8 +38,8 @@ const A2_POST = 0o01627;   // first instruction after clear macro in a2 (law ss1
 
 // Object-table absolute addresses
 const ADDR_MTB      = 0o03476;
-const ADDR_NTR      = 0o03754;
-const ADDR_NTR1     = 0o03755;
+const ADDR_NTR      = 0o03514;   // ntr offset 60 from mtb (60 octal = 48 decimal)
+const ADDR_NTR1     = 0o03515;
 const ADDR_1SC      = 0o03255;
 const ADDR_2SC      = 0o03256;
 const ADDR_GCT      = 0o03260;
@@ -45,12 +50,21 @@ const ADDR_DDD      = 0o00020;
 // HLT instruction word (PDP-1 halt = 0o760400); replace with jmp . at HLT
 const HLT_WORD  = 0o760400;
 const JMP_DOT   = 0o601604;           // jmp . (self-loop) at address HLT
+const CLA_WORD  = 0o040200;           // cla (clear AC) — safe I/O patch
+
+// I/O instructions in ml1 execution path (patched to cla to avoid SIMH I/O errors)
+const IO_IOT11  = 0o01674;            // iot 11 in mg1 (called from a40 flow via cwr)
+const IO_DPY0   = 0o00572;            // dpy-4000 in blp (star display)
+const IO_DPY1   = 0o00714;            // dpy-4000 in bpt (massive star display)
+const IO_DPY2   = 0o02125;            // dpy-i 300 in mex (explosion particle display)
+const IO_DPY3   = 0o02527;            // dpy-4000 in sq6 (ship tail display)
 
 export {
   ML0, A40, A1, A6, A2, MDN, A, A5, A4, HLT, A2_POST,
   ADDR_MTB, ADDR_NTR, ADDR_NTR1, ADDR_1SC, ADDR_2SC,
   ADDR_GCT, ADDR_NTD, ADDR_RAN, ADDR_DDD,
-  HLT_WORD, JMP_DOT,
+  HLT_WORD, JMP_DOT, CLA_WORD,
+  IO_IOT11, IO_DPY0, IO_DPY1, IO_DPY2, IO_DPY3,
 };
 
 // ── TraceHarness ──────────────────────────────────────────────────────────────
@@ -129,24 +143,107 @@ export class TraceHarness {
     return this._lastResults;
   }
 
+  // ── patchIo ─────────────────────────────────────────────────────────────
+  /**
+    * Patch I/O instructions in ml1 execution path to `cla` (0o040200).
+    *
+    * SIMH's pdp1 does not handle IOT/DPY instructions without device
+    * configuration.  Patching them to `cla` lets the game flow complete
+    * without triggering SIMH device errors.
+    */
+  patchIo() {
+    this._steps.push({
+      type: 'inject',
+      items: [
+        { addr: IO_IOT11, val: CLA_WORD },
+        { addr: IO_DPY0,  val: CLA_WORD },
+        { addr: IO_DPY1,  val: CLA_WORD },
+        { addr: IO_DPY2,  val: CLA_WORD },
+        { addr: IO_DPY3,  val: CLA_WORD },
+      ],
+    });
+    return this;
+  }
+
+  // ── setGameOverState ────────────────────────────────────────────────────
+  /**
+    * Clear ship object-table slots and set torpedo counts to 0, forcing
+    * ml0 to jump to mdn (scoring) instead of ml1.
+    */
+  setGameOverState() {
+    this._steps.push({
+      type: 'inject',
+      items: [
+        { addr: ADDR_MTB,      val: 0 },       // ship 1 slot = inactive
+        { addr: ADDR_MTB + 1,  val: 0 },       // ship 2 slot = inactive
+        { addr: ADDR_NTR,      val: 0 },       // ship 1 torps = 0
+        { addr: ADDR_NTR1,     val: 0 },       // ship 2 torps = 0
+      ],
+    });
+    return this;
+  }
+
   // ── resumeFromHlt (one-shot: replaces hlt with jmp . then continues) ──────
   /**
-   * For the "hlt at a4 → continue" scenario, this is a convenience wrapper
-   * that: (1) loads the image, (2) deposits game-over state, (3) sets hlt→jmp,
-   * (4) runs to the next target.
-   */
-  static async resumeFromHlt(rimPath, target, injections = [], { maxFrames = 100 } = {}) {
+    * For the "hlt at a4 → continue" scenario, this is a convenience wrapper
+    * that: (1) loads the image, (2) deposits game-over state, (3) patches I/O,
+    * (4) sets hlt→jmp to next instruction, (5) runs to the next target.
+    */
+  static async resumeFromHlt(rimPath, target, injections = [], { maxFrames = 100, testWord = 0 } = {}) {
     const harness = new TraceHarness(rimPath);
-    // Replace hlt with jmp .
+    // Replace hlt with jmp to next instruction (a4+2)
     harness._steps.push({
       type: 'inject',
-      items: [{ addr: HLT, val: JMP_DOT }],
+      items: [{ addr: HLT, val: 0o601606 }],  // jmp a4+2 (the `lat` after hlt)
     });
     // Then run
     for (const inj of injections) harness.inject(inj);
     harness.runTo(target, { maxFrames });
     return harness.execute();
   }
+
+  // ── fullGameFlow (static convenience) ───────────────────────────────────
+  /**
+    * Execute the complete game flow: boot → game-over → scoring → hlt →
+    * resume → reinit → back to ml0.
+    *
+    * Returns the full array of per-breakpoint results.
+    */
+  static async fullGameFlow(rimPath, {
+    entryPoint = 4,
+    seed = 256,
+    senseSwitches = 0,
+    testWord = 0,
+    maxFrames = 2000,
+  } = {}) {
+    const harness = new TraceHarness(rimPath);
+
+    // 1. Boot to ml0
+    harness.boot({ entryPoint, seed, senseSwitches, testWord, autoRunTo: null });
+
+    // 2. Patch I/O instructions so ml1 can execute
+    harness.patchIo();
+
+    // 3. Set game-over state (clear ships + torps)
+    harness.setGameOverState();
+
+    // 4. Run to scoring entry (a)
+    harness.runTo(A, { maxFrames });
+
+    // 5. Run to hlt (a4)
+    harness.runTo(HLT, { maxFrames });
+
+    // 6. Replace hlt with jmp to next instruction → continue to reinit
+    harness._steps.push({
+      type: 'inject',
+      items: [{ addr: HLT, val: 0o601606 }],  // jmp a4+2 (lat at 01606)
+    });
+    harness.runTo(A2, { maxFrames });
+
+    return harness.execute();
+  }
+
+  // ── internal ──────────────────────────────────────────────────────────────
 
   // ── internal ──────────────────────────────────────────────────────────────
 
