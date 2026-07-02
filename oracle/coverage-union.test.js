@@ -1,21 +1,30 @@
 /**
- * T-COVERAGE — the union/closure run (issue #27, ADR-0012).
+ * T-COVERAGE — the hardened union/closure gate (issue #27, ADR-0007/0012).
  *
- * This is the run the ticket demands: every scenario's SIMH trace, one
- * closure pass through the meter, the gate green.  The per-region tickets
- * light branches; this file asserts the union:
+ * This is the Oracle's merge gate and it is built to be un-fakeable. It closes
+ * the failure mode the EPIC #5 audit surfaced — trace tickets going "green"
+ * without ever driving the machine — with three properties that a static /
+ * hollow reimplementation cannot satisfy:
  *
- *   1. Every in-contract decision observed both ways (skips) / every
- *      realized edge ≥ once (multiway).
- *   2. Every one-way / correctly-dead register entry (ADR-0007) confirmed
- *      resolving only its one way over the union — never the dead arm.
- *   3. No dark in-contract branch remains unclassified.
- *   4. The correctly-dead PC blocks (sbf, sr1 hlt, mst+1, sin/cos clamp)
- *      never execute anywhere in the union.
+ *   FAIL-CLOSED. If the Substrate (SIMH pdp1 + build artifacts) is absent, the
+ *     gate FAILS — it does not skip. A green suite that never ran SIMH is
+ *     exactly the bug; here it is impossible. The only escape is a conscious,
+ *     named env opt-out (ORACLE_ALLOW_NO_SUBSTRATE=1) that CI never sets.
  *
- * The scenario set lives in coverage-union.js (buildUnionScenarios); it was
- * grown empirically against the gate's dark list until closure.  Everything
- * here runs live against the Substrate — no cached traces.
+ *   EXECUTION-GROUNDED. Acceptance is measured from real PC streams captured
+ *     from live SIMH runs of the whole pinned-input scenario union — not from
+ *     assertions about script-builder output. The distinct-PC floor makes a
+ *     stubbed run fail loudly.
+ *
+ *   RATCHETED. The coverage contract (coverage-baseline.json) cannot be
+ *     silently narrowed to make green cheaper: the in-contract decision set may
+ *     not shrink, and the one-way / correctly-dead registers must match the
+ *     baseline exactly. Any change is a reviewable baseline diff — the point
+ *     where a hidden gap becomes visible.
+ *
+ * The scenario set lives in coverage-union.js (buildUnionScenarios) and runs
+ * through the single shared runUnionClosure() path — the same one the baseline
+ * generator uses, so there is no second, divergent runner to drift.
  *
  * The passing ledger is written to oracle/coverage-manifest.json.
  */
@@ -26,107 +35,81 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { parseListingForMeter } from './meter.js';
 import {
-  CoverageGate,
-  buildUnionOneWayRegister,
-  buildDeadMultiwayRegister,
-  buildDeadSkipSiteRegister,
-} from './coverage-gate.js';
-import {
-  scanIohAddrs,
-  buildUnionScenarios,
-  filterContractListing,
+  runUnionClosure,
+  resolveDeadBlock,
+  DISPATCH_ADDR,
+  DISPATCH_ARMS,
+  DEAD_PC_BLOCKS,
 } from './coverage-union.js';
-import { PDP1, pdp1Version } from './simh.js';
+import { CoverageGate, buildUnionOneWayRegister } from './coverage-gate.js';
+import { checkRatchet } from './coverage-ratchet.js';
+import { PDP1 } from './simh.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RIM_PATH = join(HERE, '..', 'build', 'spacewar31.rim');
 const LST_PATH = join(HERE, '..', 'build', 'spacewar31.lst');
 const MANIFEST_PATH = join(HERE, 'coverage-manifest.json');
+const BASELINE_PATH = join(HERE, 'coverage-baseline.json');
 
-// The dispatch (7-way computed GOTO at 00443) must realize every arm:
-// opr fall-through (444), oc1 (445), oc2 (446, lit by the synthetic outline),
-// oc3 (447), oc4 (450), oc5 (451), oc6 (452), terminator (453).
-const DISPATCH_ADDR = 0o443;
-const DISPATCH_ARMS = [0o444, 0o445, 0o446, 0o447, 0o450, 0o451, 0o452, 0o453];
+/** Substrate present iff the SIMH binary AND both build artifacts exist. */
+function substrateStatus() {
+  const missing = [];
+  if (!existsSync(PDP1)) missing.push(`SIMH pdp1 (${PDP1})`);
+  if (!existsSync(RIM_PATH)) missing.push('build/spacewar31.rim');
+  if (!existsSync(LST_PATH)) missing.push('build/spacewar31.lst');
+  return { present: missing.length === 0, missing };
+}
 
-// Correctly-dead PC blocks (ADR-0007): never executed over the union.
-const DEAD_PC_BLOCKS = [
-  ['sbf sequence-break flush', [0o61, 0o62, 0o63, 0o64, 0o65]],
-  ['loc-3 reset vector', [0o3]],
-  ['sr1 no-free-slot hlt/jmp .-1', 'L1250-1251'],   // resolved from the listing
-  ['mex mst+1 scr 3s', 'L983'],
-  ['sin/cos saturation clamp', [0o134, 0o135, 0o136, 0o137, 0o140]],
-];
+// ── The gate ──────────────────────────────────────────────────────────────────
 
 test(
-  'T-COVERAGE: union of all scenario traces — closure gate is green',
+  'T-COVERAGE: hardened union/closure gate (fail-closed, execution-grounded, ratcheted)',
   { timeout: 600_000 },
   async (t) => {
-    if (!existsSync(PDP1) || !existsSync(RIM_PATH) || !existsSync(LST_PATH)) {
-      t.skip('SIMH binary or build artifacts not available');
-      return;
-    }
-
-    // ── Build the gate over the in-contract listing ────────────────────────
-    const listingText = await readFile(LST_PATH, 'utf8');
-    const full = parseListingForMeter(listingText);
-    const listing = filterContractListing(full);
-    const gate = new CoverageGate(
-      listing,
-      buildUnionOneWayRegister(),
-      buildDeadMultiwayRegister(),
-      buildDeadSkipSiteRegister(),
-    );
-
-    // ── Run every scenario live, feeding each dump as its own stream ───────
-    const iohAddrs = await scanIohAddrs(RIM_PATH);
-    assert.ok(iohAddrs.length > 0, 'wait-class iot words found to patch');
-
-    const scenarios = buildUnionScenarios(RIM_PATH, iohAddrs);
-    const scenarioStats = {};
-    const allPcs = new Set();
-    for (const [name, run] of Object.entries(scenarios)) {
-      const { streams } = await run();
-      assert.ok(streams.length > 0, `${name}: produced at least one PC stream`);
-      let pcs = 0;
-      for (const s of streams) {
-        gate.addTrace(s);
-        pcs += s.length;
-        for (const pc of s) allPcs.add(pc);
+    // FAIL-CLOSED: no substrate ⇒ the Oracle cannot be verified ⇒ red.
+    // The only way out is a conscious, named opt-out that CI must never set.
+    const { present, missing } = substrateStatus();
+    if (!present) {
+      if (process.env.ORACLE_ALLOW_NO_SUBSTRATE === '1') {
+        t.skip(`Substrate absent (${missing.join(', ')}); bypassed via ORACLE_ALLOW_NO_SUBSTRATE=1`);
+        return;
       }
-      scenarioStats[name] = { streams: streams.length, pcs };
+      assert.fail(
+        `Oracle coverage gate cannot run: ${missing.join(', ')} missing.\n` +
+        `The Oracle is a SIMH-executed characterization; a green suite that never ran the ` +
+        `Substrate is meaningless. Build the image (assemble) and the pdp1 binary, then re-run.\n` +
+        `To bypass for pure-unit iteration ONLY, set ORACLE_ALLOW_NO_SUBSTRATE=1 (never in CI).`,
+      );
     }
 
-    // ── The closure pass ────────────────────────────────────────────────────
-    const result = gate.assertClosure();
+    // Run the entire union LIVE — the single shared code path.
+    const run = await runUnionClosure(RIM_PATH, LST_PATH);
+    const { result, full, allPcs, scenarioStats, iohCount, substrate } = run;
 
+    // Execution-proof: this must be a real SIMH run, not a stub.
+    assert.match(substrate, /simulator/i, 'Substrate reports a real SIMH banner');
+    assert.ok(iohCount > 0, 'boot/compile ran (wait-class iot words were found to patch)');
+    assert.ok(allPcs.size > 1000,
+      `union observed ${allPcs.size} distinct PCs — a static run would produce ~0`);
+
+    // ── 1. Closure is green ────────────────────────────────────────────────
     assert.equal(result.dark.length, 0,
       `no dark in-contract branch: ${result.dark.map((d) => d.addr.toString(8)).join(',') || 'none'}`);
     assert.equal(result.unclassified.length, 0,
       `no partial unregistered branch: ${result.unclassified.map((u) => u.addr.toString(8)).join(',') || 'none'}`);
     assert.ok(result.passed, `closure gate green\n${result.summary}`);
 
-    // Every register entry confirmed one-way, exactly its registered direction.
+    // Every one-way register entry confirmed, exactly its registered direction.
     const register = buildUnionOneWayRegister();
     assert.equal(result.oneWayConfirmed.length, register.size,
       'every one-way register entry confirmed in the union');
     for (const [addr, direction] of register) {
-      assert.ok(
-        CoverageGate.isConfirmedOneWay(result, addr, direction),
-        `one-way ${addr.toString(8)} confirmed as ${direction}`,
-      );
+      assert.ok(CoverageGate.isConfirmedOneWay(result, addr, direction),
+        `one-way ${addr.toString(8)} confirmed as ${direction}`);
     }
 
-    // Both dead multiway template cells confirmed (registered AND unexecuted).
-    assert.equal(result.deadMultiwayConfirmed.length, buildDeadMultiwayRegister().size,
-      'ocm/ocn template cells confirmed dead');
-    // The registered dead skip site (sin/cos clamp spi) confirmed.
-    assert.equal(result.deadSkipConfirmed.length, buildDeadSkipSiteRegister().size,
-      'dead-block skip sites confirmed');
-
-    // ── Dispatch multiway: all 8 arms realized across the union ─────────────
+    // ── 2. Dispatch multiway realizes all 8 arms ───────────────────────────
     const dispatch = result.multiwayEntries.find((e) => e.addr === DISPATCH_ADDR);
     assert.ok(dispatch, 'outline-compiler dispatch entry present');
     for (const arm of DISPATCH_ARMS) {
@@ -134,16 +117,10 @@ test(
         `dispatch arm ${arm.toString(8)} realized`);
     }
 
-    // ── Correctly-dead PC blocks never execute ──────────────────────────────
-    const addrsOfLine = (line) =>
-      [...full.addrToSrcLine].filter(([, l]) => l === line).map(([a]) => a);
+    // ── 3. Correctly-dead PC blocks never execute ──────────────────────────
     const deadResults = [];
     for (const [name, spec] of DEAD_PC_BLOCKS) {
-      const addrs = Array.isArray(spec)
-        ? spec
-        : spec.split('-').length === 2 && spec.startsWith('L')
-          ? spec.replace('L', '').split('-').flatMap((l) => addrsOfLine(parseInt(l, 10)))
-          : addrsOfLine(parseInt(spec.replace('L', ''), 10));
+      const addrs = resolveDeadBlock(spec, full);
       assert.ok(addrs.length > 0, `${name}: block addresses resolved`);
       const executed = addrs.filter((a) => allPcs.has(a));
       assert.equal(executed.length, 0,
@@ -151,13 +128,28 @@ test(
       deadResults.push({ block: name, addrs: addrs.map((a) => a.toString(8)), executed: false });
     }
 
-    // ── Write the ledger manifest ───────────────────────────────────────────
+    // ── 4. Ratchet: the contract must not have eroded ──────────────────────
+    assert.ok(existsSync(BASELINE_PATH),
+      'coverage-baseline.json present (regenerate with gen-coverage-baseline.mjs)');
+    const baseline = JSON.parse(await readFile(BASELINE_PATH, 'utf8'));
+    const ratchet = checkRatchet(baseline, run);
+    assert.ok(ratchet.ok,
+      `coverage ratchet violated — the contract eroded:\n  ${ratchet.violations.join('\n  ')}\n` +
+      `If this change is intentional, regenerate coverage-baseline.json and review the diff.`);
+
+    // ── Write the live ledger manifest ─────────────────────────────────────
     const manifest = {
       ticket: 'T-COVERAGE (issue #27)',
       adr: ['ADR-0007', 'ADR-0012'],
       generated: new Date().toISOString(),
-      substrate: await pdp1Version(),
+      substrate,
       gate: 'PASS',
+      hardening: {
+        failClosed: true,
+        ratcheted: true,
+        minDistinctPcs: baseline.minDistinctPcs,
+        iohWordsPatched: iohCount,
+      },
       summary: {
         skipSitesBothWays: result.bothWays.length,
         skipSitesOneWayConfirmed: result.oneWayConfirmed.length,
@@ -166,20 +158,16 @@ test(
         multiwayTemplateCellsConfirmedDead: result.deadMultiwayConfirmed.length,
         dark: result.dark.length,
         unclassified: result.unclassified.length,
-        inContractSkipSites: listing.skipSites.size,
-        inContractMultiway: listing.multiwayBranches.size,
+        inContractSkipSites: run.listing.skipSites.size,
+        inContractMultiway: run.listing.multiwayBranches.size,
         distinctPcs: allPcs.size,
       },
       oneWayRegister: [...register].map(([addr, direction]) => ({
         addr: addr.toString(8), direction,
         confirmed: CoverageGate.isConfirmedOneWay(result, addr, direction),
       })),
-      deadMultiway: result.deadMultiwayConfirmed.map((e) => ({
-        addr: e.addr.toString(8), reason: e.reason,
-      })),
-      deadSkipSites: result.deadSkipConfirmed.map((e) => ({
-        addr: e.addr.toString(8), reason: e.reason,
-      })),
+      deadMultiway: result.deadMultiwayConfirmed.map((e) => ({ addr: e.addr.toString(8), reason: e.reason })),
+      deadSkipSites: result.deadSkipConfirmed.map((e) => ({ addr: e.addr.toString(8), reason: e.reason })),
       deadPcBlocks: deadResults,
       dispatchArms: dispatch.realizedTargets.map((a) => a.toString(8)).sort(),
       scenarios: scenarioStats,

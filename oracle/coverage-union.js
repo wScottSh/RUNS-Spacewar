@@ -21,7 +21,15 @@
  *
  * Address map verified against build/spacewar31.lst symbol table.
  */
-import { runPdp1 } from './simh.js';
+import { readFile } from 'node:fs/promises';
+import { runPdp1, pdp1Version } from './simh.js';
+import { parseListingForMeter } from './meter.js';
+import {
+  CoverageGate,
+  buildUnionOneWayRegister,
+  buildDeadMultiwayRegister,
+  buildDeadSkipSiteRegister,
+} from './coverage-gate.js';
 
 // ─── Symbol addresses (from the assembled listing's symbol table) ─────────────
 
@@ -503,6 +511,85 @@ export function filterContractListing(full) {
     multiwayBranches: new Map([...full.multiwayBranches].filter(([, s]) => inContract(s.srcLine))),
     addrToSrcLine: full.addrToSrcLine,
   };
+}
+
+// ─── The outline-compiler dispatch (7-way computed GOTO at 00443) ─────────────
+// Every realized arm must appear across the union: opr fall-through (444),
+// oc1 (445), oc2 (446, lit only by the synthetic outline), oc3 (447),
+// oc4 (450), oc5 (451), oc6 (452), terminator (453).
+export const DISPATCH_ADDR = 0o443;
+export const DISPATCH_ARMS = [0o444, 0o445, 0o446, 0o447, 0o450, 0o451, 0o452, 0o453];
+
+// Correctly-dead PC blocks (ADR-0007): must never execute anywhere in the
+// union.  Numeric entries are absolute addresses; `L<n>` / `L<a>-<b>` entries
+// are resolved to addresses from the listing at check time.
+export const DEAD_PC_BLOCKS = [
+  ['sbf sequence-break flush', [0o61, 0o62, 0o63, 0o64, 0o65]],
+  ['loc-3 reset vector', [0o3]],
+  ['sr1 no-free-slot hlt/jmp .-1', 'L1250-1251'],
+  ['mex mst+1 scr 3s', 'L983'],
+  ['sin/cos saturation clamp', [0o134, 0o135, 0o136, 0o137, 0o140]],
+];
+
+/** Resolve a DEAD_PC_BLOCKS spec (address list or `L…`) to absolute addresses. */
+export function resolveDeadBlock(spec, full) {
+  if (Array.isArray(spec)) return spec;
+  const addrsOfLine = (line) =>
+    [...full.addrToSrcLine].filter(([, l]) => l === line).map(([a]) => a);
+  const body = spec.replace('L', '');
+  const lines = body.includes('-')
+    ? body.split('-').map((n) => parseInt(n, 10))
+    : [parseInt(body, 10)];
+  return lines.flatMap((l) => addrsOfLine(l));
+}
+
+/**
+ * Run the entire pinned-input scenario union LIVE against the Substrate and
+ * close the gate.  This is the single code path shared by the hardened gate
+ * test and the baseline generator — there is no second, divergent runner.
+ *
+ * Returns everything the gate/ratchet need to make assertions:
+ *   { result, listing, full, allPcs, scenarioStats, iohCount, substrate }
+ *
+ * `result` is the CoverageGate.assertClosure() ledger; `allPcs` is the set of
+ * every PC observed across the union (the execution-proof surface — a static
+ * reimplementation produces ~0 of these).
+ */
+export async function runUnionClosure(rimPath, lstPath) {
+  const listingText = await readFile(lstPath, 'utf8');
+  const full = parseListingForMeter(listingText);
+  const listing = filterContractListing(full);
+
+  const gate = new CoverageGate(
+    listing,
+    buildUnionOneWayRegister(),
+    buildDeadMultiwayRegister(),
+    buildDeadSkipSiteRegister(),
+  );
+
+  const iohAddrs = await scanIohAddrs(rimPath);
+  if (iohAddrs.length === 0) {
+    throw new Error('IOH scan found no wait-class iot words — boot/compile did not run');
+  }
+
+  const scenarios = buildUnionScenarios(rimPath, iohAddrs);
+  const scenarioStats = {};
+  const allPcs = new Set();
+  for (const [name, run] of Object.entries(scenarios)) {
+    const { streams } = await run();
+    if (streams.length === 0) throw new Error(`scenario ${name} produced no PC stream`);
+    let pcs = 0;
+    for (const s of streams) {
+      gate.addTrace(s);
+      pcs += s.length;
+      for (const pc of s) allPcs.add(pc);
+    }
+    scenarioStats[name] = { streams: streams.length, pcs };
+  }
+
+  const result = gate.assertClosure();
+  const substrate = await pdp1Version();
+  return { result, listing, full, allPcs, scenarioStats, iohCount: iohAddrs.length, substrate };
 }
 
 // ─── Direct-entry background-display passes (from the merged T-BACKDISP set) ──

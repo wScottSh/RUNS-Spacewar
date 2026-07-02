@@ -4,9 +4,15 @@
     "ADR-0007",
     "ADR-0012"
   ],
-  "generated": "2026-07-02T19:06:39.933Z",
+  "generated": "2026-07-02T20:24:22.974Z",
   "substrate": "PDP-1 simulator Open SIMH V4.1-0 Current",
   "gate": "PASS",
+  "hardening": {
+    "failClosed": true,
+    "ratcheted": true,
+    "minDistinctPcs": 1982,
+    "iohWordsPatched": 105
+  },
   "summary": {
     "skipSitesBothWays": 117,
     "skipSitesOneWayConfirmed": 8,
