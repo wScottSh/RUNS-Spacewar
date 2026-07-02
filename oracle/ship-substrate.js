@@ -51,6 +51,7 @@ export const SQ6    = 0o02531;  // tail: ranct + thrust + torpedo + hyperspace
 export const SR5    = 0o02667;  // hyperspace trigger / common exit
 export const ST3    = 0o02713;  // hyperspace done
 export const SRT    = 0o02713;  // return point (jmp .)
+export const DAP_SRT = 0o262713; // `dap srt` — calc routine pointer stored in each object slot
 export const POF    = 0o02714;  // spaceship dragged into star
 export const SR1    = 0o02615;  // free slot search
 export const SR2    = 0o02625;  // torpedo setup
@@ -93,6 +94,9 @@ export const ML0_DELAY = 0o01700; // delay register start
 
 // Star position cells (star table at 6077/ — the stars are displayed, gravity is at origin)
 export const STR_ADDR = 0o00015;  // star capture radius = 1
+
+// PRNG
+export const RAN_ADDR = 0o031;  // ran (PRNG state) cell
 
 // Tunable constants
 export const TNO    = 0o006;  // torps + 1 (law i 41 → 40 torps)
@@ -146,7 +150,12 @@ export function buildShipTraceScript(rimPath, opts = {}) {
     ranSeed = 0,
   } = opts;
 
-  const lines = [`load ${rimPath}`];
+  const lines = [];
+  const oct = n => n.toString(8);
+  const deposit = (addr, val) => lines.push(`deposit ${oct(addr)} ${oct(val)}`);
+  const examine = addr => lines.push(`examine ${oct(addr)}`);
+
+  lines.push(`load ${rimPath}`);
 
   // ── Sense switches ─────────────────────────────────────────────────────
   for (const sw of senseSwitches) {
@@ -154,77 +163,77 @@ export function buildShipTraceScript(rimPath, opts = {}) {
   }
 
   // ── PRNG seed ──────────────────────────────────────────────────────────
-  lines.push(`deposit ${0o031.toString(8)} ${ranSeed.toString(8)}`);
+  deposit(RAN_ADDR, ranSeed);
 
   // ── Star capture radius ────────────────────────────────────────────────
-  lines.push(`deposit ${STR_ADDR.toString(8)} 1`);
+  deposit(STR_ADDR, 1);
 
   // ── Ship 1: position, angle, velocity ──────────────────────────────────
-  lines.push(`deposit ${SHIP1_SLOT.toString(8)} ${0o262713.toString(8)}`); // dap srt
-  lines.push(`deposit ${MX1.toString(8)} ${ship1x.toString(8)}`);
-  lines.push(`deposit ${MY1.toString(8)} ${ship1y.toString(8)}`);
-  lines.push(`deposit ${MA1.toString(8)} 0`); // not exploding
-  lines.push(`deposit ${MB1.toString(8)} 1`); // active
+  deposit(SHIP1_SLOT, DAP_SRT);
+  deposit(MX1, ship1x);
+  deposit(MY1, ship1y);
+  deposit(MA1, 0); // not exploding
+  deposit(MB1, 1); // active
 
   // ── Ship 2: position, angle, velocity ──────────────────────────────────
-  lines.push(`deposit ${SHIP2_SLOT.toString(8)} ${0o262713.toString(8)}`); // dap srt
-  lines.push(`deposit ${MX2.toString(8)} ${ship2x.toString(8)}`);
-  lines.push(`deposit ${MY2.toString(8)} ${ship2y.toString(8)}`);
-  lines.push(`deposit ${MA2.toString(8)} 0`); // not exploding
-  lines.push(`deposit ${MB2.toString(8)} 1`); // active
+  deposit(SHIP2_SLOT, DAP_SRT);
+  deposit(MX2, ship2x);
+  deposit(MY2, ship2y);
+  deposit(MA2, 0); // not exploding
+  deposit(MB2, 1); // active
 
   // ── Angle / angular velocity (dual slots for both ships) ───────────────
-  lines.push(`deposit ${MTH.toString(8)} ${ship1Angle.toString(8)}`);
-  lines.push(`deposit ${MOM.toString(8)} ${ship1AngVel.toString(8)}`);
-  lines.push(`deposit ${(MTH + 1).toString(8)} ${ship2Angle.toString(8)}`);
-  lines.push(`deposit ${(MOM + 1).toString(8)} ${ship2AngVel.toString(8)}`);
+  deposit(MTH, ship1Angle);
+  deposit(MOM, ship1AngVel);
+  deposit(MTH + 1, ship2Angle);
+  deposit(MOM + 1, ship2AngVel);
 
   // ── Shared variables ───────────────────────────────────────────────────
-  lines.push(`deposit ${MFU_ADDR.toString(8)} ${fuel.toString(8)}`);
-  lines.push(`deposit ${MTR_ADDR.toString(8)} ${torps.toString(8)}`);
-  lines.push(`deposit ${MH1_ADDR.toString(8)} ${hyperActive.toString(8)}`);
-  lines.push(`deposit ${MH2_ADDR.toString(8)} ${hyperShots.toString(8)}`);
-  lines.push(`deposit ${MH3_ADDR.toString(8)} ${hyperTimer.toString(8)}`);
-  lines.push(`deposit ${MH4_ADDR.toString(8)} ${hyperAccum.toString(8)}`);
+  deposit(MFU_ADDR, fuel);
+  deposit(MTR_ADDR, torps);
+  deposit(MH1_ADDR, hyperActive);
+  deposit(MH2_ADDR, hyperShots);
+  deposit(MH3_ADDR, hyperTimer);
+  deposit(MH4_ADDR, hyperAccum);
 
   // ── Control word setup ─────────────────────────────────────────────────
   // cwg (03257) should point to a cell containing the control word
   // The calc routines use jsp i \cwg to fetch it
   const ctrlWordAddr = 0o1000;
   const combinedCtrl = ship1Ctrl | ship2Ctrl;
-  lines.push(`deposit ${ctrlWordAddr.toString(8)} ${combinedCtrl.toString(8)}`);
-  lines.push(`deposit ${CWG_ADDR.toString(8)} ${ctrlWordAddr.toString(8)}`);
+  deposit(ctrlWordAddr, combinedCtrl);
+  deposit(CWG_ADDR, ctrlWordAddr);
 
   // ── Run main loop (one frame) ──────────────────────────────────────────
-  lines.push(`run ${ML0.toString(8)}`);
+  lines.push(`run ${oct(ML0)}`);
 
   // ── Examine key state ──────────────────────────────────────────────────
   // Positions
-  lines.push(`examine ${MX1.toString(8)}`);
-  lines.push(`examine ${MY1.toString(8)}`);
-  lines.push(`examine ${MX2.toString(8)}`);
-  lines.push(`examine ${MY2.toString(8)}`);
+  examine(MX1);
+  examine(MY1);
+  examine(MX2);
+  examine(MY2);
   // Angles
-  lines.push(`examine ${MTH.toString(8)}`);
-  lines.push(`examine ${(MTH + 1).toString(8)}`);
-  lines.push(`examine ${MOM.toString(8)}`);
-  lines.push(`examine ${(MOM + 1).toString(8)}`);
+  examine(MTH);
+  examine(MTH + 1);
+  examine(MOM);
+  examine(MOM + 1);
   // Fuel and torps
-  lines.push(`examine ${MFU_ADDR.toString(8)}`);
-  lines.push(`examine ${MTR_ADDR.toString(8)}`);
+  examine(MFU_ADDR);
+  examine(MTR_ADDR);
   // Hyperspace state
-  lines.push(`examine ${MH1_ADDR.toString(8)}`);
-  lines.push(`examine ${MH2_ADDR.toString(8)}`);
-  lines.push(`examine ${MH3_ADDR.toString(8)}`);
-  lines.push(`examine ${MH4_ADDR.toString(8)}`);
+  examine(MH1_ADDR);
+  examine(MH2_ADDR);
+  examine(MH3_ADDR);
+  examine(MH4_ADDR);
   // Object table (calc routines)
-  lines.push(`examine ${SHIP1_SLOT.toString(8)}`);
-  lines.push(`examine ${SHIP2_SLOT.toString(8)}`);
+  examine(SHIP1_SLOT);
+  examine(SHIP2_SLOT);
   // Control word pointer
-  lines.push(`examine ${CWG_ADDR.toString(8)}`);
+  examine(CWG_ADDR);
   // Gravity forces
-  lines.push(`examine ${BX_ADDR.toString(8)}`);
-  lines.push(`examine ${BY_ADDR.toString(8)}`);
+  examine(BX_ADDR);
+  examine(BY_ADDR);
 
   // ── CPU history for T-METER ────────────────────────────────────────────
   lines.push('show cpu history');
@@ -263,8 +272,6 @@ export async function runTraceScript(rimPath, scriptLines, { timeout = 60_000 } 
       const hm = line.match(/^\s*([0-7]{6})\s/);
       if (hm) {
         pcHistory.push(parseInt(hm[1], 8));
-      } else if (line.trim() === '' || line.startsWith('sim>')) {
-        // End of history
       }
     }
   }
