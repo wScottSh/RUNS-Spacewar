@@ -174,9 +174,10 @@ const DISLIS_LISTING_SNIPPET = [
   '      01164 501213',  // sad fpo+R (L592)
   '      01173 640005',  // szf 5 (L601)
   '      01177 523057',  // sas (L605)
-  '      01205 501213',  // sad at flp (L612)
-  // Page header — ignored
+  // Page header mid-expansion (the real listing breaks expansion 1 across
+  // pages exactly like this) — must not reset the call-site context
   '      spacewar 3.1  24 sep 62  pt. 1                                     Page 18',
+  '      01205 501213',  // sad at flp (L612) — after the header
   // Call site L637 (variety B) — starts a NEW callSiteLine context
   '  637                   \tdislis 2j,2q,2',
   '            000004',
@@ -259,13 +260,13 @@ test('dislis macro: repeat intermediate lines do not create skip sites', () => {
 });
 
 test('dislis macro: page header does not reset call site context', () => {
-  // After a page header, expansion lines should still be variety-(C) wrt the
-  // preceding call-site line — the page header resets nothing.
-  // (Verified indirectly: expansion lines after the header still carry callSiteLine=636.)
-  // This test checks that D1_SADFLP (at 01205, which appears BEFORE the header
-  // in real listing order, but we explicitly test the page header has no effect.)
+  // In the snippet (as in the real listing) a page header falls in the middle
+  // of expansion 1, between the sas at 01177 and the flp sad at 01205.  The
+  // post-header expansion line must still be variety-(C) wrt the preceding
+  // call-site line — the header resets nothing.
   const { skipSites } = parseListingForMeter(DISLIS_LISTING_SNIPPET);
-  assert.ok(skipSites.has(D1_SADFLP), 'sad at 01205 still found despite page header nearby');
+  assert.ok(skipSites.has(D1_SADFLP), 'sad at 01205 found after the page header');
+  assert.equal(skipSites.get(D1_SADFLP).callSiteLine, 636, 'still attributed to L636');
 });
 
 // ─── §3 Integration: real listing — confirmed addresses ───────────────────────
@@ -449,6 +450,9 @@ const PASS_STEPS = 32_768;
  * scenario relies on this: pass 1 advances the per-band start pointers
  * (`flo`), pass 2 then scans starting mid-table.
  *
+ * Omitting bcc/bkc leaves the counter untouched, so a later pass can meet
+ * the value the previous pass's own `law i`/`dac` reseed left behind.
+ *
  * @param {Array<{fpr: number, ssw?: number, bcc?: number, bkc?: number}>} passes
  */
 async function runBackdispTrace(passes) {
@@ -456,12 +460,14 @@ async function runBackdispTrace(passes) {
     `load ${RIM_PATH}`,
     `set cpu history=${Math.min(passes.length * PASS_STEPS, 65_536)}`,
   ];
-  for (const { fpr, ssw = 0, bcc = 0, bkc = 0 } of passes) {
+  for (const { fpr, ssw = 0, bcc, bkc } of passes) {
     script.push(
       `de 1443 ${fpr.toString(8)}`,   // fpr — window origin for star folding
       `de SS ${ssw.toString(8)}`,     // sense switches
-      `de 1441 ${bcc.toString(8)}`,   // bcc counter (even-cycle gate)
-      `de 1442 ${bkc.toString(8)}`,   // bkc counter (advance timer)
+    );
+    if (bcc !== undefined) script.push(`de 1441 ${bcc.toString(8)}`);  // even-cycle gate
+    if (bkc !== undefined) script.push(`de 1442 ${bkc.toString(8)}`);  // advance timer
+    script.push(
       `de AC 1134`,                   // bcx return target = bcx (spin on exit)
       `de PC 1130`,                   // enter bck
       `step ${PASS_STEPS}`,
@@ -487,8 +493,15 @@ test('T-BACKDISP: SIMH trace — bck and dislis branches covered both ways', asy
   //   baseline    — background ON, fpr=0: the normal folding pass; spa (L646)
   //                 no-skip arm (fpr-1 goes negative → wrap adjustment).
   //   ssw4-off    — SSW4 set: szs 40 no-skip arm (background suppressed).
-  //   bcc-odd     — bcc seeded -2: isp bcc no-skip arm (odd frame, EP idle).
+  //   bcc-odd     — two passes, bcc NOT re-deposited in pass 2: pass 1's own
+  //                 `law i 2`/`dac bcc` reseed (L634-635) leaves -2, so pass 2
+  //                 meets the natural odd-frame value and isp bcc resolves
+  //                 no-skip (EP idle frame) — the even-cycle gate cycling as
+  //                 in a real frame sequence.
   //   bkc-hold    — bkc seeded -2: isp bkc no-skip arm (window not advanced).
+  //                 (The natural `law i 20` cycle needs 16 EP frames — more
+  //                 passes than one SIMH history buffer holds; the seed is
+  //                 the pinned-input shortcut, per the mid-routine cut.)
   //   window-move — two passes in ONE session: pass 1 at fpr=10000 advances
   //                 each band's flo start pointer mid-table; pass 2 at
   //                 fpr=2000 then scans from a mid-table fpo over a window
@@ -497,11 +510,11 @@ test('T-BACKDISP: SIMH trace — bck and dislis branches covered both ways', asy
   //                 the full-circle exit (L592 no-skip arm).  Also lights
   //                 spa's skip arm and both isp skip arms.
   const [baseline, ssw4Off, bccOdd, bkcHold, windowMove] = await Promise.all([
-    runBackdispTrace([{ fpr: 0, ssw: SS_BACKGROUND_ON }]),
-    runBackdispTrace([{ fpr: 0o1, ssw: SS_BACKGROUND_OFF }]),
-    runBackdispTrace([{ fpr: 0, bcc: COUNTER_NEG2 }]),
-    runBackdispTrace([{ fpr: 0, bkc: COUNTER_NEG2 }]),
-    runBackdispTrace([{ fpr: 0o10000 }, { fpr: 0o2000 }]),
+    runBackdispTrace([{ fpr: 0, ssw: SS_BACKGROUND_ON, bcc: 0, bkc: 0 }]),
+    runBackdispTrace([{ fpr: 0o1, ssw: SS_BACKGROUND_OFF, bcc: 0, bkc: 0 }]),
+    runBackdispTrace([{ fpr: 0, bcc: 0, bkc: 0 }, { fpr: 0 }]),
+    runBackdispTrace([{ fpr: 0, bcc: 0, bkc: COUNTER_NEG2 }]),
+    runBackdispTrace([{ fpr: 0o10000, bcc: 0, bkc: 0 }, { fpr: 0o2000, bcc: 0, bkc: 0 }]),
   ]);
 
   // Concatenating the streams is safe for skip sites: analyzeTrace only
@@ -588,18 +601,25 @@ test('T-BACKDISP: SIMH trace — bck and dislis branches covered both ways', asy
 
   // ── region gate (acceptance criterion 4): 565–655 covered ──
   //
-  // Every meter entry attributed to the region — bck's own source lines and
-  // the dislis expansions via their call-site lines — must be lit: no dark
-  // skip site, no unrealized multiway branch.
+  // The bar, per ADR-0012 as the issue applies it to this region:
+  //   - every directly-assembled skip in the region observed BOTH ways;
+  //   - every dislis expansion site reached, with both-ways witnessed across
+  //     the four expansions per define line (asserted above — a single band's
+  //     star geometry cannot drive every arm at every site);
+  //   - every multiway branch realized.
   await t.test('T-METER reports the 565–655 region covered', () => {
+    const dislisSites = new Set(ALL_DISLIS_SITES);
     const gaps = [];
     for (const e of ledger) {
       const line = e.callSiteLine ?? e.srcLine;
       if (line < 565 || line > 655) continue;
-      if (e.type === 'multiway' ? e.realizedTargets.length === 0 : e.status === 'dark') {
-        gaps.push(`0${e.addr.toString(8)} (L${e.srcLine} ${e.mnemonic})`);
+      const covered = e.type === 'multiway' ? e.realizedTargets.length > 0
+        : dislisSites.has(e.addr)           ? e.status !== 'dark'
+        :                                     e.status === 'both';
+      if (!covered) {
+        gaps.push(`0${e.addr.toString(8)} (L${e.srcLine} ${e.mnemonic}: ${e.status ?? 'unrealized'})`);
       }
     }
-    assert.equal(gaps.length, 0, `dark in region: ${gaps.join(', ')}`);
+    assert.equal(gaps.length, 0, `not covered in region: ${gaps.join(', ')}`);
   });
 });
