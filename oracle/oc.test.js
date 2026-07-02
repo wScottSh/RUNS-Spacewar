@@ -64,7 +64,6 @@ const OT2_ADDR = 0o2752;
 
 // Compile target area:
 const NNN_ADDR  = 0o3772;
-const COMPILE_START = 0o3773;
 
 // ── Outline data from ot1/ot2 ────────────────────────────────────────────────
 
@@ -115,10 +114,15 @@ function isCompilerPC(pc) {
 }
 
 /**
- * Check if a PC is in the dispatch multiway area (444-452).
+ * Read and parse the listing for the meter, or return null if the build
+ * artifact is absent (in which case the caller skips the test gracefully).
  */
-function isDispatchArea(pc) {
-  return pc >= 0o444 && pc <= 0o452;
+async function loadListing() {
+  try {
+    return parseListingForMeter(await readFile(LISTING_PATH, 'utf8'));
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -164,13 +168,8 @@ function buildCompileScript(compileTarget, outlineTableAddr, maxSteps = 80) {
 // ── Unit tests: listing parsing ──────────────────────────────────────────────
 
 test('T-OC: listing parser finds dispatch multiway at 0443', async () => {
-  let listingText;
-  try {
-    listingText = await readFile(LISTING_PATH, 'utf8');
-  } catch {
-    return;
-  }
-  const listing = parseListingForMeter(listingText);
+  const listing = await loadListing();
+  if (!listing) return;
   assert.ok(
     listing.multiwayBranches.has(DISPATCH_ADDR),
     'dispatch jmp. at 0443 is a multiway branch'
@@ -178,13 +177,8 @@ test('T-OC: listing parser finds dispatch multiway at 0443', async () => {
 });
 
 test('T-OC: listing parser finds szf 6 skip site at 0632', async () => {
-  let listingText;
-  try {
-    listingText = await readFile(LISTING_PATH, 'utf8');
-  } catch {
-    return;
-  }
-  const listing = parseListingForMeter(listingText);
+  const listing = await loadListing();
+  if (!listing) return;
   assert.ok(
     listing.skipSites.has(OC6_ADDR),
     'szf 6 at 0632 is a skip site'
@@ -192,13 +186,8 @@ test('T-OC: listing parser finds szf 6 skip site at 0632', async () => {
 });
 
 test('T-OC: listing parser finds isp (count) at 0576', async () => {
-  let listingText;
-  try {
-    listingText = await readFile(LISTING_PATH, 'utf8');
-  } catch {
-    return;
-  }
-  const listing = parseListingForMeter(listingText);
+  const listing = await loadListing();
+  if (!listing) return;
   assert.ok(
     listing.skipSites.has(ISP_ADDR),
     'isp occ at 0576 is a skip site (count macro)'
@@ -206,13 +195,8 @@ test('T-OC: listing parser finds isp (count) at 0576', async () => {
 });
 
 test('T-OC: outline compiler address range 0402–0647 has sites in listing', async () => {
-  let listingText;
-  try {
-    listingText = await readFile(LISTING_PATH, 'utf8');
-  } catch {
-    return;
-  }
-  const listing = parseListingForMeter(listingText);
+  const listing = await loadListing();
+  if (!listing) return;
   const { skipSites, multiwayBranches } = listing;
 
   const compilerSkip = [...skipSites.entries()]
@@ -236,12 +220,8 @@ test(
     const { lines: output } = await runPdp1(script);
     const pcs = extractPCsFromStepOutput(output);
 
-    let listing;
-    try {
-      listing = parseListingForMeter(await readFile(LISTING_PATH, 'utf8'));
-    } catch {
-      return;
-    }
+    const listing = await loadListing();
+    if (!listing) return;
 
     // Filter to compiler-range PCs
     const compilerPcs = pcs.filter(isCompilerPC);
@@ -285,12 +265,8 @@ test(
     const { lines: output } = await runPdp1(script);
     const pcs = extractPCsFromStepOutput(output);
 
-    let listing;
-    try {
-      listing = parseListingForMeter(await readFile(LISTING_PATH, 'utf8'));
-    } catch {
-      return;
-    }
+    const listing = await loadListing();
+    if (!listing) return;
 
     const compilerPcs = pcs.filter(isCompilerPC);
     assert.ok(compilerPcs.length > 0, 'compiler PCs captured from stepping');
@@ -322,7 +298,7 @@ test(
       // Set M[0412] = compile target so dac i oc stores to compile target area
       `deposit 412 ${synthTarget.toString(8)}`,
       // Put synthetic outline address at compile target
-      ...SYNTHETIC_OUTLINE.flatMap((w, i) =>
+      ...SYNTHETIC_OUTLINE.map((w, i) =>
         `deposit ${(synthTarget + i).toString(8)} ${w.toString(8)}`
       ),
       `deposit ${synthTarget.toString(8)} ${synthTarget.toString(8)}`,
@@ -331,7 +307,7 @@ test(
       `break 413`,
       `run 413`,
       ...steps,
-      ...SYNTHETIC_OUTLINE.flatMap((_, i) =>
+      ...SYNTHETIC_OUTLINE.map((_, i) =>
         `examine ${(NNN_ADDR + i).toString(8)}`
       ),
       'examine pc',
@@ -342,12 +318,8 @@ test(
     const { lines: output } = await runPdp1(script);
     const pcs = extractPCsFromStepOutput(output);
 
-    let listing;
-    try {
-      listing = parseListingForMeter(await readFile(LISTING_PATH, 'utf8'));
-    } catch {
-      return;
-    }
+    const listing = await loadListing();
+    if (!listing) return;
 
     const compilerPcs = pcs.filter(isCompilerPC);
     const analysis = analyzeTrace(compilerPcs, listing);
@@ -394,12 +366,7 @@ test(
 test(
   'T-OC: dispatch edge analysis — ot1 and ot2 cover different arms (ADR-0012)',
   async () => {
-    let listing;
-    try {
-      listing = parseListingForMeter(await readFile(LISTING_PATH, 'utf8'));
-    } catch {
-      return;
-    }
+    if (!(await loadListing())) return;
 
     // ot1 words: 111131, 111111, 111111, 111163, 311111, 146111, 111114, 700000
     // Each word encodes 6 nibbles (3-bit direction codes), stored from MSB to LSB.
@@ -450,12 +417,8 @@ test(
 test(
   'T-OC: skip sites identified in compiler range for both-ways analysis',
   async () => {
-    let listing;
-    try {
-      listing = parseListingForMeter(await readFile(LISTING_PATH, 'utf8'));
-    } catch {
-      return;
-    }
+    const listing = await loadListing();
+    if (!listing) return;
 
     const { skipSites } = listing;
 
