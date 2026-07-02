@@ -10,8 +10,8 @@
  *   const harness = new TraceHarness(rimPath);
  *   harness.boot({ entryPoint: 4, senseSwitches: 0, testWord: 0, seed: 256 });
  *   harness.inject({ addr: 0o3476, val: 0 });
- *   harness.runTo(01604);       // add breakpoint at hlt
- *   harness.runTo(01621);       // add breakpoint at a2
+ *   harness.runTo(0o1604);      // add breakpoint at hlt
+ *   harness.runTo(0o1620);      // add breakpoint at a2
  *   const results = await harness.execute();
  *   // results[{pc:..., ac:..., m03476:..., ...}] per breakpoint
  *
@@ -47,10 +47,9 @@ const ADDR_NTD      = 0o03254;
 const ADDR_RAN      = 0o00031;
 const ADDR_DDD      = 0o00020;
 
-// HLT instruction word (PDP-1 halt = 0o760400); replace with jmp . at HLT
-const HLT_WORD  = 0o760400;
-const JMP_DOT   = 0o601604;           // jmp . (self-loop) at address HLT
-const CLA_WORD  = 0o040200;           // cla (clear AC) — safe I/O patch
+// Instruction words the harness deposits into memory.
+const CLA_WORD   = 0o040200;          // cla (clear AC) — safe I/O patch (flow intact)
+const HLT_RESUME = 0o601606;          // jmp a4+2 — deposited over the hlt to resume into `lat`
 
 // I/O instructions in ml1 execution path (patched to cla to avoid SIMH I/O errors)
 const IO_IOT11  = 0o01674;            // iot 11 in mg1 (called from a40 flow via cwr)
@@ -63,7 +62,7 @@ export {
   ML0, A40, A1, A6, A2, MDN, A, A5, A4, HLT, A2_POST,
   ADDR_MTB, ADDR_NTR, ADDR_NTR1, ADDR_1SC, ADDR_2SC,
   ADDR_GCT, ADDR_NTD, ADDR_RAN, ADDR_DDD,
-  HLT_WORD, JMP_DOT, CLA_WORD,
+  CLA_WORD, HLT_RESUME,
   IO_IOT11, IO_DPY0, IO_DPY1, IO_DPY2, IO_DPY3,
 };
 
@@ -189,12 +188,12 @@ export class TraceHarness {
     * that: (1) loads the image, (2) deposits game-over state, (3) patches I/O,
     * (4) sets hlt→jmp to next instruction, (5) runs to the next target.
     */
-  static async resumeFromHlt(rimPath, target, injections = [], { maxFrames = 100, testWord = 0 } = {}) {
+  static async resumeFromHlt(rimPath, target, injections = [], { maxFrames = 100 } = {}) {
     const harness = new TraceHarness(rimPath);
     // Replace hlt with jmp to next instruction (a4+2)
     harness._steps.push({
       type: 'inject',
-      items: [{ addr: HLT, val: 0o601606 }],  // jmp a4+2 (the `lat` after hlt)
+      items: [{ addr: HLT, val: HLT_RESUME }],
     });
     // Then run
     for (const inj of injections) harness.inject(inj);
@@ -236,14 +235,12 @@ export class TraceHarness {
     // 6. Replace hlt with jmp to next instruction → continue to reinit
     harness._steps.push({
       type: 'inject',
-      items: [{ addr: HLT, val: 0o601606 }],  // jmp a4+2 (lat at 01606)
+      items: [{ addr: HLT, val: HLT_RESUME }],
     });
     harness.runTo(A2, { maxFrames });
 
     return harness.execute();
   }
-
-  // ── internal ──────────────────────────────────────────────────────────────
 
   // ── internal ──────────────────────────────────────────────────────────────
 
@@ -324,9 +321,10 @@ export class TraceHarness {
         continue;
       }
 
-      // Memory examine (addr: value)
+      // Memory examine (addr: value) — PC/AC lines are handled above and
+      // cannot match this octal-address pattern.
       const memM = line.match(/^([0-7]+):\s+([0-7]+)/);
-      if (memM && !/^(PC|AC):/.test(line)) {
+      if (memM) {
         if (currentResult === null) currentResult = {};
         const addr = parseInt(memM[1], 8);
         const val = parseInt(memM[2], 8);
