@@ -132,25 +132,78 @@ export function parseListingForMeter(text) {
     const hasWord    = /^[0-7]{6}$/.test(wordField);
 
     const srcLine = hasSrcLine ? parseInt(srcField.trim(), 10)  : null;
-    const addr    = hasAddr    ? parseInt(addrField, 8)          : null;
-    const word    = hasWord    ? parseInt(wordField, 8)          : null;
+    let addr    = hasAddr    ? parseInt(addrField, 8)          : null;
+    let word    = hasWord    ? parseInt(wordField, 8)          : null;
 
     if (hasSrcLine && hasAddr && hasWord) {
-      // (A) Regular assembled instruction.
-      callSiteLine = null;
-      addrToSrcLine.set(addr, srcLine);
-      const srcText  = line.length > 18 ? line.substring(18) : '';
-      const mnemonic = _extractSkipMnemonic(srcText);
-      if (mnemonic) {
-        skipSites.set(addr, { srcLine, mnemonic, callSiteLine: srcLine });
+      // (A) Regular assembled instruction — OR macro expansion line that
+      // uses the same format as regular instructions (some macros do this).
+      // If srcLine matches the current callSiteLine, treat it as a macro
+      // expansion attributed to that call site instead of a regular instr.
+      if (callSiteLine !== null && srcLine === callSiteLine) {
+        // Macro expansion using regular format.
+        addrToSrcLine.set(addr, callSiteLine);
+        const srcText = line.length > 18 ? line.substring(18) : '';
+        const mnemonic = _extractSkipMnemonic(srcText);
+        if (mnemonic) {
+          skipSites.set(addr, { srcLine, mnemonic, callSiteLine });
+        }
+        if (isJmpDot(word, addr)) {
+          multiwayBranches.set(addr, { srcLine: callSiteLine });
+        }
+      } else {
+        // Regular assembled instruction.
+        callSiteLine = null;
+        addrToSrcLine.set(addr, srcLine);
+        const srcText  = line.length > 18 ? line.substring(18) : '';
+        const mnemonic = _extractSkipMnemonic(srcText);
+        if (mnemonic) {
+          skipSites.set(addr, { srcLine, mnemonic, callSiteLine: srcLine });
+        }
+        if (isJmpDot(word, addr)) {
+          multiwayBranches.set(addr, { srcLine });
+        }
       }
-      if (isJmpDot(word, addr)) {
-        multiwayBranches.set(addr, { srcLine });
+    } else if (hasSrcLine && !hasAddr && line.length > 30) {
+      // (B) Could be a macro call site, or a macro expansion line with
+      // addr/word at alternate positions (tab-separated expansion format).
+      // Check for addr/word at alternate positions: after the tab, there is
+      // srcLine + space + addr (5 octal digits) + space + word (6 octal digits).
+      const afterTab = line.split('\t')[1];
+      if (afterTab) {
+        const trimmed = afterTab.trim();
+        const altM = trimmed.match(/^(\d+)\s(\d{5})\s(\d{6})/);
+        if (altM) {
+          // Macro expansion line: extract addr/word from alternate positions.
+          const altSrcLine = parseInt(altM[1], 10);
+          addr    = parseInt(altM[2], 8);
+          word    = parseInt(altM[3], 8);
+
+          if (callSiteLine !== null && altSrcLine === callSiteLine) {
+            // This is a macro expansion attributed to the current call site.
+            addrToSrcLine.set(addr, callSiteLine);
+            if (isSkipWord(word)) {
+              skipSites.set(addr, {
+                srcLine:      callSiteLine,
+                mnemonic:     skipMnemonicFromWord(word),
+                callSiteLine,
+              });
+            }
+            if (isJmpDot(word, addr)) {
+              multiwayBranches.set(addr, { srcLine: callSiteLine });
+            }
+          } else {
+            // Regular macro call site line.
+            callSiteLine = srcLine;
+          }
+        } else {
+          // Regular macro call site or directive.
+          callSiteLine = srcLine;
+        }
+      } else {
+        // Regular macro call site or directive.
+        callSiteLine = srcLine;
       }
-    } else if (hasSrcLine && !hasAddr) {
-      // (B) Macro call site, directive, or comment: sets the call-site context
-      // for subsequent expansion lines.
-      callSiteLine = srcLine;
     } else if (!hasSrcLine && hasAddr && hasWord) {
       // (C) Macro expansion instruction: attributed to the current call site.
       if (callSiteLine !== null) {
@@ -175,12 +228,17 @@ export function parseListingForMeter(text) {
 
 /**
  * Extract the first PDP-1 skip mnemonic from a listing source-text field.
- * Strips labels (text before the first comma or tab) and comments (after `/`).
+ * Strips labels (text before the first comma, tab, or leading whitespace)
+ * and comments (after `/`).
  * Returns the mnemonic token, or null if no skip mnemonic is present.
  */
 function _extractSkipMnemonic(srcText) {
-  // Remove label: everything before the first tab (common) or comma+whitespace.
-  const afterLabel = srcText.replace(/^[^,\t]*,?\s*/, '').trim();
+  // Remove label: everything before the first tab or comma.
+  let afterLabel = srcText.replace(/^[^\t,]*[\t,]/, '');
+  // If no tab/comma found, strip leading whitespace.
+  if (afterLabel === srcText) {
+    afterLabel = srcText.replace(/^\s+/, '');
+  }
   // Remove comment.
   const code = afterLabel.replace(/\/.*$/, '').trim();
   // Match any skip mnemonic keyword.
