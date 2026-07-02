@@ -335,6 +335,33 @@ test('synthetic trace: bjm multiway records realized targets', () => {
   assert.ok(targets.has(BDS_ADDR + 6), 'bjm target: offset 6');
 });
 
+// bjm multiway: exercise all 16 entry offsets of the starp pad.
+// The random computation at L542-549 produces an offset into the 16-copy starp pad.
+// Each starp is 6 words; offsets 0..15×6 = 0..90 decimal span all 16 copies.
+const BJM_OFFSETS = Array.from({ length: 16 }, (_, i) => BDS_ADDR + i * STARP_WORDS);
+
+test('synthetic trace: bjm multiway — all 16 starp pad entry offsets observed', () => {
+  const listing = parseListingForMeter(STARDISP_LISTING_SNIPPET);
+
+  // PC stream that drives bjm to each of the 16 entries in the starp pad.
+  // Multiway entry: 0o715 (bjm) → target offset in the starp pad.
+  const bjmStream = [
+    // Reach bjm entry: bpt flow
+    BPT_ADDR, 0o706, 0o707, 0o712,
+  ];
+  for (const offset of BJM_OFFSETS) {
+    bjmStream.push(0o715, offset);
+  }
+
+  const { multiwayTargets } = analyzeTrace(bjmStream, listing);
+  assert.ok(multiwayTargets.has(0o715), 'bjm multiway tracked');
+  const targets = multiwayTargets.get(0o715).targets;
+
+  for (const offset of BJM_OFFSETS) {
+    assert.ok(targets.has(offset), `bjm target: starp copy ${BJM_OFFSETS.indexOf(offset)} at offset ${offset.toString(8)}`);
+  }
+});
+
 // ─── Integration: listing↔core identity — assembled stardisp code (ADR-0006) ─
 
 // Expected instruction words at key stardisp addresses (from spacewar3.1_complete.txt).
