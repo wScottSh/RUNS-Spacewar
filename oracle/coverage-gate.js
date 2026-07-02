@@ -109,7 +109,7 @@ export class CoverageGate {
    */
   assertClosure() {
     // Merge all PC streams into one.
-    const unionPcs = this._pcStreams.flat();
+    const unionPcs = mergePcStreams(this._pcStreams);
 
     // Analyze the union trace.
     const analysis = analyzeTrace(unionPcs, this.listing);
@@ -145,7 +145,7 @@ export class CoverageGate {
             mnemonic: entry.mnemonic,
           });
           break;
-        case 'one-way':
+        case 'one-way': {
           const direction = this.oneWayRegister.get(entry.addr);
           oneWayConfirmed.push({
             addr: entry.addr,
@@ -153,6 +153,7 @@ export class CoverageGate {
             direction: direction || 'unknown',
           });
           break;
+        }
         case 'dark':
           dark.push({
             addr: entry.addr,
@@ -172,12 +173,14 @@ export class CoverageGate {
     const passed = dark.length === 0 && unclassified.length === 0;
 
     // Build summary.
+    const realizedMultiway = multiwayEntries.filter(e => e.realizedTargets.length > 0).length;
+    const darkMultiway = multiwayEntries.length - realizedMultiway;
     const summary = [
       `Coverage gate: ${passed ? 'PASS' : 'FAIL'}`,
       `  Skip sites — both ways: ${bothWays.length}`,
       `  Skip sites — one-way confirmed: ${oneWayConfirmed.length}`,
-      `  Multiway branches — realized: ${multiwayEntries.filter(e => e.realizedTargets.length > 0).length}`,
-      `  Multiway branches — dark: ${multiwayEntries.filter(e => e.realizedTargets.length === 0).length}`,
+      `  Multiway branches — realized: ${realizedMultiway}`,
+      `  Multiway branches — dark: ${darkMultiway}`,
       `  Dark (unclassified): ${dark.length}`,
       `  Unclassified (partial, unregistered): ${unclassified.length}`,
     ].join('\n');
