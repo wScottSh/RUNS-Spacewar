@@ -101,8 +101,8 @@ export function slotBase(n) {
 
 /**
  * Compute the na (life counter) address for object slot N.
- * na slots are in a separate array starting at mtb + 090 octal.
- * na[N] = mtb + 090 + N * 030 octal.
+ * na slots are in a separate array starting at mtb + 0110 octal.
+ * na[N] = mtb + 0110 + N * 030 octal.
  */
 export function naAddr(n) {
   return MTB + 0o110 + n * 0o30;
