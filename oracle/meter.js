@@ -156,7 +156,7 @@ export function parseListingForMeter(text) {
       if (isJmpDot(word, addr)) {
         multiwayBranches.set(addr, { srcLine });
       }
-    } else if (hasSrcLine && !hasAddr && line.length > 30) {
+    } else if (hasSrcLine && !hasAddr) {
       // (B) A macro call site/directive, OR a macro expansion line with
       // addr/word at alternate positions (tab-separated expansion format):
       // after the tab comes srcLine + space + addr (5 octal) + space +
