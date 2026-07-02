@@ -23,7 +23,6 @@ import {
   analyzeTrace,
   parseListingForMeter,
   buildLedger,
-  isSkipWord,
 } from './meter.js';
 import { OT1_WORDS, OT2_WORDS } from './outline.test.js';
 
@@ -35,10 +34,6 @@ const NNN_ADDR  = 0o3772;
 // Ship-drawing trace addresses (from ship-substrate / mainloop):
 // When a ship is drawn, the generated code executes starting at NNN+1.
 const GEN_START = NNN_ADDR + 1;  // 03773 — first generated word
-
-// Outline table addresses:
-const OT1_ADDR = 0o2735;
-const OT2_ADDR = 0o2752;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,6 +48,14 @@ function extractNibbles(word) {
     codes.push((word >> shift) & 7);
   }
   return codes;
+}
+
+/**
+ * Set of non-zero dispatch codes appearing across a list of outline words.
+ * (Code 0 is padding and is excluded.)
+ */
+function getCodeSet(words) {
+  return new Set(words.flatMap(extractNibbles).filter((c) => c > 0));
 }
 
 /**
@@ -80,13 +83,8 @@ function simulateGenAddresses(outlineWords, terminatorBlock = false) {
         // plinst writes 1 word
         addresses.push(addr);
         addr++;
-      } else if (code >= 2 && code <= 5) {
-        // Codes 2-5: comtab handler — writes 2 words
-        addresses.push(addr);
-        addresses.push(addr + 1);
-        addr += 2;
-      } else if (code === 6) {
-        // Code 6: store/restore — comtab writes 2 words
+      } else if (code >= 2 && code <= 6) {
+        // Codes 2-5: comtab handler; code 6: store/restore — both write 2 words
         addresses.push(addr);
         addresses.push(addr + 1);
         addr += 2;
@@ -371,9 +369,6 @@ test('T-OC-OUTPUT: synthetic-outline fixture addresses dark dispatch codes', () 
 // ─── 9. OT1 vs OT2 code coverage comparison ───────────────────────────────────
 
 test('T-OC-OUTPUT: ot1 and ot2 cover different dispatch codes', () => {
-  function getCodeSet(words) {
-    return new Set(words.flatMap(extractNibbles).filter((c) => c > 0));
-  }
   const ot1Codes = getCodeSet(OT1_WORDS);
   const ot2Codes = getCodeSet(OT2_WORDS);
 
@@ -386,9 +381,6 @@ test('T-OC-OUTPUT: ot1 and ot2 cover different dispatch codes', () => {
 });
 
 test('T-OC-OUTPUT: together ot1 and ot2 cover codes {1,3,4,6,7} (not 2 or 5)', () => {
-  function getCodeSet(words) {
-    return new Set(words.flatMap(extractNibbles).filter((c) => c > 0));
-  }
   const ot1Codes = getCodeSet(OT1_WORDS);
   const ot2Codes = getCodeSet(OT2_WORDS);
   const allCodes = new Set([...ot1Codes, ...ot2Codes]);
