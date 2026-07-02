@@ -1,0 +1,199 @@
+{
+  "ticket": "T-COVERAGE (issue #27)",
+  "adr": [
+    "ADR-0007",
+    "ADR-0012"
+  ],
+  "generated": "2026-07-02T19:06:39.933Z",
+  "substrate": "PDP-1 simulator Open SIMH V4.1-0 Current",
+  "gate": "PASS",
+  "summary": {
+    "skipSitesBothWays": 117,
+    "skipSitesOneWayConfirmed": 8,
+    "skipSitesDeadBlockConfirmed": 1,
+    "multiwayRealized": 17,
+    "multiwayTemplateCellsConfirmedDead": 2,
+    "dark": 0,
+    "unclassified": 0,
+    "inContractSkipSites": 126,
+    "inContractMultiway": 19,
+    "distinctPcs": 2087
+  },
+  "oneWayRegister": [
+    {
+      "addr": "2076",
+      "direction": "skip",
+      "confirmed": true
+    },
+    {
+      "addr": "2601",
+      "direction": "no-skip",
+      "confirmed": true
+    },
+    {
+      "addr": "2673",
+      "direction": "skip",
+      "confirmed": true
+    },
+    {
+      "addr": "2255",
+      "direction": "no-skip",
+      "confirmed": true
+    },
+    {
+      "addr": "2621",
+      "direction": "no-skip",
+      "confirmed": true
+    },
+    {
+      "addr": "2725",
+      "direction": "skip",
+      "confirmed": true
+    },
+    {
+      "addr": "2411",
+      "direction": "skip",
+      "confirmed": true
+    },
+    {
+      "addr": "132",
+      "direction": "no-skip",
+      "confirmed": true
+    }
+  ],
+  "deadMultiway": [
+    {
+      "addr": "555",
+      "reason": "ocm — jump-word template planted into generated outline code"
+    },
+    {
+      "addr": "556",
+      "reason": "ocn — dap-patched jump-word template planted into generated code"
+    }
+  ],
+  "deadSkipSites": [
+    {
+      "addr": "136",
+      "reason": "sin/cos saturation-clamp block — exhaustively unreachable"
+    }
+  ],
+  "deadPcBlocks": [
+    {
+      "block": "sbf sequence-break flush",
+      "addrs": [
+        "61",
+        "62",
+        "63",
+        "64",
+        "65"
+      ],
+      "executed": false
+    },
+    {
+      "block": "loc-3 reset vector",
+      "addrs": [
+        "3"
+      ],
+      "executed": false
+    },
+    {
+      "block": "sr1 no-free-slot hlt/jmp .-1",
+      "addrs": [
+        "2623",
+        "2624"
+      ],
+      "executed": false
+    },
+    {
+      "block": "mex mst+1 scr 3s",
+      "addrs": [
+        "2135"
+      ],
+      "executed": false
+    },
+    {
+      "block": "sin/cos saturation clamp",
+      "addrs": [
+        "134",
+        "135",
+        "136",
+        "137",
+        "140"
+      ],
+      "executed": false
+    }
+  ],
+  "dispatchArms": [
+    "444",
+    "445",
+    "446",
+    "447",
+    "450",
+    "451",
+    "452",
+    "453"
+  ],
+  "scenarios": {
+    "boot4": {
+      "streams": 4,
+      "pcs": 25496
+    },
+    "boot5single": {
+      "streams": 4,
+      "pcs": 19846
+    },
+    "gameplay": {
+      "streams": 7,
+      "pcs": 216228
+    },
+    "mixedDeath": {
+      "streams": 4,
+      "pcs": 70391
+    },
+    "ocSynth": {
+      "streams": 1,
+      "pcs": 326
+    },
+    "collision": {
+      "streams": 6,
+      "pcs": 145483
+    },
+    "hyper": {
+      "streams": 6,
+      "pcs": 240603
+    },
+    "hyper2": {
+      "streams": 4,
+      "pcs": 199418
+    },
+    "gravity": {
+      "streams": 3,
+      "pcs": 34839
+    },
+    "gravityExplode": {
+      "streams": 3,
+      "pcs": 42792
+    },
+    "fuelout": {
+      "streams": 2,
+      "pcs": 36658
+    },
+    "vectors": {
+      "streams": 38,
+      "pcs": 163573
+    },
+    "backdisp": {
+      "streams": 53,
+      "pcs": 1240000
+    },
+    "boot4match": {
+      "streams": 3,
+      "pcs": 80612
+    }
+  },
+  "notes": [
+    "Wait-class iot words (ioh/dpy-i, top 6 bits 0o73) are patched to nop for headless SIMH; display words carry no branch obligation.",
+    "Contract scope is the executable partition (source lines 63-1335); class-D data segments are witnessed by listing↔core identity (ADR-0006), not branch coverage.",
+    "Latent one-ways found by this run, all observations not edits: pof spin-wait inert (mb always positive), gravity cube-guard dead (position domain bound), sin/cos clamp unreachable (exhaustive 2^18 sweep)."
+  ]
+}

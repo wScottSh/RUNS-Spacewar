@@ -274,6 +274,12 @@ export function analyzeTrace(pcStream, listing) {
   for (let i = 0; i < pcStream.length; i++) {
     const pc = pcStream[i];
 
+    // Negative values are stream separators (see CoverageGate.assertClosure):
+    // they mark boundaries between independently captured traces so that the
+    // last PC of one trace and the first PC of the next are never read as an
+    // adjacent execution pair.
+    if (pc < 0) continue;
+
     // Flag runtime-generated PCs.
     if (pc >= RUNTIME_GEN_LOW && pc <= RUNTIME_GEN_HIGH) {
       runtimeGenPcs.add(pc);
@@ -281,6 +287,7 @@ export function analyzeTrace(pcStream, listing) {
 
     if (i + 1 >= pcStream.length) continue;
     const nextPc = pcStream[i + 1];
+    if (nextPc < 0) continue;  // pair spans a stream separator — not adjacent
 
     // Skip site coverage.
     if (skipSites.has(pc)) {

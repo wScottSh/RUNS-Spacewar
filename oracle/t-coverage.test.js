@@ -83,9 +83,9 @@ const MICRO_LISTING = [
 
 // ─── 1. One-way register ─────────────────────────────────────────────────────
 
-test('T-COVERAGE: one-way register has 5 entries', () => {
+test('T-COVERAGE: one-way register has 8 entries', () => {
   const register = buildUnionOneWayRegister();
-  assert.equal(register.size, 5, '5 one-way register entries');
+  assert.equal(register.size, 8, '8 one-way register entries');
 });
 
 test('T-COVERAGE: mex ms1 sma (02076) registered as skip', () => {
@@ -93,9 +93,13 @@ test('T-COVERAGE: mex ms1 sma (02076) registered as skip', () => {
   assert.equal(register.get(0o02076), 'skip', 'mex ms1 sma: skip always taken');
 });
 
-test('T-COVERAGE: T-SHIP free-slot (02616) registered as skip', () => {
+test('T-COVERAGE: T-SHIP free-slot sza (02616) is NOT registered (both-ways)', () => {
+  // Every torpedo launch resolves it both ways: skip over the occupied ship
+  // slots, no-skip into the free slot.  The EPIC's sr1 register entry is the
+  // sas at 02621 that guards the no-free-slot hlt.
   const register = buildUnionOneWayRegister();
-  assert.equal(register.get(0o02616), 'skip', 'sr1 free-slot: skip always taken');
+  assert.ok(!register.has(0o02616), 'sza at 02616 resolves both ways on launch');
+  assert.equal(register.get(0o02621), 'no-skip', 'sr1 limit sas: no-skip (slot always found)');
 });
 
 test('T-COVERAGE: SSW3 single-shot (02601) registered as no-skip', () => {
@@ -103,14 +107,25 @@ test('T-COVERAGE: SSW3 single-shot (02601) registered as no-skip', () => {
   assert.equal(register.get(0o02601), 'no-skip', 'SSW3 single-shot: inert, no-skip');
 });
 
-test('T-COVERAGE: T-SHIP mh2 (02673) registered as no-skip', () => {
+test('T-COVERAGE: sr5 shots guard (02673) registered as skip', () => {
+  // lac i \mh2 / sza i skips while mh2 != 0, which holds until the ship
+  // explodes — the fall-through arm is the dead one.
   const register = buildUnionOneWayRegister();
-  assert.equal(register.get(0o02673), 'no-skip', 'mh2 shots-exhausted: no-skip');
+  assert.equal(register.get(0o02673), 'skip', 'sr5 mh2 guard: skip always taken');
 });
 
-test('T-COVERAGE: T-HYPER mh2 (02255) registered as skip', () => {
+test('T-COVERAGE: hp3 shots count (02255) registered as no-skip', () => {
+  // count i \mh2 (isp) increments the negative mh2 toward zero and never
+  // reaches it — the skip -> dzm (shots-exhausted) arm is dead.
   const register = buildUnionOneWayRegister();
-  assert.equal(register.get(0o02255), 'skip', 'mh2 in-flight: skip always taken');
+  assert.equal(register.get(0o02255), 'no-skip', 'hp3 mh2 count: no-skip always');
+});
+
+test('T-COVERAGE: latent one-ways registered (pof wait, cube guard, sincos clamp)', () => {
+  const register = buildUnionOneWayRegister();
+  assert.equal(register.get(0o02725), 'skip', 'pof spin-wait inert: mb always positive');
+  assert.equal(register.get(0o02411), 'skip', 'gravity cube guard: position domain bound');
+  assert.equal(register.get(0o00132), 'no-skip', 'sin/cos clamp sign test: exhaustively unreachable');
 });
 
 // ─── 2. CoverageGate construction ────────────────────────────────────────────
@@ -132,7 +147,7 @@ test('T-COVERAGE: gate has correct multiway count', () => {
 
 test('T-COVERAGE: gate has correct one-way register size', () => {
   const gate = buildCoverageGate(MICRO_LISTING);
-  assert.equal(gate.getOneWayRegisterSize(), 5, '5 entries in one-way register');
+  assert.equal(gate.getOneWayRegisterSize(), 8, '8 entries in one-way register');
 });
 
 test('T-COVERAGE: gate exposes skip site addresses', () => {
@@ -150,9 +165,9 @@ test('T-COVERAGE: gate exposes multiway addresses', () => {
   assert.ok(addrs.includes(0o240), '0240 jmp. in multiway branches');
 });
 
-test('T-COVERAGE: union one-way register has 5 entries', () => {
+test('T-COVERAGE: union one-way register has 8 entries', () => {
   const gate = buildCoverageGate(MICRO_LISTING);
-  assert.equal(gate.getOneWayRegisterSize(), 5);
+  assert.equal(gate.getOneWayRegisterSize(), 8);
 });
 
 // ─── 3. addTrace ─────────────────────────────────────────────────────────────
@@ -586,7 +601,7 @@ test('T-COVERAGE: real listing gate constructed', async () => {
 
   const gate = buildCoverageGate(text);
   assert.ok(gate.getSkipSiteCount() > 0, 'has skip sites');
-  assert.ok(gate.getOneWayRegisterSize() === 5, '5 one-way register entries');
+  assert.ok(gate.getOneWayRegisterSize() === 8, '8 one-way register entries');
 }, { timeout: 10_000 });
 
 test('T-COVERAGE: real listing — one-way register addresses are in the listing', async () => {

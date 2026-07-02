@@ -32,17 +32,26 @@ import {
  *   'no-skip' — the no-skip arm is always taken (the skip is dead)
  *
  * Source-grounded entries from EPIC #5 and per-region tickets:
- *   - sbf (112-116): sequence-break flush — correctly dead, out-of-contract
- *     Not registered as a skip site (no skip instruction), but confirmed
- *     by the meter when the listing is loaded.
- *   - sr1 no-free-slot (1250-1251, addr 02610): hlt/jmp.-1 — correctly dead
- *     Not a skip site; registered via skip site at 02616 (sza i free-slot search).
- *   - mex ms1 sma (L962, addr 02076): one-way skip — mxc always negative
- *   - T-SHIP sr1 free-slot (1247, addr 02616): always finds free slot at default
- *   - SSW3 single-shot (1236, addr 02601): inert because mco never stored
- *   - mh2 shots-exhausted (1292, addr 02673): explodes before shots run out
- *   - mh2 shots-exhausted (1056, addr 02255): explodes before mh2 reaches zero
- *   - mco-dependent arms (1296): mco never stored, always resolves same way
+ *   - sbf (112-116): sequence-break flush — correctly dead, out-of-contract.
+ *     Not registered (no skip instruction in the block); confirmed dead by
+ *     asserting its PCs are absent from the union trace.
+ *   - sr1 no-free-slot hlt/jmp .-1 (1250-1251): correctly dead — also not a
+ *     skip site; confirmed by PC absence.  (The sza i free-slot search at
+ *     02616 / L1247 is NOT one-way: every torpedo launch resolves it both
+ *     ways — skip over the occupied ship slots, no-skip into the free slot.)
+ *   - mex ms1 sma (L962, addr 02076): one-way skip — \mxc is always negative,
+ *     so the idx msh / scr 3s arm (mst+1) is dead.
+ *   - SSW3 single-shot (1236, addr 02601): one-way no-skip — szs i 30 skips
+ *     only when SSW3 is set, and the pinned domain never sets it (and mco is
+ *     never stored, so the mode is inert either way).
+ *   - sr5 shots guard (1292, addr 02673): one-way SKIP — `lac i \mh2 / sza i`
+ *     skips while mh2 ≠ 0; mh2 starts at -10 (xct mhs) and the ship explodes
+ *     with certainty (\mh4 += hur = 40000 per jump) before it counts to zero.
+ *   - hp3 shots count (1056, addr 02255): one-way NO-SKIP — `count i \mh2`
+ *     (isp) increments the negative mh2 toward zero and never reaches it for
+ *     the same reason; the skip → dzm arm is dead.
+ *   - mco-dependent arm (ior i mco, 1296): not a skip instruction — no
+ *     register entry; inertness is a data fact witnessed by T-CONST.
  */
 export function buildUnionOneWayRegister() {
   const register = new Map();
@@ -52,23 +61,79 @@ export function buildUnionOneWayRegister() {
   // always skips → idx msh never reached → scr 3s arm is dead.
   register.set(0o02076, 'skip');
 
-  // T-SHIP: free-slot search at 02616 (L1247) — one-way: skip only
-  // At default constants (rlt/tlf/tno), a free slot is always found.
-  register.set(0o02616, 'skip');
-
   // T-SHIP: SSW3 single-shot at 02601 (L1236) — one-way: no-skip
-  // mco is never stored in 3.1, so szs i 30 never fires (always salvo).
+  // szs i 30 skips only with SSW3 set; the pinned domain keeps it clear
+  // (and mco is never stored in 3.1, so single-shot mode is inert anyway).
   register.set(0o02601, 'no-skip');
 
-  // T-SHIP: mh2 shots-exhausted at 02673 (L1292) — one-way: no-skip
-  // The 8th jump explodes via \mh4 overflow before \mh2 reaches zero.
-  register.set(0o02673, 'no-skip');
+  // T-SHIP: sr5 hyperspace shots guard at 02673 (L1292) — one-way: skip
+  // lac i \mh2 / sza i skips while mh2 is nonzero; mh2 never reaches zero
+  // (the ship explodes first), so the jmp st3 fall-through arm is dead.
+  register.set(0o02673, 'skip');
 
-  // T-HYPER: mh2 shots-exhausted at 02255 (L1056) — one-way: skip
-  // count i \mh2: mh2 stays positive; isp always skips → jmp hp7 never taken.
-  register.set(0o02255, 'skip');
+  // T-HYPER: hp3 shots count at 02255 (L1056) — one-way: no-skip
+  // count i \mh2 (isp) increments mh2 (negative, from xct mhs = law i 10)
+  // toward zero; the explosion certainty (\mh4 overflow) arrives first, so
+  // the skip → dzm i \mh2 arm is dead.
+  register.set(0o02255, 'no-skip');
+
+  // T-SHIP: sr1 slot-search limit at 02621 (L1249, index macro sas) —
+  // one-way: no-skip.  The sas skips only when the search pointer passes the
+  // end of the object table without finding a free slot — the arm that guards
+  // the no-free-slot hlt (L1250-1251).  At default tno/rlt/tlf a free slot is
+  // always found first (this is the EPIC's "sr1 no-free-slot" register entry;
+  // the sza i at 02616 resolves both ways on every launch and is NOT one-way).
+  register.set(0o02621, 'no-skip');
+
+  // T-POF: vanish spin-wait at 02725 (L1326, count \ssn) — one-way: skip.
+  // \ssn is loaded from the ship's mb cell, which only ever receives positive
+  // constants (2000 at a2/hp3, 7 at hp1, 3 at sr5), so the isp result is
+  // always ≥ 0 and the wait-loop never loops — the delay is inert in 3.1.
+  register.set(0o02725, 'skip');
+
+  // T-SHIP: gravity distance-cube guard at 02411 (L1152 sza) — one-way: skip.
+  // AC there is (root(t1) >> 9) × t1 >> 17 with t1 = (x>>11)² + (y>>11)²;
+  // positions are 18-bit, so t1 ≤ 2×63² = 7938 and the scaled cube can never
+  // reach 2^17 — AC is always zero and the jmp bsg guard arm is dead code
+  // over the whole position domain.
+  register.set(0o02411, 'skip');
+
+  // T-SINCOS: saturation-clamp sign test at 00132 (L232 sma) — one-way:
+  // no-skip.  The Horner polynomial never overshoots |1.0|, so the result
+  // sign never differs from the argument sign.  Exhaustively verified on the
+  // Substrate: a breakpoint on the clamp path (00134) never fired across all
+  // 2^18 angle inputs through the sin entry (cos joins the identical tail).
+  register.set(0o00132, 'no-skip');
 
   return register;
+}
+
+/**
+ * Skip sites that are themselves inside correctly-dead code (never reached
+ * over the game-scoped domain, ADR-0007).  Analogous to the one-way register
+ * but for whole dead blocks: the gate confirms each stays dark AND that its
+ * PC never executes.
+ */
+export function buildDeadSkipSiteRegister() {
+  return new Map([
+    // sin/cos clamp-path spi (L236): inside the saturation-clamp block that
+    // the exhaustive 2^18-angle sweep proved unreachable (see 00132 above).
+    [0o00136, 'sin/cos saturation-clamp block — exhaustively unreachable'],
+  ]);
+}
+
+/**
+ * Multiway (`jmp .`) sites that are compile-time jump-word templates, not
+ * runtime branches: the outline compiler dap-patches them and PLANTS their
+ * words into the generated code (plinst ocm / plinst ocn); the cells
+ * themselves are never executed.  Registered so the closure gate can confirm
+ * them dead (their PCs must never appear in the union) instead of failing.
+ */
+export function buildDeadMultiwayRegister() {
+  return new Map([
+    [0o555, 'ocm — jump-word template planted into generated outline code'],
+    [0o556, 'ocn — dap-patched jump-word template planted into generated code'],
+  ]);
 }
 
 // ─── CoverageGate class ───────────────────────────────────────────────────────
@@ -77,10 +142,17 @@ export class CoverageGate {
   /**
    * @param {object} listing — result of parseListingForMeter
    * @param {Map<string, string>} oneWayRegister — address → 'skip' | 'no-skip'
+   * @param {Map<number, string>} [deadMultiwayRegister] — jmp.-template cells
+   *   (never executed at runtime); confirmed dead rather than failed-dark.
+   * @param {Map<number, string>} [deadSkipSiteRegister] — skip sites inside
+   *   correctly-dead blocks (ADR-0007); confirmed dead rather than failed-dark.
    */
-  constructor(listing, oneWayRegister) {
+  constructor(listing, oneWayRegister, deadMultiwayRegister = new Map(),
+              deadSkipSiteRegister = new Map()) {
     this.listing = listing;
     this.oneWayRegister = oneWayRegister;
+    this.deadMultiwayRegister = deadMultiwayRegister;
+    this.deadSkipSiteRegister = deadSkipSiteRegister;
     this._pcStreams = [];  // array of PC arrays, accumulated via addTrace
   }
 
@@ -108,8 +180,14 @@ export class CoverageGate {
    *   }
    */
   assertClosure() {
-    // Merge all PC streams into one.
-    const unionPcs = mergePcStreams(this._pcStreams);
+    // Merge all PC streams into one, separated by -1 sentinels so that the
+    // boundary between two independently captured traces is never analyzed
+    // as an adjacent-PC pair (a false pair could spuriously resolve a skip).
+    const unionPcs = [];
+    for (const stream of this._pcStreams) {
+      if (unionPcs.length > 0) unionPcs.push(-1);
+      for (const pc of stream) unionPcs.push(pc);
+    }
 
     // Analyze the union trace.
     const analysis = analyzeTrace(unionPcs, this.listing);
@@ -121,18 +199,33 @@ export class CoverageGate {
     const dark = [];
     const bothWays = [];
     const oneWayConfirmed = [];
+    const deadMultiwayConfirmed = [];
+    const deadSkipConfirmed = [];
     const unclassified = [];  // skip-only, no-skip-only, or unknown
     const multiwayEntries = [];
+
+    // Registered template cells must never actually execute.
+    const executedPcs = new Set();
+    for (const pc of unionPcs) if (pc >= 0) executedPcs.add(pc);
 
     for (const entry of ledger) {
       if (entry.type === 'multiway') {
         multiwayEntries.push(entry);
         if (entry.realizedTargets.length === 0) {
-          dark.push({
-            addr: entry.addr,
-            srcLine: entry.srcLine,
-            mnemonic: 'jmp.',
-          });
+          const reason = this.deadMultiwayRegister.get(entry.addr);
+          if (reason !== undefined && !executedPcs.has(entry.addr)) {
+            deadMultiwayConfirmed.push({
+              addr: entry.addr,
+              srcLine: entry.srcLine,
+              reason,
+            });
+          } else {
+            dark.push({
+              addr: entry.addr,
+              srcLine: entry.srcLine,
+              mnemonic: 'jmp.',
+            });
+          }
         }
         continue;
       }
@@ -154,14 +247,25 @@ export class CoverageGate {
           });
           break;
         }
-        case 'dark':
-          dark.push({
-            addr: entry.addr,
-            srcLine: entry.srcLine,
-            mnemonic: entry.mnemonic,
-            callSiteLine: entry.callSiteLine,
-          });
+        case 'dark': {
+          const deadReason = this.deadSkipSiteRegister.get(entry.addr);
+          if (deadReason !== undefined && !executedPcs.has(entry.addr)) {
+            deadSkipConfirmed.push({
+              addr: entry.addr,
+              srcLine: entry.srcLine,
+              mnemonic: entry.mnemonic,
+              reason: deadReason,
+            });
+          } else {
+            dark.push({
+              addr: entry.addr,
+              srcLine: entry.srcLine,
+              mnemonic: entry.mnemonic,
+              callSiteLine: entry.callSiteLine,
+            });
+          }
           break;
+        }
         default:
           // skip-only or no-skip-only without one-way registration
           unclassified.push(entry);
@@ -180,7 +284,9 @@ export class CoverageGate {
       `  Skip sites — both ways: ${bothWays.length}`,
       `  Skip sites — one-way confirmed: ${oneWayConfirmed.length}`,
       `  Multiway branches — realized: ${realizedMultiway}`,
-      `  Multiway branches — dark: ${darkMultiway}`,
+      `  Multiway branches — confirmed dead (template cells): ${deadMultiwayConfirmed.length}`,
+      `  Multiway branches — dark: ${darkMultiway - deadMultiwayConfirmed.length}`,
+      `  Skip sites — confirmed dead blocks: ${deadSkipConfirmed.length}`,
       `  Dark (unclassified): ${dark.length}`,
       `  Unclassified (partial, unregistered): ${unclassified.length}`,
     ].join('\n');
@@ -192,6 +298,8 @@ export class CoverageGate {
       dark,
       bothWays,
       oneWayConfirmed,
+      deadMultiwayConfirmed,
+      deadSkipConfirmed,
       unclassified,
       multiwayEntries,
     };
@@ -294,7 +402,8 @@ export class CoverageGate {
 export function buildCoverageGate(listingText) {
   const listing = parseListingForMeter(listingText);
   const oneWayRegister = buildUnionOneWayRegister();
-  return new CoverageGate(listing, oneWayRegister);
+  return new CoverageGate(listing, oneWayRegister, buildDeadMultiwayRegister(),
+                          buildDeadSkipSiteRegister());
 }
 
 // ─── Utility: merge multiple PC streams ───────────────────────────────────────
