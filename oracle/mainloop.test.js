@@ -348,6 +348,19 @@ function buildMainloopLedger(listing) {
   return buildLedger(analysis, listing);
 }
 
+// Index of the first spot where `from` is immediately followed by `to` in the
+// PC stream, or -1 if that transition never occurs. Used to assert that a
+// specific skip arm (from → from+2) or fall-through arm (from → from+1) is
+// exercised.
+function streamTransitionIndex(from, to) {
+  for (let i = 0; i < MAINLOOP_PC_STREAM.length - 1; i++) {
+    if (MAINLOOP_PC_STREAM[i] === from && MAINLOOP_PC_STREAM[i + 1] === to) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 // ─── Unit tests (pure-function; no Substrate required) ───────────────────────
 
 test('mainloop address constants: 12 expected skip sites', () => {
@@ -486,56 +499,29 @@ test('authored-trace: slot-active arm of sza i (01704) leads to collision-eligib
 
 test('authored-trace: inactive-slot arm of sza i (01704) leads to jmp mq1', () => {
   // Find the NO-SKIP occurrence: sza i followed by 01705 (jmp mq1).
-  let found = false;
-  for (let i = 0; i < MAINLOOP_PC_STREAM.length - 1; i++) {
-    if (MAINLOOP_PC_STREAM[i] === ADDR_SZA_I_OUTER &&
-        MAINLOOP_PC_STREAM[i + 1] === ADDR_SZA_I_OUTER + 1) {
-      found = true;
-      assert.equal(MAINLOOP_PC_STREAM[i + 2], MQ1,
-        'jmp mq1 at 01705 should redirect to 02011');
-      break;
-    }
-  }
-  assert.ok(found, 'no-skip arm of sza i (01704) not found in stream');
+  const idx = streamTransitionIndex(ADDR_SZA_I_OUTER, ADDR_SZA_I_OUTER + 1);
+  assert.ok(idx >= 0, 'no-skip arm of sza i (01704) not found in stream');
+  assert.equal(MAINLOOP_PC_STREAM[idx + 2], MQ1,
+    'jmp mq1 at 01705 should redirect to 02011');
 });
 
 test('authored-trace: inner loop exits via sas SKIP at 02001', () => {
-  // Find occurrence of 02001 followed by 02003 (sas SKIP → skip jmp ml2 at 02002).
-  let found = false;
-  for (let i = 0; i < MAINLOOP_PC_STREAM.length - 1; i++) {
-    if (MAINLOOP_PC_STREAM[i] === ADDR_SAS_INNER &&
-        MAINLOOP_PC_STREAM[i + 1] === ADDR_SAS_INNER + 2) {
-      found = true;
-      break;
-    }
-  }
-  assert.ok(found, 'inner loop exit (sas 02001 SKIP → 02003) not found in stream');
+  // 02001 followed by 02003 (sas SKIP → skip jmp ml2 at 02002).
+  assert.ok(streamTransitionIndex(ADDR_SAS_INNER, ADDR_SAS_INNER + 2) >= 0,
+    'inner loop exit (sas 02001 SKIP → 02003) not found in stream');
 });
 
 test('authored-trace: outer loop exits via sas SKIP at 02033', () => {
-  let found = false;
-  for (let i = 0; i < MAINLOOP_PC_STREAM.length - 1; i++) {
-    if (MAINLOOP_PC_STREAM[i] === ADDR_SAS_OUTER &&
-        MAINLOOP_PC_STREAM[i + 1] === ADDR_SAS_OUTER + 2) {
-      found = true;
-      break;
-    }
-  }
-  assert.ok(found, 'outer loop exit (sas 02033 SKIP → 02035) not found in stream');
+  assert.ok(streamTransitionIndex(ADDR_SAS_OUTER, ADDR_SAS_OUTER + 2) >= 0,
+    'outer loop exit (sas 02033 SKIP → 02035) not found in stream');
 });
 
 test('authored-trace: mtc budget loop — remaining then exhausted', () => {
-  // isp at 02047: first occurrence NO-SKIP (→ 02050 jmp back), second SKIP (→ 02051 jmp ml0).
-  let remaining = false, exhausted = false;
-  for (let i = 0; i < MAINLOOP_PC_STREAM.length - 1; i++) {
-    if (MAINLOOP_PC_STREAM[i] === ADDR_ISP_MTC) {
-      const next = MAINLOOP_PC_STREAM[i + 1];
-      if (next === ADDR_ISP_MTC + 1) remaining = true;   // no-skip: → 02050
-      if (next === ADDR_ISP_MTC + 2) exhausted = true;   // skip: → 02051
-    }
-  }
-  assert.ok(remaining, 'mtc budget remaining arm (isp 02047 NO-SKIP → 02050) not found');
-  assert.ok(exhausted, 'mtc budget exhausted arm (isp 02047 SKIP → 02051) not found');
+  // isp at 02047: one occurrence NO-SKIP (→ 02050 jmp back), one SKIP (→ 02051 jmp ml0).
+  assert.ok(streamTransitionIndex(ADDR_ISP_MTC, ADDR_ISP_MTC + 1) >= 0,
+    'mtc budget remaining arm (isp 02047 NO-SKIP → 02050) not found');
+  assert.ok(streamTransitionIndex(ADDR_ISP_MTC, ADDR_ISP_MTC + 2) >= 0,
+    'mtc budget exhausted arm (isp 02047 SKIP → 02051) not found');
 });
 
 // ─── Integration tests (require build/spacewar31.lst) ────────────────────────
