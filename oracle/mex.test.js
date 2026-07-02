@@ -221,6 +221,13 @@ const MEX_SKIP_SITES = [
   { addr: ADDR_ISP_DURATION, line: 978, mnemonic: 'isp', desc: 'count i ma1 (duration hold)' },
 ];
 
+/** Skip sites from the listing, restricted to the T-MEX explosion region. */
+async function getMexSkipSites() {
+  const { skipSites } = await getMeterSites();
+  const mexAddrs = new Set(MEX_SKIP_SITES.map(s => s.addr));
+  return new Map([...skipSites].filter(([addr]) => mexAddrs.has(addr)));
+}
+
 test(
   'T-MEX: all 3 explosion-region skip sites are in the listing',
   { timeout: 10_000 },
@@ -470,12 +477,7 @@ test(
   'T-MEX: ledger builder correctly classifies explosion-region skip sites',
   { timeout: 10_000 },
   async () => {
-    const { skipSites } = await getMeterSites();
-    const mexAddrs = new Set(MEX_SKIP_SITES.map(s => s.addr));
-    const filtered = new Map();
-    for (const [addr, site] of skipSites) {
-      if (mexAddrs.has(addr)) filtered.set(addr, site);
-    }
+    const filtered = await getMexSkipSites();
 
     // Simulate a trace with no PC history (no execution yet)
     const analysis = analyzeTrace([], { skipSites: filtered, multiwayBranches: new Map() });
@@ -499,12 +501,7 @@ test(
   'T-MEX: ledger with ms1 sma observed skip-only and registered one-way → "one-way"',
   { timeout: 10_000 },
   async () => {
-    const { skipSites } = await getMeterSites();
-    const mexAddrs = new Set(MEX_SKIP_SITES.map(s => s.addr));
-    const filtered = new Map();
-    for (const [addr, site] of skipSites) {
-      if (mexAddrs.has(addr)) filtered.set(addr, site);
-    }
+    const filtered = await getMexSkipSites();
 
     // Simulate a trace where sma at 02076 is reached only its skip arm:
     //   02076, 02100 → skip (AC < 0, always true) — 02076+2 = 02100 (mz1)
@@ -526,12 +523,7 @@ test(
   'T-MEX: ledger with particle loop observed both ways → "both"',
   { timeout: 10_000 },
   async () => {
-    const { skipSites } = await getMeterSites();
-    const mexAddrs = new Set(MEX_SKIP_SITES.map(s => s.addr));
-    const filtered = new Map();
-    for (const [addr, site] of skipSites) {
-      if (mexAddrs.has(addr)) filtered.set(addr, site);
-    }
+    const filtered = await getMexSkipSites();
 
     // Simulate a trace where particle count at 02126 is reached both ways:
     //   02126, 02127 → no-skip (isp \mxc, \mxc < 0, loop continues → jmp mz1)
@@ -551,12 +543,7 @@ test(
   'T-MEX: ledger with duration count observed both ways → "both"',
   { timeout: 10_000 },
   async () => {
-    const { skipSites } = await getMeterSites();
-    const mexAddrs = new Set(MEX_SKIP_SITES.map(s => s.addr));
-    const filtered = new Map();
-    for (const [addr, site] of skipSites) {
-      if (mexAddrs.has(addr)) filtered.set(addr, site);
-    }
+    const filtered = await getMexSkipSites();
 
     // Simulate a trace where duration count at 02130 is reached both ways:
     //   02130, 02131 → no-skip (isp i ma1, (ma1) < 0, loop → jmp mxr)

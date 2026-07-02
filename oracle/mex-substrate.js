@@ -231,9 +231,9 @@ export function buildMexTraceScript(rimPath, opts = {}) {
 
   // ── Explosion (configured slot): calc routine = mex ────────────────────
   const slotBaseAddr = slotBase(slot);
-  deposit(mlAddr(slot), MEX);         // ml = mex (explosion calc routine)
-  deposit(mlAddr(slot) + 1, explosionX); // explosion x-position
-  deposit(mlAddr(slot) + 2, explosionY); // explosion y-position
+  deposit(slotBaseAddr, MEX);          // ml = mex (explosion calc routine)
+  deposit(slotBaseAddr + 1, explosionX); // explosion x-position
+  deposit(slotBaseAddr + 2, explosionY); // explosion y-position
   deposit(naAddr(slot), duration);     // na = lifetime (frames)
   deposit(slotBaseAddr + 4, explosionSize); // mb = particle count magnitude
   // Inertia carry-over variables (mdx, mdy) — small values for clean trace
@@ -247,7 +247,7 @@ export function buildMexTraceScript(rimPath, opts = {}) {
 
   // ── Examine key state ──────────────────────────────────────────────────
   // Explosion state
-  examine(mlAddr(slot));               // calc routine (should be mex or cleared)
+  examine(slotBaseAddr);               // calc routine (should be mex or cleared)
   examine(naAddr(slot));               // life counter (changed by isp)
   examine(slotBaseAddr + 1);           // x-position
   examine(slotBaseAddr + 2);           // y-position
