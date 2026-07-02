@@ -15,39 +15,14 @@
  * gravity capture path (same setup: object table, ship near star, gravity on).
  */
 
-import {
-  RIM_PATH,
-  SS1, SS2,
-  SR0, MTH, MOM, BSG, SQ6, SR5, ST3, SRT, POF,
-  SR1, SR2, SQ9,
-  ML1, ML2, MX1, MY1, MX2, MY2, MA1, MA2, MB1, MB2,
-  MFU_ADDR, MTR_ADDR, MH1_ADDR, MH2_ADDR, MH3_ADDR, MH4_ADDR,
-  MCO_ADDR, CWG_ADDR, SCW_ADDR, BX_ADDR, BY_ADDR,
-  MTB, NOB, SHIP1_SLOT, SHIP2_SLOT,
-  ML0, STR_ADDR,
-  TNO, TVL, RLT, TLF, FOO, MAA, SAC, ME1, ME2,
-  SSW1, SSW2, SSW3, SSW4, SSW5, SSW6,
-  buildShipTraceScript,
-  runTraceScript,
-  traceShip,
-} from './ship-substrate.js';
+// Re-export the full ship-substrate surface — pof is reached through T-SHIP's
+// gravity capture path, so callers need the same object-table, ship, and
+// sense-switch symbols. buildPofTraceScript (below) layers pof-specific defaults
+// on top.
+export * from './ship-substrate.js';
 
-export {
-  RIM_PATH,
-  SS1, SS2,
-  SR0, MTH, MOM, BSG, SQ6, SR5, ST3, SRT, POF,
-  SR1, SR2, SQ9,
-  ML1, ML2, MX1, MY1, MX2, MY2, MA1, MA2, MB1, MB2,
-  MFU_ADDR, MTR_ADDR, MH1_ADDR, MH2_ADDR, MH3_ADDR, MH4_ADDR,
-  MCO_ADDR, CWG_ADDR, SCW_ADDR, BX_ADDR, BY_ADDR,
-  MTB, NOB, SHIP1_SLOT, SHIP2_SLOT,
-  ML0, STR_ADDR,
-  TNO, TVL, RLT, TLF, FOO, MAA, SAC, ME1, ME2,
-  SSW1, SSW2, SSW3, SSW4, SSW5, SSW6,
-  buildShipTraceScript,
-  runTraceScript,
-  traceShip,
-};
+// Pulled into local scope for buildPofTraceScript's defaults.
+import { buildShipTraceScript, SSW6 } from './ship-substrate.js';
 
 // ─── Addresses ────────────────────────────────────────────────────────────────
 
@@ -64,22 +39,23 @@ export const PO1    = 0o02730;  // explode path: self-mod calc vector to mex
  */
 export function buildPofTraceScript(rimPath, opts = {}) {
   return buildShipTraceScript(rimPath, {
-    // Ship extremely close to star at origin — guarantees gravity capture
-    ship1x: opts.ship1x ?? 0o0010,
-    ship1y: opts.ship1y ?? 0o0010,
+    // Ship 1 extremely close to the star at origin — guarantees gravity capture
+    ship1x: 0o0010,
+    ship1y: 0o0010,
     // Ship 2 far away — no interference
-    ship2x: opts.ship2x ?? 0o14000,
-    ship2y: opts.ship2y ?? 0o14000,
+    ship2x: 0o14000,
+    ship2y: 0o14000,
     // Gravity on
-    senseSwitches: opts.senseSwitches ?? [SSW6],
-    // No control input needed — gravity capture is autonomous
-    ship1Ctrl: opts.ship1Ctrl ?? 0,
-    ship2Ctrl: opts.ship2Ctrl ?? 0,
+    senseSwitches: [SSW6],
+    // No control input — gravity capture is autonomous
+    ship1Ctrl: 0,
+    ship2Ctrl: 0,
     // Plenty of fuel
-    fuel: opts.fuel ?? 0o757777,
+    fuel: 0o757777,
     // PRNG seed
-    ranSeed: opts.ranSeed ?? 0,
-    // Ship must be active (mb1 = 1)
+    ranSeed: 0,
+    // Caller overrides win (also passes through opts handled only by
+    // buildShipTraceScript, e.g. ship1Angle, torps).
     ...opts,
   });
 }

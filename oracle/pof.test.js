@@ -25,7 +25,7 @@ import { readFile } from 'node:fs/promises';
 
 import {
   RIM_PATH,
-  POF, PO1, SRT,
+  POF, PO1, SRT, DAP_SRT,
   ML1, MA1, MB1, MX1, MY1,
   MTB, NOB, SHIP1_SLOT, SHIP2_SLOT,
   ML0, STR_ADDR,
@@ -130,13 +130,12 @@ test('T-POF: script sets star capture radius', () => {
 
 test('T-POF: script deposits ship calc routines at slot 0 and slot 1', () => {
   const script = buildPofTraceScript(RIM_PATH);
-  const dapSrt = 0o262713;
   const slot0Line = script.find(l => l.includes(`deposit ${SHIP1_SLOT.toString(8)}`));
   const slot1Line = script.find(l => l.includes(`deposit ${SHIP2_SLOT.toString(8)}`));
   assert.ok(slot0Line, 'slot 0 deposit present');
   assert.ok(slot1Line, 'slot 1 deposit present');
-  assert.ok(slot0Line.includes(dapSrt.toString(8)), 'slot 0 has dap srt');
-  assert.ok(slot1Line.includes(dapSrt.toString(8)), 'slot 1 has dap srt');
+  assert.ok(slot0Line.includes(DAP_SRT.toString(8)), 'slot 0 has dap srt');
+  assert.ok(slot1Line.includes(DAP_SRT.toString(8)), 'slot 1 has dap srt');
 });
 
 test('T-POF: script runs main loop and captures CPU history', () => {
