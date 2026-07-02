@@ -438,7 +438,11 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
               promptFile: "./.sandcastle/review-prompt.md",
               promptArgs: {
                 BRANCH: issue.branch,
-                TARGET_BRANCH: integrationBranch,
+                // TARGET_BRANCH is a reserved built-in in @ai-hero/sandcastle:
+                // sandbox.run auto-injects it as the host's current branch,
+                // which is integrationBranch here. Passing it explicitly makes
+                // the library throw ("cannot be overridden via promptArgs"),
+                // which silently skips the Opus review and merges unreviewed.
                 COMMITS: review.commits,
                 DIFFSTAT: review.stat,
                 DIFF: review.diff,
