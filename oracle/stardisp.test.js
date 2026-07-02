@@ -28,7 +28,6 @@ import { fileURLToPath } from 'node:url';
 import { runPdp1 } from './simh.js';
 import {
   parseListingForMeter,
-  parseSimhHistory,
   analyzeTrace,
   buildLedger,
 } from './meter.js';
@@ -37,6 +36,16 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const RIM_PATH = join(ROOT, 'build/spacewar31.rim');
 const LST_PATH = join(ROOT, 'build/spacewar31.lst');
+
+// Parse the real macro1 listing, or return null if the build is not present
+// (tests that depend on the build skip themselves when this returns null).
+async function loadRealListing() {
+  try {
+    return parseListingForMeter(await readFile(LST_PATH, 'utf8'));
+  } catch {
+    return null;
+  }
+}
 
 // ─── Addresses ───────────────────────────────────────────────────────────────
 
@@ -133,13 +142,8 @@ test('stardisp: starp pad is 6 words per copy, 20 copies = 120 words', () => {
 // ─── Unit: listing-based skip/multiway discovery ─────────────────────────────
 
 test('listing: all 5 skip sites found at correct addresses', async () => {
-  let listing;
-  try {
-    const text = await readFile(LST_PATH, 'utf8');
-    listing = parseListingForMeter(text);
-  } catch {
-    return; // build not present
-  }
+  const listing = await loadRealListing();
+  if (!listing) return; // build not present
 
   for (const site of SKIP_SITES) {
     assert.ok(
@@ -153,37 +157,22 @@ test('listing: all 5 skip sites found at correct addresses', async () => {
 });
 
 test('listing: bjm jmp. at 0715 found as multiway branch (L552)', async () => {
-  let listing;
-  try {
-    const text = await readFile(LST_PATH, 'utf8');
-    listing = parseListingForMeter(text);
-  } catch {
-    return;
-  }
+  const listing = await loadRealListing();
+  if (!listing) return;
   assert.ok(listing.multiwayBranches.has(0o715), 'bjm is multiway');
   assert.equal(listing.multiwayBranches.get(0o715).srcLine, 552);
 });
 
 test('listing: bpx jmp. at 1117 found as multiway branch (L555)', async () => {
-  let listing;
-  try {
-    const text = await readFile(LST_PATH, 'utf8');
-    listing = parseListingForMeter(text);
-  } catch {
-    return;
-  }
+  const listing = await loadRealListing();
+  if (!listing) return;
   assert.ok(listing.multiwayBranches.has(0o1117), 'bpx is multiway');
   assert.equal(listing.multiwayBranches.get(0o1117).srcLine, 555);
 });
 
 test('listing: blx jmp. at 675 found as multiway branch (L539)', async () => {
-  let listing;
-  try {
-    const text = await readFile(LST_PATH, 'utf8');
-    listing = parseListingForMeter(text);
-  } catch {
-    return;
-  }
+  const listing = await loadRealListing();
+  if (!listing) return;
   assert.ok(listing.multiwayBranches.has(0o675), 'blx is multiway');
   assert.equal(listing.multiwayBranches.get(0o675).srcLine, 539);
 });
@@ -357,9 +346,9 @@ test('synthetic trace: bjm multiway — all 16 starp pad entry offsets observed'
   assert.ok(multiwayTargets.has(0o715), 'bjm multiway tracked');
   const targets = multiwayTargets.get(0o715).targets;
 
-  for (const offset of BJM_OFFSETS) {
-    assert.ok(targets.has(offset), `bjm target: starp copy ${BJM_OFFSETS.indexOf(offset)} at offset ${offset.toString(8)}`);
-  }
+  BJM_OFFSETS.forEach((offset, copy) => {
+    assert.ok(targets.has(offset), `bjm target: starp copy ${copy} at offset ${offset.toString(8)}`);
+  });
 });
 
 // ─── Integration: listing↔core identity — assembled stardisp code (ADR-0006) ─
@@ -413,13 +402,8 @@ test('stardisp: listing↔core identity — all 15 key addresses match (ADR-0006
 // ─── Integration: meter finds stardisp skip/multiway sites in real listing ───
 
 test('listing: all stardisp skip sites found by meter (ADR-0012)', async () => {
-  let listing;
-  try {
-    const text = await readFile(LST_PATH, 'utf8');
-    listing = parseListingForMeter(text);
-  } catch {
-    return;
-  }
+  const listing = await loadRealListing();
+  if (!listing) return;
 
   for (const site of SKIP_SITES) {
     assert.ok(listing.skipSites.has(site.addr), `skip ${site.mnemonic} at ${site.addr.toString(8).padStart(6, '0')}`);
@@ -430,13 +414,8 @@ test('listing: all stardisp skip sites found by meter (ADR-0012)', async () => {
 });
 
 test('listing: all stardisp multiway branches found by meter', async () => {
-  let listing;
-  try {
-    const text = await readFile(LST_PATH, 'utf8');
-    listing = parseListingForMeter(text);
-  } catch {
-    return;
-  }
+  const listing = await loadRealListing();
+  if (!listing) return;
 
   for (const site of MULTIWAY_SITES) {
     assert.ok(listing.multiwayBranches.has(site.addr), `multiway ${site.mnemonic} at ${site.addr.toString(8).padStart(6, '0')}`);
@@ -503,13 +482,8 @@ test('ledger: synthetic trace produces correct stardisp status for all skip site
 // ─── Macro-expansion attribution ─────────────────────────────────────────────
 
 test('stardisp: starp macro expansion PCs attributed to line 512', async () => {
-  let listing;
-  try {
-    const text = await readFile(LST_PATH, 'utf8');
-    listing = parseListingForMeter(text);
-  } catch {
-    return;
-  }
+  const listing = await loadRealListing();
+  if (!listing) return;
 
   // starp expansion instructions start at bds (0o716). Their addrToSrcLine
   // should point to line 512 (the `starp` define call site).
