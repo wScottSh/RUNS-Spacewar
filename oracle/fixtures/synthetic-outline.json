@@ -1,0 +1,15 @@
+{
+  "witness": "trace-oc-dark-arms",
+  "adr": "ADR-0012",
+  "purpose": "Synthetic outline to exercise dispatch codes 2 and 5 if dark",
+  "source_lines": "synthetic",
+  "codes": [
+    2,
+    5,
+    7
+  ],
+  "words_octal": [
+    "225225",
+    "700000"
+  ]
+}
