@@ -31,7 +31,7 @@ import {
   DAP_SRT, MTB, NOB, SHIP1_SLOT,
   ML0, ML1, MX1, MY1, MA1, MB1,
   RAN_ADDR,
-  SSW1, SSW2, SSW3, SSW4, SSW5, SSW6,
+  SSW1, SSW6,
   buildHyperTraceScript,
 } from './hyper-substrate.js';
 
@@ -46,17 +46,14 @@ import {
 } from './meter.js';
 
 const LISTING_PATH = join(HERE, '..', 'build', 'spacewar31.lst');
-let cachedListingText = null;
 let cachedSkipSites = null;
 
 /** Lazily load and parse the listing for meter analysis. */
 async function getMeterSites() {
   if (cachedSkipSites) return cachedSkipSites;
   const text = await readFile(LISTING_PATH, 'utf8');
-  cachedListingText = text;
-  const result = parseListingForMeter(text);
-  cachedSkipSites = result;
-  return result;
+  cachedSkipSites = parseListingForMeter(text);
+  return cachedSkipSites;
 }
 
 // ── 1. Constants ─────────────────────────────────────────────────────────────

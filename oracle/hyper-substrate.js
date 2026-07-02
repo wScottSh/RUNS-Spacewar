@@ -136,7 +136,6 @@ export function buildHyperTraceScript(rimPath, opts = {}) {
   const lines = [];
   const oct = n => n.toString(8);
   const deposit = (addr, val) => lines.push(`deposit ${oct(addr)} ${oct(val)}`);
-  const examine = addr => lines.push(`examine ${oct(addr)}`);
 
   lines.push(`load ${rimPath}`);
 
@@ -179,7 +178,7 @@ export function buildHyperTraceScript(rimPath, opts = {}) {
  * `state` maps examined addresses → integer values.
  * `pcHistory` is the array of PC addresses from `show cpu history`.
  */
-export async function runTraceScript(rimPath, scriptLines, { timeout = 60_000 } = {}) {
+export async function runTraceScript(scriptLines, { timeout = 60_000 } = {}) {
   const { lines } = await runPdp1(scriptLines, { timeout });
 
   const state = {};
