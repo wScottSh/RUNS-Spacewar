@@ -116,6 +116,31 @@ export function parseCoreDump(lines) {
   return core;
 }
 
+/**
+ * Parse the per-frame snapshot blocks a `snapshotRanges` run emits.  Each
+ * block starts at its `===SNAPSHOT <label>===` echo marker and collects the
+ * "addr: word" examine lines that follow it.  Words are kept as raw 6-digit
+ * octal strings keyed by unpadded octal address — the observed truth,
+ * undecoded (ADR-0004: the snapshot records, it does not interpret).
+ */
+export function parseSnapshotDumps(lines) {
+  const snapshots = [];
+  let current = null;
+  for (const line of lines) {
+    const marker = line.match(/^===SNAPSHOT (.+)===/);
+    if (marker) {
+      current = { label: marker[1].trim(), words: {} };
+      snapshots.push(current);
+      continue;
+    }
+    if (current) {
+      const w = line.match(/^([0-7]+):\s+([0-7]{6})/);
+      if (w) current.words[parseInt(w[1], 8).toString(8)] = w[2];
+    }
+  }
+  return snapshots;
+}
+
 // ─── IOH patch list ───────────────────────────────────────────────────────────
 
 /**
@@ -150,7 +175,15 @@ export async function scanIohAddrs(rimPath, { entry = 4, ss = 0, tw = 0, deposit
  * The IOH patch list is re-deposited at every frame seam (a2 recompiles the
  * outline code after each game restart, restoring the wait-class words).
  *
- * Returns { streams, lines } — PC streams (one per history dump) + raw output.
+ * snapshotRanges (optional): [[lo, hi], ...] address ranges to EXAMINE at
+ * every ml0 seam — after boot and after each frame's continue — capturing the
+ * per-frame object-table snapshot (ADR-0004/0012).  Examines are SCP commands
+ * issued while the CPU is stopped: they perturb neither execution nor the PC
+ * history, and when the option is absent the script is byte-identical to the
+ * coverage gate's.
+ *
+ * Returns { streams, lines, snapshots } — PC streams (one per history dump),
+ * raw output, and parsed per-frame snapshots (empty without snapshotRanges).
  */
 export async function runFrames(rimPath, {
   entry = 5,
@@ -160,6 +193,7 @@ export async function runFrames(rimPath, {
   deposits = [],
   frames = [],
   iohAddrs = [],
+  snapshotRanges = null,
   timeout = 300_000,
 } = {}) {
   const script = [
@@ -172,13 +206,24 @@ export async function runFrames(rimPath, {
   for (const [addr, val] of deposits) script.push(`D ${oct(addr)} ${oct(val)}`);
   script.push('break 1444');
   script.push(`go ${entry.toString(8)}`);
+
+  // Per-frame snapshot: echo marker + examines, issued at the stopped seam.
+  const snap = (label) => {
+    if (!snapshotRanges) return;
+    script.push(`echo ===SNAPSHOT ${label}===`);
+    for (const [lo, hi] of snapshotRanges) {
+      script.push(lo === hi ? `EXAMINE ${oct(lo)}` : `EXAMINE ${oct(lo)}-${oct(hi)}`);
+    }
+  };
+  snap('boot');
+
   // Boot history (a40/a1 → a/a6 → a2 compile → ml0) is its own dump.
   script.push('show cpu history');
   script.push(`set cpu history=${HIST_MAX}`);
 
   const patchLines = iohAddrs.map((a) => `D ${oct(a)} ${oct(NOP_WORD)}`);
 
-  for (const frame of frames) {
+  for (const [i, frame] of frames.entries()) {
     script.push(...patchLines);                    // idempotent; survives a2 recompiles
     if (frame.tw !== undefined) script.push(`D CPU TW ${oct(frame.tw)}`);
     if (frame.ss !== undefined) script.push(`D SS ${oct(frame.ss)}`);
@@ -190,6 +235,7 @@ export async function runFrames(rimPath, {
       if (frame.twAfterHlt !== undefined) script.push(`D CPU TW ${oct(frame.twAfterHlt)}`);
       script.push('continue');
     }
+    snap(i);
     if (frame.dump) {
       script.push('show cpu history');
       script.push(`set cpu history=${HIST_MAX}`);
@@ -199,7 +245,11 @@ export async function runFrames(rimPath, {
   script.push('quit');
 
   const { stdout } = await runPdp1(script, { timeout });
-  return { streams: splitHistoryDumps(stdout), lines: stdout.split('\n') };
+  return {
+    streams: splitHistoryDumps(stdout),
+    lines: stdout.split('\n'),
+    snapshots: parseSnapshotDumps(stdout.split('\n')),
+  };
 }
 
 /** Shorthand: n identical frames. */
@@ -331,8 +381,13 @@ export const NEG1 = (n) => (0o777777 - n) & 0o777777;
  *
  * The set was grown empirically against the gate's dark list until closure:
  * every entry names the arms it exists to light.
+ *
+ * `runOpts` is spread into every runFrames-based scenario (the frame-scripted
+ * game runs) — the seam the reference-snapshot capture uses to add
+ * snapshotRanges without duplicating the pinned scenario set.  The gate path
+ * passes nothing, so its SIMH scripts are unchanged.
  */
-export function buildUnionScenarios(rimPath, iohAddrs) {
+export function buildUnionScenarios(rimPath, iohAddrs, runOpts = {}) {
   const M = ADDR;
   return {
     // boot via loc 4 (a40 → a6 → a2; mg1 control-box source) + idle frames:
@@ -340,6 +395,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
     boot4: () => runFrames(rimPath, {
       entry: 4, tw: 0, ss: 0, iohAddrs,
       frames: rep(3, { dump: true }),
+      ...runOpts,
     }),
 
     // loc-5 boot (a1 → a; mg2 test-word source), ddd=+0 single-outline arm,
@@ -351,6 +407,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
         entry: 5, tw: 0, ss: ssMask(6), iohAddrs: ioh5,
         deposits: [[M.DDD, 0]],
         frames: rep(3, { dump: true }),
+        ...runOpts,
       });
     },
 
@@ -358,7 +415,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
     // torps-exhausted arms, angle-normalize boundaries, last-object slot,
     // game-over by torpedo exhaustion, restart
     gameplay: () => runFrames(rimPath, {
-      entry: 5, tw: 0, ss: 0, iohAddrs,
+      entry: 5, tw: 0, ss: 0, iohAddrs, ...runOpts,
       frames: [
         {}, {},
         { tw: CTL.S1_CCW | CTL.S2_CCW }, {},
@@ -391,7 +448,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
     // ship2 dies alone (gravity capture, SSW5 explode): ml0-tail ship2 arm,
     // mixed score flags, match-count expiry with unequal scores → a4 hlt readout
     mixedDeath: () => runFrames(rimPath, {
-      entry: 5, tw: 0, ss: ssMask(5), iohAddrs,
+      entry: 5, tw: 0, ss: ssMask(5), iohAddrs, ...runOpts,
       frames: [
         {},
         { deposits: [[M.NX1 + 1, 0o1000], [M.NY1 + 1, 0o1000]] },
@@ -407,7 +464,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
     // near-miss then hit; explosion; dead-dead scoring; hlt readout both TW
     // arms; second round for the score-equal match-extension arm
     collision: () => runFrames(rimPath, {
-      entry: 5, tw: 0o40, ss: 0, iohAddrs,
+      entry: 5, tw: 0o40, ss: 0, iohAddrs, ...runOpts,
       frames: [
         {},
         { deposits: [[M.NX1 + 1, 0o205000], [M.NY1 + 1, 0o205000]] },   // near miss
@@ -428,7 +485,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
     // the counting arms; first breakouts take the safe arm; from frame 12 the
     // seeded mh4 (0o337776 + hur → max positive) makes the next draw explode
     hyper: () => runFrames(rimPath, {
-      entry: 5, tw: CTL.S1_CCW | CTL.S1_CW, ss: 0, iohAddrs,
+      entry: 5, tw: CTL.S1_CCW | CTL.S1_CW, ss: 0, iohAddrs, ...runOpts,
       frames: Array.from({ length: 42 }, (_, i) => ({
         deposits: [
           ...(i % 3 === 0 ? [[M.NA1, NEG1(2)], [M.NH3, NEG1(2)]] : []),
@@ -440,7 +497,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
 
     // second seed: diversifies the hp4 angle-normalize draws
     hyper2: () => runFrames(rimPath, {
-      entry: 5, tw: CTL.S1_CCW | CTL.S1_CW, ss: 0, seed: 0o123456, iohAddrs,
+      entry: 5, tw: CTL.S1_CCW | CTL.S1_CW, ss: 0, seed: 0o123456, iohAddrs, ...runOpts,
       frames: Array.from({ length: 36 }, (_, i) => ({
         deposits: i % 3 === 0 ? [[M.NA1, NEG1(2)], [M.NH3, NEG1(2)]] : [],
         dump: (i + 1) % 12 === 0,
@@ -449,7 +506,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
 
     // gravity: far shortcut arm, near division path, capture → pof vanish
     gravity: () => runFrames(rimPath, {
-      entry: 5, tw: 0, ss: 0, iohAddrs,
+      entry: 5, tw: 0, ss: 0, iohAddrs, ...runOpts,
       frames: [
         {},
         { deposits: [[M.NX1, 0o4000], [M.NY1, 0o4000]] },
@@ -460,7 +517,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
 
     // capture → pof explode (SSW5), light star (SSW2), gyro rotation (SSW1)
     gravityExplode: () => runFrames(rimPath, {
-      entry: 5, tw: CTL.S1_CCW, ss: ssMask(1, 2, 5), iohAddrs,
+      entry: 5, tw: CTL.S1_CCW, ss: ssMask(1, 2, 5), iohAddrs, ...runOpts,
       frames: [
         {},
         { deposits: [[M.NX1, 0o4000], [M.NY1, 0o4000]] },
@@ -471,7 +528,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
 
     // thrust with fuel nearly out: fuel isp/sad/spi arms
     fuelout: () => runFrames(rimPath, {
-      entry: 5, tw: CTL.S1_THRUST | CTL.S2_THRUST, ss: 0, iohAddrs,
+      entry: 5, tw: CTL.S1_THRUST | CTL.S2_THRUST, ss: 0, iohAddrs, ...runOpts,
       frames: [
         { deposits: [[M.NFU, NEG1(3)], [M.NFU + 1, NEG1(3)]] },
         {}, {}, {}, { dump: true },
@@ -484,7 +541,7 @@ export function buildUnionScenarios(rimPath, iohAddrs) {
     // loc-4 boot with match-length TW bits: a6 nonzero arm → gct = -12,
     // then a collision game-over drives the match-count no-skip arm
     boot4match: () => runFrames(rimPath, {
-      entry: 4, tw: 0o1400, ss: 0, iohAddrs,
+      entry: 4, tw: 0o1400, ss: 0, iohAddrs, ...runOpts,
       frames: [
         {},
         { deposits: [[M.NX1 + 1, 0o201000], [M.NY1 + 1, 0o201000]] },
