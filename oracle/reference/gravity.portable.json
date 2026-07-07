@@ -1,0 +1,1314 @@
+{
+  "scenario": "gravity",
+  "instrument": "portable frame — address-free game state decoded from the raw golden (ADR-0015): Bin-A raw words verbatim, Bin-B state enum, Bin-C dropped.",
+  "frames": [
+    {
+      "label": "boot",
+      "objects": [
+        {
+          "state": "ship",
+          "position_x": "200000",
+          "position_y": "200000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000",
+          "angular_velocity": "000000",
+          "angle": "144420",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "ship",
+          "position_x": "577777",
+          "position_y": "577777",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000",
+          "angular_velocity": "000000",
+          "angle": "000000",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        }
+      ],
+      "globals": {
+        "ran": "000000"
+      }
+    },
+    {
+      "label": "0",
+      "objects": [
+        {
+          "state": "ship",
+          "position_x": "200000",
+          "position_y": "200000",
+          "lifetime": "000000",
+          "velocity_x": "777772",
+          "velocity_y": "777772",
+          "angular_velocity": "000000",
+          "angle": "144420",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "ship",
+          "position_x": "577777",
+          "position_y": "577777",
+          "lifetime": "000000",
+          "velocity_x": "000005",
+          "velocity_y": "000005",
+          "angular_velocity": "000000",
+          "angle": "000000",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        }
+      ],
+      "globals": {
+        "ran": "427156"
+      }
+    },
+    {
+      "label": "1",
+      "objects": [
+        {
+          "state": "ship",
+          "position_x": "004000",
+          "position_y": "004000",
+          "lifetime": "000000",
+          "velocity_x": "777772",
+          "velocity_y": "777772",
+          "angular_velocity": "000000",
+          "angle": "144420",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "ship",
+          "position_x": "600000",
+          "position_y": "600000",
+          "lifetime": "000000",
+          "velocity_x": "000012",
+          "velocity_y": "000012",
+          "angular_velocity": "000000",
+          "angle": "000000",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        }
+      ],
+      "globals": {
+        "ran": "415425"
+      }
+    },
+    {
+      "label": "2",
+      "objects": [
+        {
+          "state": "ship",
+          "position_x": "377777",
+          "position_y": "377777",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000",
+          "angular_velocity": "000000",
+          "angle": "144420",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "ship",
+          "position_x": "600002",
+          "position_y": "600002",
+          "lifetime": "000000",
+          "velocity_x": "000020",
+          "velocity_y": "000020",
+          "angular_velocity": "000000",
+          "angle": "000000",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        }
+      ],
+      "globals": {
+        "ran": "647763"
+      }
+    },
+    {
+      "label": "3",
+      "objects": [
+        {
+          "state": "ship",
+          "position_x": "377777",
+          "position_y": "377777",
+          "lifetime": "000000",
+          "velocity_x": "777776",
+          "velocity_y": "777776",
+          "angular_velocity": "000000",
+          "angle": "144420",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "ship",
+          "position_x": "600004",
+          "position_y": "600004",
+          "lifetime": "000000",
+          "velocity_x": "000026",
+          "velocity_y": "000026",
+          "angular_velocity": "000000",
+          "angle": "000000",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        }
+      ],
+      "globals": {
+        "ran": "331400"
+      }
+    },
+    {
+      "label": "4",
+      "objects": [
+        {
+          "state": "ship",
+          "position_x": "377777",
+          "position_y": "377777",
+          "lifetime": "000000",
+          "velocity_x": "777775",
+          "velocity_y": "777775",
+          "angular_velocity": "000000",
+          "angle": "144420",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "ship",
+          "position_x": "600007",
+          "position_y": "600007",
+          "lifetime": "000000",
+          "velocity_x": "000034",
+          "velocity_y": "000034",
+          "angular_velocity": "000000",
+          "angle": "000000",
+          "fuel": "757777",
+          "torpedoes": "777736",
+          "old_control_word": "000000",
+          "hyperspace_saved_calc": "000000",
+          "hyperspace_active": "777767",
+          "hyperspace_button_timer": "000000",
+          "hyperspace_counter": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        },
+        {
+          "state": "empty",
+          "position_x": "000000",
+          "position_y": "000000",
+          "lifetime": "000000",
+          "velocity_x": "000000",
+          "velocity_y": "000000"
+        }
+      ],
+      "globals": {
+        "ran": "543676"
+      }
+    }
+  ]
+}
