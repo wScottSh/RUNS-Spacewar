@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The frozen golden and the witnessed decode — Spacewar! Verification</title>
+<style>
+  :root{
+    --bg:#0a0e0d; --panel:#0f1614; --ink:#c8d6cf; --dim:#7c8f86;
+    --phos:#5ffba0; --phos-dim:#2f7f57; --amber:#ffb454; --red:#ff6b6b;
+    --line:#1d2a26; --mono:"SF Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:radial-gradient(120% 90% at 50% -10%,#10201a 0%,var(--bg) 60%);
+    color:var(--ink);font-family:var(--sans);line-height:1.65;font-size:17px;
+    -webkit-font-smoothing:antialiased;padding:0 0 8rem}
+  .wrap{max-width:820px;margin:0 auto;padding:0 24px}
+  header{padding:4rem 0 2rem;border-bottom:1px solid var(--line);margin-bottom:2.5rem}
+  .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--phos-dim);margin-bottom:1rem}
+  .kicker .prev{color:var(--dim)}
+  h1{font-size:2.2rem;line-height:1.15;margin:.2rem 0 1rem;color:#eaf4ef;letter-spacing:-.01em}
+  h1 .glow{color:var(--phos);text-shadow:0 0 18px rgba(95,251,160,.35)}
+  .q{font-family:var(--mono);font-size:.95rem;color:var(--amber);background:rgba(255,180,84,.06);
+    border-left:2px solid var(--amber);padding:.7rem 1rem;border-radius:0 6px 6px 0;margin-top:1.2rem}
+  h2{font-size:1.35rem;margin:3rem 0 .4rem;color:#eaf4ef;letter-spacing:-.01em}
+  h2 .n{font-family:var(--mono);color:var(--phos-dim);font-size:1rem;margin-right:.6rem}
+  h3{font-size:1.05rem;margin:1.8rem 0 .3rem;color:var(--phos)}
+  p{margin:.7rem 0}
+  .lede{font-size:1.15rem;color:#d8e6df}
+  strong{color:#eaf4ef}
+  em{color:var(--amber);font-style:normal}
+  code{font-family:var(--mono);font-size:.86em;background:#0c1512;color:var(--phos);
+    padding:.1em .4em;border-radius:4px;border:1px solid var(--line)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.3rem 1.5rem;margin:1.4rem 0}
+  .callout{border-left:3px solid var(--phos);background:rgba(95,251,160,.05);padding:.9rem 1.2rem;border-radius:0 8px 8px 0;margin:1.4rem 0}
+  .callout.warn{border-color:var(--amber);background:rgba(255,180,84,.05)}
+  .callout.crux{border-color:var(--phos);background:rgba(95,251,160,.08)}
+  .metaphor{background:linear-gradient(180deg,#0f1a16,#0c1512);border:1px solid var(--phos-dim);border-radius:10px;padding:1.4rem 1.5rem;margin:1.4rem 0}
+  .metaphor h3{margin-top:0}
+  table{width:100%;border-collapse:collapse;margin:1.3rem 0;font-size:.9rem}
+  th,td{text-align:left;padding:.6rem .7rem;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);font-weight:600}
+  td code{font-size:.8em}
+  .yes{color:var(--phos);font-weight:600} .no{color:var(--red);font-weight:600} .part{color:var(--amber);font-weight:600}
+  .num{font-family:var(--mono);color:var(--phos);font-weight:600}
+  hr{border:none;border-top:1px solid var(--line);margin:2.5rem 0}
+  .foot{color:var(--dim);font-size:.85rem;margin-top:2rem}
+  .tt{font-family:var(--mono);color:var(--amber)}
+  /* the split-word figure */
+  .weld{margin:1.6rem 0;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.4rem;overflow-x:auto}
+  .weld svg{display:block;margin:0 auto;max-width:100%;height:auto}
+  figcaption{font-size:.85rem;color:var(--dim);text-align:center;margin-top:.8rem;font-style:italic}
+  /* the three-bin classifier */
+  .bins{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem;margin:1.4rem 0}
+  @media(max-width:680px){.bins{grid-template-columns:1fr}}
+  .bin{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1rem 1.1rem}
+  .bin .lab{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .bin h4{margin:.3rem 0 .5rem;font-size:1rem;font-family:var(--mono)}
+  .bin.a{border-color:var(--phos-dim)} .bin.a h4{color:var(--phos)}
+  .bin.b{border-color:var(--amber)} .bin.b h4{color:var(--amber)}
+  .bin.c{border-color:#3a3a3a} .bin.c h4{color:var(--dim)}
+  .bin p{font-size:.85rem;margin:.4rem 0}
+  .bin .cols{font-family:var(--mono);font-size:.78rem;color:var(--ink);margin-top:.6rem;padding-top:.5rem;border-top:1px dashed var(--line)}
+  /* dialog */
+  .dlg{border-left:2px solid var(--phos-dim);padding-left:1rem;margin:1.2rem 0}
+  .dlg p{margin:.55rem 0;font-size:.96rem}
+  .dlg .who{font-family:var(--mono);font-size:.75rem;letter-spacing:.08em;color:var(--phos-dim);text-transform:uppercase}
+  .dlg .heretic .who{color:var(--red)}
+  .dlg .heretic{border-color:var(--red)}
+  /* quiz */
+  .quiz{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1.3rem 1.5rem;margin:1.6rem 0}
+  .quiz .opt{display:block;width:100%;text-align:left;font:inherit;color:var(--ink);background:#0c1512;
+    border:1px solid var(--line);border-radius:8px;padding:.7rem .9rem;margin:.5rem 0;cursor:pointer;transition:.15s}
+  .quiz .opt:hover{border-color:var(--phos-dim)}
+  .quiz .opt.right{border-color:var(--phos);background:rgba(95,251,160,.08)}
+  .quiz .opt.wrong{border-color:var(--red);background:rgba(255,107,107,.08)}
+  .quiz .fb{margin-top:.8rem;font-size:.9rem;color:var(--dim);min-height:1.2em}
+  .pill{display:inline-block;font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;
+    padding:.15em .6em;border-radius:20px;border:1px solid var(--line);color:var(--dim);vertical-align:middle}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="kicker"><span class="prev">Explainer 0001 — Oracle vs. Anchor  ▸</span>  Spacewar! Verification · Explainer 0002</div>
+  <h1>The goldens are frozen now.<br>So is the game <span class="glow">anchored</span> — or not?</h1>
+  <div class="q">“Our Oracle was already built with ADRs in mind, and has already litigated this. Am <em>I</em> the crazy one?”</div>
+</header>
+
+<p class="lede">No. You're not the crazy one. You're about <span class="num">80%</span> right, and this lesson exists to show you the exact <span class="num">20%</span> that's real — so the residual stops feeling like fog. Explainer 0001 ended with <em>“<code>reference/</code> is empty; the game has only the seabed anchor-end.”</em> Yesterday's <span class="tt">T-REFERENCE</span> freeze (<code>c93443</code>) filled it: <span class="num">11</span> goldens, raw octal words, one per frame. So the obvious question is — did the boat-end just appear?</p>
+
+<h2><span class="n">01</span>The one thing your memory got slightly wrong</h2>
+<p>You said the Oracle “already litigated this.” Half true — and the half that's off is the whole confusion. Split the surface in two:</p>
+
+<div class="panel">
+<p><span class="pill" style="border-color:var(--phos-dim);color:var(--phos)">CAPTURE</span>&nbsp; what to record, how strong, raw words, provenance, coverage-as-branch-completeness. &nbsp;→&nbsp; <strong class="yes">litigated to death.</strong> ADR-0004/0006/0007/0008/0012.</p>
+<p><span class="pill" style="border-color:var(--amber);color:var(--amber)">DECODE</span>&nbsp; how a <em>Realization</em> is compared against those raw words. &nbsp;→&nbsp; <strong class="no">not litigated. Consciously deferred.</strong></p>
+</div>
+
+<p>And this isn't interpretation — it's written into your own freeze commit, <code>oracle/reference-snapshots.js:13</code>:</p>
+<div class="callout">
+<em>“The words are frozen RAW … A Realization-facing decode is a <strong>phase-2 interface decision</strong> (ADR-0007 defers it to the variant author).”</em>
+</div>
+<p>So the “am I crazy?” feeling has one clean source: <strong>you remembered “we settled the capture” as “we settled everything.”</strong> You didn't. You settled ~95% of the surface and <em>deliberately punted one square</em> — with your own fingerprints on the punt. Against a fully-settled backdrop, one open square looks like an anomaly that must mean you're missing something. It isn't. It's punted, on purpose.</p>
+
+<h2><span class="n">02</span>A frozen raw word can <em>still</em> be reference-internal</h2>
+<p>Here's the trap the freeze sets. It <em>feels</em> like freezing the words gave you the boat-end shackle from 0001. For most columns, it did. For a few, it did <strong>not</strong> — and those few are exactly the game.</p>
+<p>Open your own golden — <code>oracle/reference/gravity.snapshot.json</code>, the first <code>boot</code> frame. Look at address <code>3476</code>:</p>
+
+<div class="panel" style="font-family:var(--mono);font-size:.9rem">
+<span style="color:var(--dim)">"3476": </span><span style="color:var(--phos)">"002310"</span><span style="color:var(--dim)">,   // mtb — ship&nbsp;1 calc-routine column</span><br>
+<span style="color:var(--dim)">"3477": </span><span style="color:var(--phos)">"002314"</span><span style="color:var(--dim)">,   // mtb — ship&nbsp;2</span>
+</div>
+
+<p>Now the question that cracks it open: <strong>what <em>is</em> <code>002310</code>?</strong></p>
+<p>It is not a game fact. It's a <strong>PDP-1 core address</strong> — the memory location of the normal ship-calc routine. And the tell is in Ground Truth itself, at <code>spacewar3.1_complete.txt:889</code>:</p>
+<div class="panel" style="font-family:var(--mono);font-size:.88rem;color:var(--phos)">lac (mex 400000<span style="color:var(--dim)">&nbsp;&nbsp;&nbsp;/ yes, EXPLODE</span></div>
+<p>When a ship explodes, the main loop <strong>rewrites that word</strong> to hold the address of <code>mex</code>, the explosion routine (<code>:950</code>). That's the self-modification T-MAINLOOP / EPIC #5 is about. So sit with what a single 18-bit word is carrying:</p>
+
+<figure class="weld">
+<svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="One object-table word carrying both a game fact and a machine encoding.">
+  <!-- the word -->
+  <rect x="270" y="20" width="180" height="46" rx="6" fill="#0c1512" stroke="#5ffba0" stroke-width="1.5"/>
+  <text x="360" y="40" fill="#7c8f86" font-family="monospace" font-size="10" text-anchor="middle">object-table word @3476</text>
+  <text x="360" y="58" fill="#5ffba0" font-family="monospace" font-size="16" text-anchor="middle" font-weight="bold">002310</text>
+
+  <!-- two branches down -->
+  <line x1="360" y1="66" x2="360" y2="86" stroke="#2f7f57" stroke-width="1.5"/>
+  <line x1="200" y1="86" x2="520" y2="86" stroke="#2f7f57" stroke-width="1.5"/>
+  <line x1="200" y1="86" x2="200" y2="108" stroke="#2f7f57" stroke-width="1.5"/>
+  <line x1="520" y1="86" x2="520" y2="108" stroke="#2f7f57" stroke-width="1.5"/>
+
+  <!-- LEFT: the game fact -->
+  <rect x="70" y="108" width="260" height="86" rx="8" fill="#0f1a16" stroke="#5ffba0" stroke-width="1.5"/>
+  <text x="200" y="130" fill="#5ffba0" font-family="monospace" font-size="11" text-anchor="middle">THE GAME FACT</text>
+  <text x="200" y="156" fill="#eaf4ef" font-family="monospace" font-size="15" text-anchor="middle">behavior = NORMAL</text>
+  <text x="200" y="178" fill="#7c8f86" font-family="monospace" font-size="10" text-anchor="middle">(vs. exploding) — portable</text>
+
+  <!-- RIGHT: the encoding -->
+  <rect x="390" y="108" width="260" height="86" rx="8" fill="#1a1408" stroke="#ffb454" stroke-width="1.5"/>
+  <text x="520" y="130" fill="#ffb454" font-family="monospace" font-size="11" text-anchor="middle">THE ENCODING</text>
+  <text x="520" y="156" fill="#eaf4ef" font-family="monospace" font-size="15" text-anchor="middle">= core addr of calc</text>
+  <text x="520" y="178" fill="#7c8f86" font-family="monospace" font-size="10" text-anchor="middle">a PDP-1 fact — NOT portable</text>
+
+  <text x="360" y="228" fill="#7c8f86" font-family="monospace" font-size="11" text-anchor="middle">welded into the same 18 bits</text>
+</svg>
+<figcaption>The object table stores the <em>game fact</em> and the <em>machine encoding of that fact</em> as the same number. Freezing the number froze both — including the part your Realization can't share.</figcaption>
+</figure>
+
+<div class="callout warn">
+<strong>This is the irreducible idea.</strong> A frozen raw word looks like a portable, two-ended anchor. But if the value <em>is</em> a PDP-1 core address, the boat-end has nothing to shackle to — a from-scratch Realization has no <code>mex</code>, no <code>002310</code>, no core map. <span class="tt">Reference-internal</span> and <span class="tt">portable</span> aren't a property of <em>whether</em> you froze the word — they're a property of <em>what the word means</em>. Freezing didn't decide it. It just deferred it.</p>
+</div>
+
+<h2><span class="n">03</span>Why you can't have the Zelda hash</h2>
+<p>You've probably wished for the decomp trick: <code>sha1(built.z64) == sha1(original.z64)</code> — one mechanical hash, done. This word is exactly why you can't.</p>
+<div class="metaphor">
+<h3>Zelda recompiles to the <em>same</em> substrate. Your Realization doesn't.</h3>
+<p>The N64 decomp emits <strong>N64 machine code</strong>, so a byte-identical binary is a real, achievable object — the hash has a referent. Your Exact Realization is a from-scratch DIGS expression on a <strong>different substrate</strong>. It reproduces the <em>fact</em> “ship is normal / exploding,” but the number <code>002310</code> has <strong>no referent over there.</strong></p>
+<p>So the equivalent of the matching hash isn't “same core image” — that phrase is meaningless across substrates. It's an exact match of a <strong>decoded game-state fingerprint per frame</strong>: numeric fields raw, artifact fields decoded to game meaning, pure-machine-timing fields projected out. And notice what kind of problem that is — <strong>classification, not construction.</strong> The hard part is deciding which column is which. Once classified, the projection is ~50 lines.</p>
+</div>
+
+<h2><span class="n">04</span>The decode <em>feels</em> like heresy — here's the exorcism</h2>
+<p>This is the part that actually spooked you, even unnamed. Your creed is carved into <code>CONTEXT.md</code>: <em>“nothing asserted, everything checked; the Translator is never authority.”</em> The example dialogue ends: <em>“What you never do is promote a reading of the Translator to a green test. Ever.”</em></p>
+<p>And a decode layer <strong>smells exactly like that forbidden move.</strong> “This word <em>means</em> exploding” sounds like an interpretation being promoted to green. The prior grill voiced the fear precisely: <em>“the adapter becomes a new trust surface — who verifies the adapter?”</em> That whiff of heresy is what turned a trivial projection into a felt architectural hazard.</p>
+
+<div class="dlg heretic">
+<p class="who">The fear</p>
+<p>“If I write <code>mtb == addr(mex) ⇒ exploding</code>, I've asserted a meaning. That's Translator-class interpretation wearing a green checkmark. Heresy.”</p>
+</div>
+<div class="dlg">
+<p class="who">The dissolution</p>
+<p>Where does that map come from? <strong>Not</strong> the masswerk Translator's prose. You <em>observe</em> it from the Substrate — the T-MAINLOOP trace literally shows the explode branch writing <code>mex</code>'s address into that slot, the <em>same way</em> you observe every raw word you already trust. It's read off Ground-Truth execution, and it's falsifiable by re-running the trace.</p>
+</div>
+
+<div class="callout crux">
+<strong>The line that defuses it:</strong> an interpretation read from <em>prose</em> is heresy; a mapping read from <em>execution</em> is just another observation. A witnessed decode is <span class="tt">observe-don't-assert</span> applied one layer up — not a violation of the creed, an <em>instance</em> of it. The decode map earns its green the way everything else does: it's witnessed, and it's re-runnable.</p>
+</div>
+
+<h2><span class="n">05</span>So: three bins, not one frozen blob</h2>
+<p>The freeze treats every captured word identically — raw octal. The <em>contract</em> doesn't. Each column falls into one of three bins, and which bin is a witnessed classification, not a guess:</p>
+
+<div class="bins">
+  <div class="bin a">
+    <div class="lab">Bin A</div>
+    <h4>Raw</h4>
+    <p>Numeric game state. The Exact Realization is bit-exact fixed-point <em>by axiom</em>, so the raw word already <em>is</em> a two-ended portable anchor. Decoding here would only manufacture a Variant — strictly <em>worse</em>.</p>
+    <div class="cols">nx1 ny1 ndx ndy nom nth nfu ntr … + scalars</div>
+  </div>
+  <div class="bin b">
+    <div class="lab">Bin B</div>
+    <h4>Decode</h4>
+    <p>The value is a PDP-1 code/memory address. Reference-internal as raw. A <em>witnessed</em> decode to game meaning gives it the boat-end.</p>
+    <div class="cols">mtb (calc ptr) · not (outline ptr)</div>
+  </div>
+  <div class="bin c">
+    <div class="lab">Bin C — open</div>
+    <h4>Drop?</h4>
+    <p>Zero game-state content — pure machine timing. Candidate: <code>nb1</code>, the instruction-budget count (<code>:677</code>). No boat-end because there's no game fact to shackle.</p>
+    <div class="cols">nb1 (mtc budget) — unratified</div>
+  </div>
+</div>
+
+<div class="callout">
+<strong>What you already locked before you called timeout</strong> (now live in <code>CONTEXT.md</code>): <span class="tt">Exact Realization</span> (bit-exact subject of the goldens) and <span class="tt">Variant</span> (any non-exact Realization, not graded). Bin A is settled by axiom; Bin B is settled in principle (the <code>mtb</code>/Zelda call); Bin C — and whether “same” is exact-no-epsilon — is the <em>only</em> thing still genuinely open, and it's a <em>decision</em>, not a fog.</p>
+</div>
+
+<h2><span class="n">06</span>The thesis, in one breath</h2>
+<div class="metaphor">
+<p style="font-size:1.1rem;color:#eaf4ef;margin:0">It was never hard to <em>implement</em>. It was hard to <strong>name</strong>, and it carried a false whiff of heresy. Once you see that <span class="num">(a)</span> the object table welds game-fact to machine-encoding in single words like <code>3476</code>, and <span class="num">(b)</span> a witnessed decode is not an asserted interpretation — the whole thing collapses back to the ~50-line projection you intuited it should be.</p>
+</div>
+<p>Your intuition was right about the <em>code</em> and got ambushed by a <em>classification</em> problem wearing a <em>heresy</em> costume. That's the 20%. It's real, it's small, and now it's named.</p>
+
+<hr>
+
+<h2><span class="n">07</span>Check yourself</h2>
+<div class="quiz" id="quiz">
+  <p><strong>Q.</strong> The <code>mtb</code> word at <code>3476</code> is frozen in <code>gravity.snapshot.json</code> as the raw octal <code>002310</code>. Your from-scratch Realization runs the same pinned match. Should its <code>mtb</code> word raw-compare equal to <code>002310</code>?</p>
+  <button class="opt" data-c="0">A. Yes — it's a frozen golden word, and green means bit-exact.</button>
+  <button class="opt" data-c="1">B. No — <code>002310</code> is a PDP-1 core address the Realization can't share; only the <em>decoded</em> game fact (“normal, not exploding”) should match.</button>
+  <button class="opt" data-c="0">C. No — because floating-point rounding will differ.</button>
+  <button class="opt" data-c="0">D. Yes, but only within an epsilon.</button>
+  <div class="fb" id="fb"></div>
+</div>
+
+<div class="foot">
+<hr>
+Explainer 0002 · adheres to <code>CONTEXT.md</code> terminology · builds on Explainer 0001 (Oracle vs. Anchor)<br>
+The distinction in one breath: <strong>freezing a word doesn't make it portable — a word whose <em>value is a machine address</em> stays reference-internal until a <em>witnessed</em> decode (read from execution, never from the Translator) gives it a game-side end to shackle to.</strong>
+</div>
+</div>
+
+<script>
+document.querySelectorAll('#quiz .opt').forEach(function(b){
+  b.addEventListener('click',function(){
+    var correct=b.dataset.c==="1";
+    b.classList.add(correct?'right':'wrong');
+    document.getElementById('fb').innerHTML = correct
+      ? "✓ Right. <code>002310</code> is the encoding, not the fact. Raw-comparing it would demand the Realization host a PDP-1 core map — reference-internal. The portable anchor is the witnessed decode: <b>mtb-holds-addr(mex) ⇔ exploding</b>. That's Bin B."
+      : "Not quite. The word looks numeric, but its <em>value</em> is a PDP-1 core address (the calc-routine pointer, rewritten to <code>mex</code> on explode). Raw-comparing it forces the Realization to reproduce PDP-1 internals it doesn't have. Re-read §02 — a frozen raw word can still be reference-internal.";
+    if(!correct){b.disabled=true;}
+  });
+});
+</script>
+</body>
+</html>
