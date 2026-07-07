@@ -4,7 +4,7 @@
     "ADR-0007",
     "ADR-0012"
   ],
-  "generated": "2026-07-02T20:24:22.974Z",
+  "generated": "2026-07-06T17:53:22.448Z",
   "substrate": "PDP-1 simulator Open SIMH V4.1-0 Current",
   "gate": "PASS",
   "hardening": {

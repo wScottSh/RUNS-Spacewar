@@ -65,6 +65,6 @@
   "tool_versions": {
     "simh_pdp1": "PDP-1 simulator Open SIMH V4.1-0 Current",
     "macro1": "macro1.c — canonical PDP-1 Macro assembler (tools/macro1)",
-    "node": "v22.23.1"
+    "node": "v24.15.0"
   }
 }
