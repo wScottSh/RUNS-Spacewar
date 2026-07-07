@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<!--
+  PROTOTYPE: Does the ship fly identically to PDP-1 Spacewar! — gyro turn (instant,
+  no angular inertia), weak thrust along heading, frictionless inertia, toroidal
+  wrap — so a veteran couldn't tell the difference?
+
+  Fidelity rig, not feel-tuning. The movement math is a LITERAL integer fixed-point
+  replica of the 1962 spaceship routine. Constants lifted verbatim from
+  source/spacewar3.1_complete.txt and source/masswerk/insidespacewar-pt5-ships.html:
+
+    maa = 10 (oct) = 8       angular acceleration       (line 82)
+    sac = sar 4s   = >>4     spaceship acceleration      (line 83)
+    angle wrap = 311040(oct) = 102944  ............ 2*pi
+    spawn angle = 144420(oct) =  51472  ............ pi (180 deg)
+    pos wrap   = 400000(oct) = 131072  ... toroidal overflow
+    gyro turn  = maa * 128 (ral 7s) = 1024 / frame, momentum zeroed each frame
+    integrate  = pos += velocity >> 3 (sar 3s); velocity NEVER damped
+
+  Controls:  W thrust   A rotate CCW   D rotate CW
+             R reset    Space pause    M toggle gyro/inertial rotation
+             slider = simulation rate (calibrate by eye vs the masswerk emulator)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spacewar ship movement — fidelity</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; font-family: monospace; }
+  #wrap { position: fixed; inset: 0; display: grid; place-items: center; }
+  #stage {
+    position: relative;
+    width: min(100vw, 100vh); height: min(100vw, 100vh);
+    aspect-ratio: 1 / 1; background: #000; touch-action: none;
+  }
+  canvas { width: 100%; height: 100%; display: block; }
+  #hz {
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center; color: #888; font-size: 12px;
+    background: rgba(0,0,0,.4); padding: 4px 10px; border-radius: 4px;
+  }
+  #hz input { width: 160px; }
+  #focusmsg {
+    position: absolute; inset: 0; z-index: 5; cursor: pointer;
+    display: flex; flex-direction: column; gap: 6px;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(0,0,0,.6); color: #fff; font-size: 18px;
+  }
+  #focusmsg small { color: #9bd; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="c"></canvas>
+  <div id="focusmsg">Click to focus<small>keyboard input needs this window focused</small></div>
+  <div id="hz">
+    <span>sim rate</span>
+    <input id="hzr" type="range" min="5" max="60" step="1" value="30">
+    <span id="hzv">30 Hz</span>
+  </div>
+</div></div>
+<script>
+"use strict";
+
+// ---- Canvas (square, DPR-aware) -------------------------------------------
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+const SIZE = 512;                       // logical square coordinate space
+function fit() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = SIZE * dpr; canvas.height = SIZE * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+fit(); addEventListener("resize", fit);
+
+// ---- TUNABLES (the original's constants — edit and reload) ----------------
+const TWO_PI_INT  = 102944;   // 311040 oct  = 2*pi  (angle units)
+const START_ANGLE = 51472;    // 144420 oct  = pi
+const POS_MAX     = 131072;   // 400000 oct  : coords live in [-POS_MAX, POS_MAX)
+const MAA         = 8;        // 10 oct      : angular acceleration / frame
+const GYRO_MULT   = 128;      // ral 7s      : gyro mode multiplies turn by 128
+const COS_ONE     = 65536;    // cosine fixed-point: 1.0 => (>>9) yields 128
+const ACC_SHIFT_A = 9;        // sar 9s      : normalise unit vector
+const ACC_SHIFT_B = 4;        // sac=sar 4s  : spaceship acceleration
+const VEL_SHIFT   = 3;        // sar 3s      : velocity -> position each frame
+
+let simHz = 30;               // calibration knob (NOT original) — see slider
+
+// ---- STATE ----------------------------------------------------------------
+let S, trail, paused, inertial;
+function reset() {
+  S = { x:0, y:0, vx:0, vy:0, angle:START_ANGLE, mom:0, thrusting:false };
+  trail = [];
+  paused = false;
+  if (inertial === undefined) inertial = false;  // default = gyro
+}
+reset();
+
+// ---- INPUT ----------------------------------------------------------------
+const keys = new Set();
+addEventListener("keydown", e => {
+  const k = e.key.toLowerCase();
+  if (k === " ") { paused = !paused; e.preventDefault(); return; }
+  if (k === "r") { reset(); return; }
+  if (k === "m") { inertial = !inertial; S.mom = 0; return; }
+  keys.add(k);
+});
+addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
+
+const hzr = document.getElementById("hzr"), hzv = document.getElementById("hzv");
+hzr.addEventListener("input", () => { simHz = +hzr.value; hzv.textContent = simHz + " Hz"; });
+
+// ---- Focus prompt — keyboard events only arrive when this window is focused --
+const focusMsg = document.getElementById("focusmsg");
+function updateFocus() { focusMsg.style.display = document.hasFocus() ? "none" : "flex"; }
+addEventListener("focus", updateFocus);
+addEventListener("blur",  () => { keys.clear(); updateFocus(); });
+focusMsg.addEventListener("click", () => { window.focus(); updateFocus(); });
+updateFocus();
+
+// ---- HELPERS --------------------------------------------------------------
+const wrapAngle = n => ((n % TWO_PI_INT) + TWO_PI_INT) % TWO_PI_INT;
+function wrapPos(n) {                       // keep in [-POS_MAX, POS_MAX), toroidal
+  const span = 2 * POS_MAX;
+  return ((((n + POS_MAX) % span) + span) % span) - POS_MAX;
+}
+const toPx = p => (p + POS_MAX) / (2 * POS_MAX) * SIZE;   // coord -> screen pixel
+
+// ---- SIMULATION (one fixed integer step = one original frame) -------------
+function step() {
+  // --- rotation (the sc1 / mom / mth block) ---
+  let ac = 0;
+  if (keys.has("a")) ac -= MAA;            // rotate CCW
+  if (keys.has("d")) ac += MAA;            // rotate CW
+  ac += S.mom;                             // add momentum  (mom, add .)
+  S.mom = ac;                              // store it      (dac i mom)
+  if (!inertial) { S.mom = 0; ac *= GYRO_MULT; }  // gyro: clear + ral 7s (x128)
+  S.angle = wrapAngle(S.angle + ac);       // mth, add . ; limit to 2*pi
+
+  // --- thrust (cos/sin >>9, then sac=>>4 -> max +-8 vel/frame along heading) ---
+  let ax = 0, ay = 0;
+  S.thrusting = keys.has("w");
+  if (S.thrusting) {
+    const theta = S.angle / TWO_PI_INT * Math.PI * 2;
+    const hx = Math.sin(theta), hy = -Math.cos(theta);     // nose: angle 0 = up
+    ax = (Math.round(hx * COS_ONE) >> ACC_SHIFT_A) >> ACC_SHIFT_B;
+    ay = (Math.round(hy * COS_ONE) >> ACC_SHIFT_A) >> ACC_SHIFT_B;
+  }
+
+  // --- integrate (the diff macro): velocity += accel; position += velocity>>3 ---
+  S.vx += ax; S.x = wrapPos(S.x + (S.vx >> VEL_SHIFT));    // velocity is never damped
+  S.vy += ay; S.y = wrapPos(S.y + (S.vy >> VEL_SHIFT));
+
+  // --- breadcrumb trail (dots so the toroidal seam doesn't streak) ---
+  trail.push({ x: S.x, y: S.y });
+  if (trail.length > 240) trail.shift();
+}
+
+// ---- DRAW (greybox) -------------------------------------------------------
+// draw a thing at every wrapped image so it splits across the seam
+function atWrapped(sx, sy, fn) {
+  for (let ox = -SIZE; ox <= SIZE; ox += SIZE)
+    for (let oy = -SIZE; oy <= SIZE; oy += SIZE) {
+      const x = sx + ox, y = sy + oy;
+      if (x > -40 && x < SIZE + 40 && y > -40 && y < SIZE + 40) fn(x, y);
+    }
+}
+
+function drawShip(sx, sy) {
+  const theta = S.angle / TWO_PI_INT * Math.PI * 2;
+  const dirx = Math.sin(theta), diry = -Math.cos(theta);   // nose
+  const perpx = -diry, perpy = dirx;
+  const L = 11, W = 7;                       // greybox wedge (a touch larger than 1:1 for a legible nose)
+  const nose = [sx + dirx * L,        sy + diry * L];
+  const bl   = [sx - dirx * L*0.6 + perpx * W, sy - diry * L*0.6 + perpy * W];
+  const br   = [sx - dirx * L*0.6 - perpx * W, sy - diry * L*0.6 - perpy * W];
+  const tail = [sx - dirx * L*0.3,    sy - diry * L*0.3];   // wedge notch
+  ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(nose[0], nose[1]);
+  ctx.lineTo(bl[0], bl[1]);
+  ctx.lineTo(tail[0], tail[1]);
+  ctx.lineTo(br[0], br[1]);
+  ctx.closePath();
+  ctx.stroke();
+
+  // exhaust tail: dotted random-length plume out the back while thrusting
+  if (S.thrusting) {
+    const n = (Math.random() * 16) | 0;      // ranct: random 0..16 locations
+    ctx.fillStyle = "#f93";
+    for (let i = 0; i < n; i++) {
+      const d = L*0.6 + i * 1.6 + Math.random() * 1.5;
+      ctx.fillRect(sx - dirx * d - 0.5, sy - diry * d - 0.5, 1.4, 1.4);
+    }
+  }
+
+  // momentum-mode RCS puff: one side of the nose tip fires to show the angular
+  // thrust being applied. Reaction-correct — the jet vents OPPOSITE the turn:
+  //   A (CCW): jet off the right of the nose, pushing the nose left  (CCW)
+  //   D (CW) : jet off the left  of the nose, pushing the nose right (CW)
+  // Flip the `cw ? -1 : 1` sign if you'd rather the puff sit on the turn side.
+  if (inertial && !paused) {
+    const ccw = keys.has("a"), cw = keys.has("d");
+    if (ccw !== cw) {                          // exactly one — never simultaneous
+      const side = cw ? -1 : 1;                // which side of the nose tip vents
+      const jx = perpx * side, jy = perpy * side;
+      const ox = nose[0] + jx * 2, oy = nose[1] + jy * 2;
+      ctx.fillStyle = "#7cf";
+      const m = 4 + ((Math.random() * 5) | 0);
+      for (let i = 0; i < m; i++) {
+        const d = 1 + i * 1.5 + Math.random() * 1.4;
+        ctx.fillRect(ox + jx * d - 0.6, oy + jy * d - 0.6, 1.4, 1.4);
+      }
+    }
+  }
+
+  // velocity arrow — momentum vs. facing (the money shot)
+  const K = 0.018;
+  let ex = S.vx * K, ey = S.vy * K;
+  const mag = Math.hypot(ex, ey), CAP = 90;
+  if (mag > CAP) { ex *= CAP / mag; ey *= CAP / mag; }
+  if (mag > 1.5) {
+    ctx.strokeStyle = "#3cf"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + ex, sy + ey); ctx.stroke();
+    const a = Math.atan2(ey, ex);
+    ctx.beginPath();
+    ctx.moveTo(sx + ex, sy + ey);
+    ctx.lineTo(sx + ex - 6*Math.cos(a - 0.4), sy + ey - 6*Math.sin(a - 0.4));
+    ctx.moveTo(sx + ex, sy + ey);
+    ctx.lineTo(sx + ex - 6*Math.cos(a + 0.4), sy + ey - 6*Math.sin(a + 0.4));
+    ctx.stroke();
+  }
+}
+
+function draw() {
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, SIZE, SIZE);
+
+  // border + faint centre (so wrap seam & origin are legible)
+  ctx.strokeStyle = "#222"; ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, SIZE-1, SIZE-1);
+  ctx.fillStyle = "#222"; ctx.fillRect(SIZE/2-1, SIZE/2-1, 2, 2);
+
+  // fading breadcrumb trail
+  for (let i = 0; i < trail.length; i++) {
+    const t = trail[i], a = i / trail.length;
+    ctx.fillStyle = "rgba(120,160,200," + (a * 0.7).toFixed(3) + ")";
+    atWrapped(toPx(t.x), toPx(t.y), (x, y) => ctx.fillRect(x-0.5, y-0.5, 1.4, 1.4));
+  }
+
+  // the ship (every wrapped image)
+  atWrapped(toPx(S.x), toPx(S.y), (x, y) => drawShip(x, y));
+
+  // ---- HUD ----
+  const deg = (S.angle / TWO_PI_INT * 360);
+  const speed = Math.hypot(S.vx, S.vy);
+  ctx.fillStyle = "#9c9"; ctx.font = "12px monospace"; ctx.textBaseline = "top";
+  const L = [
+    "MODE   : " + (inertial ? "inertial (momentum)" : "gyro (instant)"),
+    "angle  : " + deg.toFixed(1) + " deg   (" + S.angle + " raw)",
+    "vel    : vx " + S.vx + "   vy " + S.vy,
+    "speed  : " + speed.toFixed(0),
+    "pos    : " + S.x + ", " + S.y,
+  ];
+  L.forEach((s, i) => ctx.fillText(s, 8, 8 + i * 15));
+
+  ctx.fillStyle = "#556";
+  ctx.fillText("W thrust  A/D turn  R reset  Space pause  M mode", 8, SIZE - 38);
+  if (paused) {
+    ctx.fillStyle = "#fff"; ctx.font = "20px monospace";
+    ctx.fillText("PAUSED", SIZE/2 - 36, SIZE/2 - 40);
+  }
+}
+
+// ---- LOOP (fixed timestep = original frames; rAF only paces the wall clock) -
+let last = performance.now(), acc = 0;
+function frame(now) {
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.25) dt = 0.25;                 // avoid spiral after a tab stall
+  if (!paused) {
+    acc += dt;
+    const stepDur = 1 / simHz;
+    let budget = 8;                         // cap steps/frame
+    while (acc >= stepDur && budget-- > 0) { step(); acc -= stepDur; }
+  } else { acc = 0; }
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
