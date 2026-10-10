@@ -1,0 +1,20 @@
+# The tunables the original keeps as instructions (each is executed with
+# `xct`), so an operator could patch the rule, not just the number.
+
+function torpedo_space_warpage(position: word) -> word      # the
+  return position >> 9
+
+function breakout_time() -> word                            # hd2
+  return -0100
+
+function hyperfield_recharge_time() -> word                 # hd3
+  return -0200
+
+function hyperspatial_displacement(high: word, low: word) -> (word, word)   # hr1
+  return scl(high, low, 9)
+
+function hyperspatial_velocity(high: word, low: word) -> (word, word)       # hr2
+  return scl(high, low, 4)
+
+function torpedo_life() -> word                             # tlf
+  return -0140

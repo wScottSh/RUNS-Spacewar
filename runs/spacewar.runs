@@ -1,0 +1,66 @@
+# Spacewar! 3.1: the game's state.
+#
+# Every word of core the game carries from one routine to another, or from
+# one frame to the next, is a field of a Record here. Scratch words a routine
+# sets before it reads them are not state: they are locals of the routine.
+
+type word
+  bits: 18
+  complement: ones          # -0 exists; add and subtract are the PDP-1's (end-around carry, never yield -0)
+  compare: sign             # word < 0 tests the sign bit; == compares all 18 bits
+
+# The routine word (the ml1 property): which calc routine runs the object.
+# Each value also fixes whether the object collides; core keeps that in the
+# word's sign bit.
+enum calc_routine
+  none                      # a free slot
+  first_spaceship           # ss1
+  second_spaceship          # ss2
+  torpedo                   # tcr
+  explosion                 # mex: does not collide
+  in_hyperspace             # hp1: does not collide
+  breakout                  # hp3
+
+# The object table (mtb): two spaceships, then 22 torpedoes.
+record objects[030]
+  routine: calc_routine = none
+  x: word = 0               # nx1: position
+  y: word = 0               # ny1
+  counter: word = 0         # na1: frames left of a torpedo's life, an explosion, a stay in hyperspace
+  cycles: word = 0          # nb1: instructions the calc routine takes; an explosion's size
+  dx: word = 0              # ndx: velocity
+  dy: word = 0              # ndy
+
+# Spaceship-only properties, slot for slot with objects[0] and objects[1].
+record ships[2]
+  angular_momentum: word = 0    # nom
+  angle: word = 0               # nth: heading
+  fuel: word = 0                # nfu: counting up, out at 0
+  torpedoes: word = 0           # ntr: torpedoes left, counting up
+  outline: word = 0             # not: the ship's compiled outline
+  previous_control: word = 0    # nco: last frame's control word
+  saved_routine: calc_routine = none   # nh1: the ship's own calc routine, kept during hyperspace
+  jumps_left: word = 0          # nh2: hyperspace jumps left, counting up
+  recharge: word = 0            # nh3: hyperfield generator recharge, counting up
+  uncertainty: word = 0         # nh4: hyperspatial uncertainty
+
+record random
+  number: word = 0          # ran
+
+record frame
+  spare_time: word = 0      # mtc: the frame's instruction budget, counting up
+  restart_delay: word = 0   # ntd: frames until the next game, counting up
+  objects_seen: word = 0    # moc: counted, never read
+
+# The tunables at the head of the tape (words 3-116). The ones the original
+# keeps as instructions to execute are functions in tunables.runs-prim.
+record tunables
+  collision_radius: word = 06000            # me1
+  collision_radius_half: word = 03000       # me2
+  hyperspatial_uncertainty: word = 040000   # hur
+
+# What the scope shows: each point in the order it is plotted.
+stream display
+  x: word
+  y: word
+  intensity: int

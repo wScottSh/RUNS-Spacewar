@@ -1,0 +1,47 @@
+# One pass of the main loop is one frame (ml0 .. ml0). The Network only
+# decides what fires: its guards read Records, and every value it moves
+# between Processors goes through a Record.
+
+network frame                                               # ml0
+  run begin_frame
+  # The restart checks: while both ships fly on their own calc routines and
+  # one still has torpedoes, the restart delay is held; otherwise it counts
+  # down, and then the survivors score.
+  if objects.routine[0] == first_spaceship and objects.routine[1] == second_spaceship and (1 + ships.torpedoes[0] < 0 or 1 + ships.torpedoes[1] < 0):
+    run hold_restart
+  else:
+    run count_down_restart
+    if frame.restart_delay >= 0:
+      run score_survivors
+      run between_games
+      stop
+  # The object loop (ml1): each active object that can collide is tested
+  # against every later one that can, then its calc routine runs and its
+  # time is charged to the frame. The last object has no later one to test,
+  # and is not counted.
+  for slot in 0 .. 026:
+    if objects.routine[slot] != none:
+      run count_object
+      if collides(objects.routine[slot]):
+        for other in slot + 1 .. 027:
+          if objects.routine[other] != none and collides(objects.routine[other]):
+            run collision(slot, other)
+      run calc(slot)
+      run charge_time(slot)
+  if objects.routine[027] != none:
+    run calc(027)
+    run charge_time(027)
+  run expensive_planetarium                                 # mq3
+  run central_star
+  run spare_time
+
+# The calc routine the object's routine word names.
+network calc(slot)
+  match objects.routine[slot]:
+    none: unreachable
+    first_spaceship: run spaceship(slot)
+    second_spaceship: run spaceship(slot)
+    torpedo: run torpedo(slot)
+    explosion: run explosion(slot)
+    in_hyperspace: run in_hyperspace(slot)
+    breakout: run breakout(slot)
