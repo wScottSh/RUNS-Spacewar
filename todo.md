@@ -101,3 +101,25 @@ Predicate: runsc MATCH 8744e9c9; the extended check_compiled passes (every mutan
 - [x] deslop, check_all on the final commit, decisions.tsv
 - [ ] Open: no independent reviewer has re-read runsc's shared-words check and the bit-level proof (BLOCKED: independent review in this subagent)
 - [ ] Open: the gate does not mutate a match's arms or insert statements; cross-type field swaps were swept once by hand (939, none silent), not in the gate
+
+## Round 10 (autonomous): close reviewer C's holes
+Playbook (autonomous run), verbatim:
+- [x] 1. State the exit condition as a checkable predicate before the first iteration (tests green, repro fixed, all N PRs merged, pixel-diff zero).
+- skip: 2. Pick the wake mechanism (loop skill): no external event to watch; every check runs in the foreground or a background job I wait on
+- [x] 3. Each iteration makes the smallest change the evidence justifies, verifies it against the predicate, commits if it advanced, discards changes that didn't help.
+- [x] 4. Mid-run discoveries are yours.
+- [x] 5. Checkpoint every iteration via the show-me-your-work skill.
+- [x] 6. Stop when the predicate is met.
+
+Predicate: runsc MATCH 8744e9c9; reviewer C's harnesses (hC_gen, hC_gen2, hC_decl, hC_bfuzz, hC_elem) re-run at HEAD show 0 silent-and-different, 0 crashes, every declaration drop caught; the extended check_compiled passes; check_all.sh passes on the final code commit; findings 1-6 fixed or declined with a logged reason.
+
+- [x] 1. "One value in two places" peephole sound; every other runsc peephole audited for unchecked assumptions
+- [x] 2. Gate: dup, move, insert, run target, negate, branch swap, match arms, cross-type/record field, declaration drops, binding list elements and values
+- [x] 3. runs.check: declarations checked against bodies both ways; requires decided
+- [x] 4. runs.check: static types
+- [x] 5. runsc crashes become BindErrors at their cause
+- [x] 6. Dead list element handoff.swap; the gate catches dead list elements
+- [x] deslop, docs, decisions.tsv, check_all (972027f: full gate 39,847 mutants and check_all pass)
+- [x] Audit (subagent) of every runsc peephole: two more holes fixed (a block's run in tail position; the jump-back run's arguments); loop bounds kept as RUNS's check, judged by firing
+- [ ] Open: the audit's rules judged unchecked but guarded by the image in practice (held guards, shared xor, spill, preinc, shift-table `known`, jump-table range, pending results, slot chain) have no mutant that builds MATCH; no rule makes them sound by construction
+- [ ] Open: no independent reviewer has re-read this round's runs.check type and declaration rules (BLOCKED: independent review in this subagent)
