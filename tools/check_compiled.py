@@ -38,19 +38,37 @@ def replaced(tree, path, new):
     return items if isinstance(tree, list) else tuple(items)
 
 
+def compiled(prog: runs.Program, name: str, bound: set[str]):
+    """The Processors a bound routine compiles: itself, or the ones its
+    Network runs that are not bound routines of their own."""
+    r = prog.routines[name]
+    if r.kind == "processor":
+        yield name
+        return
+    for s in r.body:
+        if s[1] not in bound:
+            yield from compiled(prog, s[1], bound)
+
+
 def sites(prog: runs.Program):
-    """(label, mutate) for each number the bindings compile."""
-    for b in sorted(runsc.BINDINGS.glob("*.toml")):
-        for place in tomllib.loads(b.read_text())["place"]:
-            if name := place.get("processor"):
-                body = prog.routines[name].body
-                for path, n in numbers(body):
-                    yield f"{name} {path} {n:o}", ("routine", name, path, n)
-            for dotted in place.get("fields", []):
-                rec, fld = dotted.split(".")
-                init = prog.records[rec].fields[fld][1]
-                for path, n in numbers(init):
-                    yield f"{dotted} = {n:o}", ("field", rec, fld, path, n)
+    """(label, mutate) for each number the bindings compile, and the initial
+    value of each field they place or hand a routine."""
+    places = [p for b in sorted(runsc.BINDINGS.glob("*.toml")) for p in tomllib.loads(b.read_text())["place"]]
+    bound = {p["routine"] for p in places if "routine" in p}
+    fields = []
+    for place in places:
+        if name := place.get("routine"):
+            for proc in dict.fromkeys(compiled(prog, name, bound)):
+                for path, n in numbers(prog.routines[proc].body):
+                    yield f"{proc} {path} {n:o}", ("routine", proc, path, n)
+            fields += [place.get(k) for k in ("entry", "io_param", "byname")]
+            fields += place.get("result", []) + place.get("cells", [])
+        fields += place.get("fields", [])
+    for dotted in dict.fromkeys(f for f in fields if f):
+        rec, fld = dotted.split(".")
+        init = prog.records[rec].fields[fld][1]
+        for path, n in numbers(init):
+            yield f"{dotted} = {n:o}", ("field", rec, fld, path, n)
 
 
 def is_bound(prog, site) -> bool:
@@ -79,9 +97,14 @@ def mutate(prog: runs.Program, site) -> runs.Program:
 
 
 def changes_image(site) -> tuple[bool, str]:
+    """Whether the mutated text builds a different image, or none: a number
+    the binding cannot carry (an entry word's initial value) is refused."""
     prog = runs.program(runs.source())
     with tempfile.TemporaryDirectory() as out:
-        code = runsc.build(mutate(prog, site), Path(out))
+        try:
+            code = runsc.build(mutate(prog, site), Path(out))
+        except runsc.BindError as e:
+            return True, f"refused: {e}"
     first = next((line.strip() for line in runsc.build.said.splitlines() if "first difference" in line), "")
     return code != 0, first
 
@@ -98,12 +121,15 @@ def main() -> int:
     with ProcessPoolExecutor(mp_context=multiprocessing.get_context("fork")) as pool:
         results = list(pool.map(changes_image, [s for _, s in built]))
     silent = [label for (label, _), (changed, _) in zip(built, results) if not changed]
+    refused = [label for (label, _), (_, how) in zip(built, results) if how.startswith("refused")]
     for label in bounds:
         print(f"  loop bound, RUNS's check only: {label}")
+    for label in refused:
+        print(f"  refused by the binding: {label}")
     for label in silent:
         print(f"  NO CHANGE: {label}")
-    print(f"check_compiled: image matches; {len(built) - len(silent)}/{len(built)} numbers change it, "
-          f"{len(bounds)} loop bounds")
+    print(f"check_compiled: image matches; {len(built) - len(silent)}/{len(built)} numbers change it "
+          f"({len(refused)} of them refused by the binding), {len(bounds)} loop bounds")
     return 1 if silent else 0
 
 

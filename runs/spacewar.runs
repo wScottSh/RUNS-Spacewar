@@ -80,6 +80,20 @@ record square_root_call
   passes_left: word = 0     # sq1
   root: word = 0            # sq2: the result
 
+# The multiply subroutines' own words (mpy, imp). The second factor is the
+# word after the call (`jda mpy / lac b`); no caller names a word the
+# routine writes, so reading it once or each time gives the same value.
+record multiply_call
+  entry: word = 0           # mpy: jda leaves the first factor here
+  factor: word = 0          # the second factor
+  partial: word = 0         # mp2: |factor|, then the product's high half, AC at return
+  low: word = 0             # IO at return: the product's low half
+
+record integer_multiply_call
+  entry: word = 0           # imp: jda leaves the first factor here
+  factor: word = 0          # the second factor
+  product: word = 0         # AC at return: the product's low 17 bits and its sign
+
 # Values the original hands from one rule to the next in AC and IO. Each is a
 # place only because a register carried it: into or out of a tunable the
 # original executes with xct, or into the diff macro.

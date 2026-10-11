@@ -3,10 +3,10 @@
 replaces = "lift/square_root.c"
 
 [[place]]
-processor = "square_root"
+routine = "square_root"
 convention = "JDA"
 entry = "square_root_call.entry"
-result = "square_root_call.root"
+result = ["square_root_call.root"]
 io = ["input_bits"]
 
 [[place]]

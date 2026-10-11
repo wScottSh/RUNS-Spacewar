@@ -41,6 +41,8 @@ FIELDS = {
     ("explosion_cloud", "particles"): "mxc",
     ("square_root_call", "entry"): "sqt", ("square_root_call", "passes_left"): "sq1",
     ("square_root_call", "root"): "sq2",
+    ("multiply_call", "entry"): "mpy", ("multiply_call", "partial"): "mp2",
+    ("integer_multiply_call", "entry"): "imp",
 }
 
 # Fields the original keeps inside an instruction, not in a word of their

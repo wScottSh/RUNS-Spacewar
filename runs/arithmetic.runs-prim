@@ -28,6 +28,48 @@ processor square_root                                       # sqt
     set square_root_call.entry = next
     set square_root_call.root = square_root_call.root + 1
 
+# BBN multiply (mpy). The product of the two factors: 34 bits and two signs,
+# the high half in multiply_call.partial, the low in multiply_call.low.
+processor multiply                                          # mpy
+  writes: multiply_call
+  let magnitude = multiply_call.entry
+  if magnitude < 0:
+    set magnitude = -magnitude
+  set multiply_call.low = magnitude                         # the multiplier, shifted out as the product shifts in
+  set magnitude = multiply_call.factor
+  if magnitude < 0:
+    set magnitude = -magnitude
+  set multiply_call.partial = magnitude
+  let high = 0
+  for step in 1 .. 021:
+    set (high, multiply_call.low) = mus(high, multiply_call.low, multiply_call.partial)
+  set multiply_call.partial = high
+  if (multiply_call.factor ^ multiply_call.entry) < 0:      # the signs differ: negate the 36 bits
+    set high = -multiply_call.partial
+    set (high, multiply_call.low) = rcr(high, multiply_call.low, 18)
+    set high = -high
+    set (high, multiply_call.low) = rcr(high, multiply_call.low, 18)
+    set multiply_call.partial = high
+
+# BBN integer multiply (imp): mpy with the factors swapped, keeping the low
+# half's 17 bits and sign.
+processor integer_multiply_factors                          # imp: xct, jda mpy, lac imp
+  reads: integer_multiply_call
+  writes: multiply_call
+  set multiply_call.entry = integer_multiply_call.factor
+  set multiply_call.factor = integer_multiply_call.entry
+
+processor integer_multiply_product                          # rir 1s: the low half's sign, bit 17, back to bit 0
+  reads: multiply_call
+  writes: integer_multiply_call
+  set integer_multiply_call.product = rar(multiply_call.low, 1)
+
+network integer_multiply                                    # imp
+  writes: integer_multiply_call
+  run integer_multiply_factors
+  run multiply
+  run integer_multiply_product
+
 # The `random` macro: the generator's next value.
 processor next_random
   writes: random

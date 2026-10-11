@@ -87,6 +87,7 @@ The original passes values between routines in AC and IO, and that is what had m
 
 - **A subroutine** (`jda sqt`) is a Processor over the routine's own words. `jda` leaves the argument in the entry word `sqt`, and the routine leaves the root in `sq2`, so `square_root` reads `square_root_call.entry` and writes `square_root_call.root`. The scratch words `sq1` and `sq2` are fields of the same Record, because they are the routine's places in the original too.
 - **A tunable executed with `xct`** (`the`, `hd2`, `hd3`, `hr1`, `hr2`, `tlf`) is a Processor of its own. What it takes from AC and IO and what it leaves there are fields of the `handoff` Record. A routine that executed one becomes a Network: a Processor sets the input, the tunable fires, and a Processor uses the output. An operator can still patch the rule and not only the number.
+- **A subroutine that calls another** (`imp` calls `mpy`) is a Network. A Processor sets the callee's Record, as the caller's AC and the word after its call would, the callee runs, and a Processor reads the callee's results. The word after a call (`jda mpy / lac b`) is the callee's argument by name: the callee executes it each time it reads it. No caller in Spacewar names a word the callee writes, so it is a field the caller sets once (checked against every call site in the listing).
 - **A macro** (`random`, `diff`) is a Processor too. `random` updates `random.number` in place. `diff` reads its acceleration from `handoff.acceleration` and moves one axis of one object, so it is two Processors, `inertia_x` and `inertia_y`. A loop that runs a macro moves up into the Network. The explosion's dot loop is the case in this slice.
 
 `handoff` holds only values that the original carried in a register from one rule to the next. Each field names the register and the instruction in a comment. A value that a Processor computes and uses itself stays a local. A word that the original keeps in core between two rules is a Record field named for what it means, such as `explosion_cloud.particles` (`mxc`).
@@ -123,7 +124,8 @@ The syntax is a working draft. These are the forms this slice needed:
 
 - `record name[N]` with typed fields and initial values, and `stream` for ordered output (the display's points).
 - `enum`, and `match` over an enum in a Network. The evaluator checks that every member has an arm.
-- In bodies: `let`, `set` (which updates a local or a declared Record field), `if`, `elif`, `else`, `loop at most N:` with `break`, `continue`, and `return`, and `emit`.
+- In bodies: `let`, `set` (which updates a local or a declared Record field), `if`, `elif`, `else`, `loop at most N:` with `break`, `continue`, and `return`, `for i in a .. b` (a counted loop: `mpy`'s 17 multiply steps), and `emit`.
+- The word's operators: `ral`, `rar`, `popcount`, and the AC:IO pair operators `rcl`, `rcr`, `scl`, `scr`, `mus` (multiply step) and `dis` (divide step), which return the pair: `set (high, low) = mus(high, low, m)`.
 - In Networks: `run`, `if`, `for i in a .. b` (bounded and ascending, and the bounds may depend on an outer index), `match`, `stop`, `unreachable`, `requires:`, and the contract, `reads:` and `writes:`. A guard is any expression that writes nothing; `breakout`'s `if (random.number | 0400000) + ships.uncertainty[slot] >= 0:` is one.
 - The Network loop, `loop at most N:`. Its body fires and chooses like any Network body, and it must hold an `if <guard>: break` among its own statements. The guard reads Records that the Processors in the body write. The loop runs its body, in order, until a guard breaks. Running past N passes means the port is wrong, as it does in a Processor. The explosion's dot loop is the form:
 
@@ -164,6 +166,7 @@ A swarm stress-tested this draft against Super Mario Bros., DOOM, Ocarina of Tim
 Each check runs the RUNS source in the evaluator and SIMH running the oracle image on the same Records, and compares every field and every plotted point.
 
 - `square_root`, the Processor over its own words: all 65,536 inputs match (`tools/check_square_root.py`, against RUNS-Spacewar's observed vectors).
+- `multiply` and the Network `integer_multiply`: 101,453 calls each, all match on AC, IO, `mpy`, `mp2` and `imp` (`tools/check_multiply.py`, against SIMH: every pair of 38 edge values, RUNS-Spacewar's nine observed pairs, and 100,000 seeded pairs).
 - The Networks `explosion`, `torpedo`, `in_hyperspace`, `breakout`: 3,000 calls each, all match, 6.1 million points (`tools/check_calc_routines.py`).
 - The frame Network from `ml0` to `mq3`, covering the restart countdown, the object loop, collisions, and every ported calc routine: 1,500 frames, all match, with 4,343 collisions that hit (`tools/check_frame.py`).
 - The checks fail when the source is wrong. Each mutation through `tools/mutate.sh` was caught: skipping adjacent collision tests, testing objects that do not collide, skipping slot 0, an off-by-one in the time charge, a wrong torpedo explosion counter, and dropping the second `random` from the explosion's dot loop.
@@ -172,4 +175,6 @@ Each check runs the RUNS source in the evaluator and SIMH running the oracle ima
 
 ## Not yet ported
 
-The spaceship calc routine, which covers gravity, thrust, the controls, torpedo launch, the jump into the compiled outline, hyperspace entry, and the halt on a full object table. Also the outline compiler and the Expensive Planetarium (presentation), the central star (presentation, with two game-rule random draws), the game control between games (scores, the game count, halts, and the test word), and the sense switches. With them come the boundary's inputs: the control word, the sense switches, and the words the game reads from core at power-on. Then the compiler from RUNS plus the binding to the exact binary.
+The spaceship calc routine, which covers gravity, thrust, the controls, torpedo launch, the jump into the compiled outline, hyperspace entry, and the halt on a full object table. Also the outline compiler and the Expensive Planetarium (presentation), the central star (presentation, with two game-rule random draws), the game control between games (scores, the game count, halts, and the test word), and the sense switches. With them come the boundary's inputs: the control word, the sense switches, and the words the game reads from core at power-on.
+
+`tools/runsc.py` compiles `square_root` and the multiply subroutines from RUNS and their bindings (`pdp1/`) to the exact tape image. The rest of the image still comes from spacewar-c's lifted C.

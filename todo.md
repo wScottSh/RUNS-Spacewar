@@ -20,3 +20,8 @@
 - [ ] Open: port the spaceship (confirms or refutes that play never observes mot's reads past the outline array)
 - [ ] Open: the boundary's inputs (control word, sense switches, power-on words 1sc, 2sc, gct)
 - [ ] Open: runs-spec is untouched; it still says what the user called directionally right, wrong in details
+
+## Round 3 (autonomous): compile multiply, divide, sincos from RUNS
+- [x] multiply: RUNS mpy + imp Network, check_multiply vs SIMH, pdp1/multiply.toml, runsc networks/calls/byname/dword, MATCH, gate
+- [ ] divide
+- [ ] sincos

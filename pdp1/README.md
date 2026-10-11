@@ -8,9 +8,27 @@ A binding holds only choices that play cannot observe:
 
 - **Tape order.** `[[place]]` entries in the order their words lie on the tape: a routine, or a list of Record fields.
 - **Calling convention.** How a routine is entered and left: `JDA`, `JSP`, `BLOCK`, `XCT`, laid out in place, a skip return.
-- **Storage.** Which register or word carries a value: an AC or IO local, a JDA entry word, a pool word, the address field of an instruction (a cursor).
+- **Storage.** Which register or word carries a value: an AC or IO local, a JDA entry word, a pool word, the address field of an instruction (a cursor), the word after a call (by name).
 - **Layout of code.** Where a block of a routine's code lies when the original lays it out of order.
 - **Names the lifted C still uses.** While a unit that refers to a name is still lifted C, the binding gives the C name. These go when the last such unit is ported.
+
+## The vocabulary
+
+A `[[place]]` with `fields` lays out those Record fields as data words, with their RUNS initial values. A `[[place]]` with `routine` compiles a Processor or a Network to one C function:
+
+- `convention`: `JDA`, `JSP`, `XCT`, as spacewar-c's dialect spells it (`tools/pdp1cc/include/pdp1.h`).
+- `entry`: the field that is the JDA entry word, where the call leaves AC.
+- `byname`: the field that is the word after the call, executed each time it is read.
+- `result`: the fields that hold the result when the routine returns: AC, then IO.
+- `io`: locals and fields that live in IO. The rest live in AC or in a word of their own.
+
+A Network bound as one routine runs its Processors inline. A `run` of another bound routine is a call: the sets of that routine's parameter fields just before the run are its arguments, and its result fields are read from the returned AC:IO pair.
+
+A field with no data word of its own (an entry word, a register) has no value on the tape, so its RUNS initial value must be 0; `runsc` refuses any other.
+
+## Names the lifted C still uses
+
+Lifted units call the ported routines by their C names. `runsc` names each C function after its RUNS routine, and the lifted names are the same: `square_root` and `multiply`, `integer_multiply` (`lift/spaceship.c`). No binding renames one. These names stop mattering when the last lifted unit that calls them is ported.
 
 ## What a binding may not say
 

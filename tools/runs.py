@@ -143,6 +143,16 @@ def mus(h: W, l: W, m: W) -> tuple[W, W]:
     return W(ac >> 1), W((l.v >> 1) | ((ac & 1) << 17))
 
 
+def dis(h: W, l: W, m: W) -> tuple[W, W]:
+    top = h.v >> 17
+    ac = ((h.v << 1) | (l.v >> 17)) & MASK
+    lv = ((l.v << 1) | (top ^ 1)) & MASK
+    ac = ac + (m.v ^ MASK) if lv & 1 else ac + m.v + 1
+    if ac > MASK:
+        ac = (ac + 1) & MASK
+    return W(0 if ac == MASK else ac), W(lv)
+
+
 BUILTINS = {
     "ral": lambda a, n: ral(as_word(a), as_count(n)),
     "rar": lambda a, n: rar(as_word(a), as_count(n)),
@@ -151,6 +161,7 @@ BUILTINS = {
     "scl": lambda h, l, n: scl(as_word(h), as_word(l), as_count(n)),
     "scr": lambda h, l, n: scr(as_word(h), as_word(l), as_count(n)),
     "mus": lambda h, l, m: mus(as_word(h), as_word(l), as_word(m)),
+    "dis": lambda h, l, m: dis(as_word(h), as_word(l), as_word(m)),
     "popcount": lambda a: bin(as_word(a).v).count("1"),
 }
 
