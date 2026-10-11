@@ -1,0 +1,84 @@
+# The calc routines for objects that are not flying spaceships: mex, tcr,
+# hp1 and hp3, jsp routines the main loop enters with its cursors on the
+# current object. The random and diff macros are laid out at each use.
+replaces = "lift/objects.c"
+include = ["object_table.h"]
+registers = ["handoff"]
+pool = ["explosion_cloud.particles"]
+
+# A Record field indexed by the routine's slot is the word the main loop's
+# cursor points at (object_table.h, homed in the main loop's code).
+[cursors]
+"objects.routine" = "routine_slot"
+"objects.x" = "x_slot"
+"objects.y" = "y_slot"
+"objects.counter" = "counter_slot"
+"objects.cycles" = "cycles_slot"
+"objects.dx" = "dx_slot"
+"objects.dy" = "dy_slot"
+"ships.angle" = "angle_slot"
+"ships.saved_routine" = "saved_routine_slot"
+"ships.jumps_left" = "jumps_left_slot"
+"ships.recharge" = "recharge_slot"
+"ships.uncertainty" = "uncertainty_slot"
+
+# Fields held in a shift instruction: spread as the address field of the
+# xct that runs one of a table of shifts (msh, xct .), scatter as the
+# shift itself, built at run time where it runs (mi1).
+[homes]
+"explosion_cloud.spread" = "table"
+"explosion_cloud.scatter" = "built"
+
+# The routine word: the calc routine's address, with the sign bit when the
+# object does not collide.
+[spell.calc_routine]
+none = 0
+explosion = { routine = "explosion", sign = true }
+in_hyperspace = { routine = "in_hyperspace", sign = true }
+breakout = { routine = "breakout" }
+torpedo = { routine = "torpedo" }
+first_spaceship = { routine = "first_spaceship" }
+second_spaceship = { routine = "second_spaceship" }
+
+[streams]
+display = "dpy"
+
+[[inline]]
+routine = "next_random"
+result = ["random.number"]
+
+[[inline]]
+routine = "inertia_x"
+ac_param = "handoff.acceleration"
+result = ["handoff.position"]
+shifts = "xct"
+
+[[inline]]
+routine = "inertia_y"
+ac_param = "handoff.acceleration"
+result = ["handoff.position"]
+shifts = "xct"
+
+[[place]]
+routine = "explosion"
+convention = "JSP"
+io = ["handoff.particle_low"]
+
+[[place]]
+shifts = "explosion_cloud.spread"
+
+[[place]]
+routine = "torpedo"
+convention = "JSP"
+
+# IO holds what the main loop left there; the hyperspace draw shifts it out.
+[[place]]
+routine = "in_hyperspace"
+convention = "JSP"
+io_param = "handoff.jump_low"
+io = ["low"]
+pool = ["angle_steps"]
+
+[[place]]
+routine = "breakout"
+convention = "JSP"

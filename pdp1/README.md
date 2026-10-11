@@ -16,7 +16,7 @@ A binding holds only choices that play cannot observe:
 
 A `[[place]]` with `fields` lays out those Record fields as data words, with their RUNS initial values. A `[[place]]` with `routine` compiles a Processor or a Network to one C function:
 
-- `convention`: `JDA`, `JSP`, `XCT`, as spacewar-c's dialect spells it (`tools/pdp1cc/include/pdp1.h`).
+- `convention`: `JDA`, `JSP`, `XCT`, as spacewar-c's dialect spells it (`tools/pdp1cc/include/pdp1.h`). An `[[inline]]` entry takes the same keys and binds a macro: the routine is laid out at each run, as a `static inline` function of each unit that runs it, whichever binding binds it.
 - `entry`: the field that is the JDA entry word, where the call leaves AC.
 - `ac_param`: the field that arrives in AC, for a routine with no entry word (`XCT`).
 - `byname`: the field that is the word after the call, executed each time it is read.
@@ -27,9 +27,28 @@ A `[[place]]` with `fields` lays out those Record fields as data words, with the
 - `skips`: a field and a member: the routine returns one word further when the field holds the member.
 - `block`: the routine's body is a block that other routines of the unit jump into. The routine's own entry stores its entry word and jumps there too. A run of the routine as the last thing another routine of the unit does is that jump: the jumper stores the entry word, as jda would have.
 - `block_takes_entry`: the block is entered with the entry word already in AC (`sin` loads it; `cos` jumps in past the load).
+- `shifts = "xct"`: each shift of the routine is executed from a constant word (`xct (sar 3s`), as the `diff` macro runs the shift it is passed.
+- `pool`: locals that live in a pool word (`\hpt`), not in AC.
 - `loops = "exit first"`: each loop of the routine is laid out with its first exit falling through into the code after the loop, and the rest of its body after the routine's last return, jumping back to the top. When the loop's body ends with the statement that an `if` just before the loop runs, that statement is the loop's top, and the loop is entered there or one statement past it. It changes the order of the code, not what runs.
 
-A Network bound as one routine runs its Processors inline. A `run` of another bound routine is a call: the sets of that routine's parameter fields just before the run are its arguments, and its result fields are read from the returned AC:IO pair.
+A Network bound as one routine runs its Processors inline, under its guards and loops. A `run` of another bound routine is a call: the sets of that routine's parameter fields just before the run are its arguments, and a parameter field that lives in a register is passed in it. A two-word result is read from the returned AC:IO pair. A one-word result is in AC when the call returns, so the statement right after the run takes it from there, as `xct hd2 / dac i ma1` does; when that statement does not read it, the call stands alone.
+
+The keys that hold for a whole unit:
+
+- `include`: lifted headers the generated C includes, for the names they declare (the cursors of `object_table.h`).
+- `registers`: Records whose fields live in AC or IO, never in a word of their own (`handoff`). A field there is a local of the routine that uses it.
+- `pool`: fields that live in a pool word (`\mxc`).
+- `[cursors]`: a field to the cursor on the current object's slot. In a routine whose parameter is the slot the main loop's cursors point at, `objects.x[slot]` is `*x_slot`.
+- `[homes]`: fields held in a shift instruction. `"table"`: a pointer in the address field of the `xct` that runs one shift of a table (`msh, xct .`); the table's entries are the counts the RUNS text sets the field to, in text order, and a `[[place]]` with `shifts` lays the table out. Setting the field to the next entry steps the pointer (`idx msh`), to the first sets it (`law mst / dap msh`). `"built"`: the shift instruction itself, built at run time from `popcount(w & m)` and run where it stands (`mi1`). The shift is the pair operator that takes the field as its count; the pair it shifts is one AC:IO local.
+- `[spell.<enum>]`: the word each member is: a number, or a routine's address, with the sign bit when `sign` is set (the object does not collide).
+- `[streams]`: the display instruction that plots a stream's points (`dpy`): x in AC, y in IO.
+
+`runsc` lays code out by rules of its own, from the shape of the RUNS text, the same for every binding:
+
+- A loop whose one exit is its last statement, `if c: break`, tests at the bottom and jumps back to the top while `c` fails (`count \mxc, mz1`).
+- `set x = x + 1` followed by a test of `x` against 0 is one index-and-skip (`isp`).
+- When an `if`'s else arm ends in an `if` whose arm ends with the statements of the first arm, those statements are laid out once, at the end of the inner arm, and the first arm jumps to them (`count i ma1, hp6`).
+- `set a = -a` on an AC local followed by `set f = 0` on a place in IO is one instruction, `cma cli`.
 
 A `[[place]]` may instead lay out words that the PDP-1 and its operator need and that no game rule reads. `runsc` knows each kind as the PDP-1 back end, the way it knows `jda`:
 

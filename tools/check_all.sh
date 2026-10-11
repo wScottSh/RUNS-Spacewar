@@ -12,4 +12,4 @@ PYTHONPATH=tools uv run -q python "$here/check_divide.py"
 PYTHONPATH=tools uv run -q python "$here/check_sincos.py" 20000
 PYTHONPATH=tools uv run -q python "$here/check_tunables.py"
 PYTHONPATH=tools uv run -q python "$here/check_calc_routines.py" 1000 | tail -4
-PYTHONPATH=tools uv run -q python "$here/check_frame.py" 300 | tail -1
+PYTHONPATH=tools uv run -q python "$here/check_frame.py" 300 | grep -v fired

@@ -29,4 +29,4 @@
 
 ## Round 4 (autonomous): compile tunables and objects from RUNS
 - [x] tunables: all twelve xct tunables as Processors, the numbers as tunables fields; check_tunables vs SIMH; pdp1/tunables.toml with the machine's words (sequence break, start vectors, control word slot); XCT + ac_param, [names], MINUS_ZERO in runsc; MATCH, gate
-- [ ] objects: explosion, torpedo, in_hyperspace, breakout compiled from RUNS
+- [x] objects: explosion, torpedo, in_hyperspace, breakout compiled from RUNS; RUNS reshaped where the original carries a register (diff's position, the dots' IO, hyperspace's IO, the jump's swap, a cla per diff); runsc: cursors, inline macros, pending AC results, Network guards/loops, bottom-tested loops, shared tail, shift homes, dpy, enum spelling; MATCH, gate

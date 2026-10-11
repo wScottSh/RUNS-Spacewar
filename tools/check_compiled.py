@@ -39,21 +39,18 @@ def replaced(tree, path, new):
 
 
 def compiled(prog: runs.Program, name: str, bound: set[str]):
-    """The Processors a bound routine compiles: itself, or the ones its
+    """The routines a bound routine compiles: itself, and the ones its
     Network runs that are not bound routines of their own."""
-    r = prog.routines[name]
-    if r.kind == "processor":
-        yield name
-        return
-    for s in r.body:
-        if s[1] not in bound:
-            yield from compiled(prog, s[1], bound)
+    yield name
+    for inner in sorted(runs.runs_of(prog.routines[name].body) - bound):
+        yield from compiled(prog, inner, bound)
 
 
 def sites(prog: runs.Program):
     """(label, mutate) for each number the bindings compile, and the initial
     value of each field they place or hand a routine."""
-    places = [p for b in sorted(runsc.BINDINGS.glob("*.toml")) for p in tomllib.loads(b.read_text())["place"]]
+    specs = [tomllib.loads(b.read_text()) for b in sorted(runsc.BINDINGS.glob("*.toml"))]
+    places = [p for spec in specs for p in spec["place"] + spec.get("inline", [])]
     bound = {p["routine"] for p in places if "routine" in p}
     fields = []
     for place in places:
@@ -64,6 +61,7 @@ def sites(prog: runs.Program):
             fields += [place.get(k) for k in ("entry", "ac_param", "io_param", "byname")]
             fields += place.get("result", []) + place.get("cells", [])
         fields += place.get("fields", [])
+    fields += [f for spec in specs for f in spec.get("pool", []) + list(spec.get("homes", {}))]
     for dotted in dict.fromkeys(f for f in fields if f):
         rec, fld = dotted.split(".")
         init = prog.records[rec].fields[fld][1]

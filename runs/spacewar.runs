@@ -138,8 +138,11 @@ record cosine_call
 record handoff
   coordinate: word = 0      # AC into `the`: a torpedo's coordinate, sar 9s
   acceleration: word = 0    # AC into diff: from `the`, or 0 (cla)
+  position: word = 0        # AC out of diff: the new position
+  particle_low: word = 0    # IO through the explosion's dots: cleared (cli), then each dot's y
   jump_high: word = 0       # AC: hyperspace's random draw into and out of hr1, hr2;
-  jump_low: word = 0        # IO:   one 36-bit value, scaled as one
+  jump_low: word = 0        # IO:   one 36-bit value, scaled as one. IO holds what the main
+                            #   loop left there when hyperspace begins; the draw pushes it out
   torpedo_direction: word = 0   # AC into tvl: the sine or cosine of the ship's heading
   torpedo_velocity: word = 0    # AC out of tvl
   thrust_direction: word = 0    # AC into sac: the sine or cosine of the heading, sar 9s

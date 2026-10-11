@@ -10,6 +10,7 @@
 network explosion(slot)                                     # mex
   run coast                                                 # cla
   run inertia_x(slot)
+  run coast                                                 # cla
   run inertia_y(slot)
   run size_explosion(slot)
   loop at most 0400001:                                     # mz1
@@ -33,7 +34,7 @@ network torpedo(slot)                                       # tcr
     run warp_from_x(slot)                                   # tc1
     run torpedo_space_warpage
     run inertia_y(slot)
-    run warp_from_y(slot)
+    run warp_from_y
     run torpedo_space_warpage
     run inertia_x(slot)
     run plot_torpedo(slot)
