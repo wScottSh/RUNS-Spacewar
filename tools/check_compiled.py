@@ -7,6 +7,8 @@ routine and field the bindings compile, one change at a time:
 - each operator to another (+ and -, < and >=, & and |, and and or, ...);
 - each enum member to another of its enum;
 - each statement deleted, and each pair of adjacent statements swapped;
+- each set of a field at a Processor's top level made a local of the
+  field's name, which the Processor's later statements read instead;
 
 and deletes each key line of each binding, which must then build another
 image or be refused: a key that changes nothing is dead.
@@ -43,6 +45,7 @@ from pathlib import Path
 
 import runs
 import runsc
+from runsc import dotted_of
 
 OPERATORS = {"+": "-", "-": "+", "&": "|", "|": "&", "^": "|", "<<": ">>", ">>": "<<",
              "<": ">=", ">=": "<", ">": "<=", "<=": ">", "==": "!=", "!=": "==", "and": "or", "or": "and"}
@@ -68,6 +71,19 @@ def replaced(tree, path, new):
     items = list(tree)
     items[k] = replaced(tree[k], path[1:], new)
     return items if isinstance(tree, list) else tuple(items)
+
+
+def replaced_all(tree, old, new):
+    """tree with every node equal to old as new."""
+    if tree == old:
+        return new
+    if isinstance(tree, list):
+        return [replaced_all(t, old, new) for t in tree]
+    if isinstance(tree, tuple):
+        return tuple(replaced_all(t, old, new) for t in tree)
+    if isinstance(tree, dict):
+        return {k: replaced_all(v, old, new) for k, v in tree.items()}
+    return tree
 
 
 def at(tree, path):
@@ -140,6 +156,13 @@ def routine_sites(prog: runs.Program, proc: str):
                     other = next(m for m in members if m != node[1])
                     yield Mutant(f"{proc} member {node[1]} -> {other} {path}", "member", proc, path,
                                  ("name", other))
+        if path == () and prog.routines[proc].kind == "processor":
+            own = runsc.routine_locals(prog.routines[proc])
+            for k, s in enumerate(node):
+                fields = [x for x in (s[1][1] if s[1][0] == "tuple" else [s[1]]) if x[0] == "field"]
+                if s[0] == "set" and fields and not {x[2] for x in fields} & own:
+                    yield Mutant(f"{proc} local {', '.join(dotted_of(x) for x in fields)} @{line(s)}", "local",
+                                 proc, (k,))
         if is_block(node):
             for k, s in enumerate(node):
                 if len(node) > 1:
@@ -194,7 +217,15 @@ def mutate(prog: runs.Program, m: Mutant) -> runs.Program:
         fields = {**r.fields, fld: (typ, replaced(init, path, m.new))}
         return dataclasses.replace(prog, records={**prog.records, rec: runs.Record(rec, r.count, fields, r.stream)})
     r = prog.routines[m.routine]
-    if m.kind in ("delete", "swap"):
+    if m.kind == "local":
+        (k,) = m.path
+        s = r.body[k]
+        target, rest = s[1], r.body[k + 1:]
+        for x in (s[1][1] if s[1][0] == "tuple" else [s[1]]):
+            if x[0] == "field":
+                target, rest = replaced_all(target, x, ("name", x[2])), replaced_all(rest, x, ("name", x[2]))
+        body = r.body[:k] + [("let", target, s[2], s[3])] + rest
+    elif m.kind in ("delete", "swap"):
         *where, k = m.path
         block = list(at(r.body, where))
         if m.kind == "delete":

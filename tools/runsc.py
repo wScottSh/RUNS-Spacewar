@@ -3268,6 +3268,8 @@ def ignores(routine: runs.Routine, name: str, where: str) -> bool:
                 outs.append(block(s[2], dict(env)))
                 env = joined(*outs)
             elif op in ("loop", "for"):
+                if any(any(value(b, env)) for b in (s[1:2] if op == "loop" else s[2:4])):
+                    raise Taint()               # how many passes is a choice
                 for _ in range(64):             # the words after any number of passes: until it settles
                     exits.append([])
                     end = block(s[-2], dict(env))
@@ -3321,6 +3323,9 @@ class UnionFind:
         return {root: names for root, names in out.items() if len(names) > 1}
 
 
+PASSED = "@passed"
+
+
 class SharedWords:
     """Which RUNS names a shared word holds, through every bound routine.
     Names share a word when the binding puts them there (an entry word and
@@ -3367,7 +3372,7 @@ class SharedWords:
                 for callee, state in Occupancy(self, fn, entry[name]).run(stmts):
                     old = entry.get(callee)
                     new = state if old is None else {g: old.get(g, frozenset()) & state.get(g, frozenset())
-                                                      for g in self.shared}
+                                                      for g in [*self.shared, PASSED]}
                     if new != old:
                         entry[callee] = new
                         todo.append(callee)
@@ -3401,18 +3406,44 @@ class Occupancy:
         b = self.fn.b
         state: dict[str, frozenset] = {}
         for root, holders in self.entry.items():
-            g = self.group[next(iter(self.words.shared[root]))]
-            state[g] = state.get(g, frozenset()) | holders
-        for f in [b.entry, b.ac_param, b.io_param, b.byname, b.inline, *self.fn.own]:
+            if root != PASSED:
+                g = self.group[next(iter(self.words.shared[root]))]
+                state[g] = state.get(g, frozenset()) | holders
+        passed = self.entry.get(PASSED, frozenset())
+        for f in [b.entry, *(f for f in [b.ac_param, b.io_param, b.byname, b.inline, *self.fn.own] if f in passed)]:
             if f in self.group:
                 state[self.group[f]] = state.get(self.group[f], frozenset()) | {f}
-        self.block(stmts, state)
+        end = self.block(stmts, state)
+        if end is not None:
+            self.leave(end, b.name)
         return self.calls
 
-    def export(self, state: dict) -> dict:
-        """The binding's shared words, as a routine run here starts."""
+    def leave(self, state: dict, where: str):
+        """The routine returns its result fields: each word must hold its own.
+        A word the binding gives fields (an entry word and its cells, a
+        [share], a register a Record's field lives in) must not be left
+        holding only the routine's locals: the RUNS field would keep a value
+        the machine no longer has."""
+        binds = self.fn.binds
+        for g, names in self.members.items():
+            lasting = sorted(f for f in names if f in binds.cell_of or f in binds.shared
+                             or f in binds.shared.values() or "." in f and f.split(".")[0] in binds.registers)
+            holders = state.get(g, frozenset())
+            if lasting and holders and not any("." in x for x in holders):
+                raise BindError(f"{where}: {self.fn.b.name} leaves the word of {lasting[0]} holding its local "
+                                f"{sorted(holders)[0]}")
+        for f in self.fn.b.result:
+            g = self.group.get(f)
+            if g is not None and f not in state.get(g, frozenset()):
+                raise BindError(f"{where}: {self.fn.b.name} returns {f}, but its word holds "
+                                f"{sorted(state.get(g, frozenset())) or 'no name set on every path'}")
+
+    def export(self, state: dict, passed=frozenset()) -> dict:
+        """The binding's shared words, as a routine run here starts, and the
+        parameters the run hands it (PASSED): a register a routine reads is
+        its parameter only where every run of it sets it just before."""
         return {root: state.get(self.group[next(iter(names))], frozenset()) & names
-                for root, names in self.words.shared.items()}
+                for root, names in self.words.shared.items()} | {PASSED: frozenset(passed)}
 
     def kill(self, state: dict, routines) -> dict:
         """What the routines may write no longer holds what it held."""
@@ -3535,6 +3566,8 @@ class Occupancy:
         if op in ("return", "stop", "unreachable"):
             if op == "return" and s[1] is not None:
                 self.reads(s[1], state, where)
+            if op == "return":
+                self.leave(state, where)
             return None
         if op == "emit":
             for a in s[2]:
@@ -3544,7 +3577,7 @@ class Occupancy:
             callee = self.fn.binds.bound[s[1]]
             for e in s[2].values():
                 self.reads(e, state, where)
-            self.calls.append((s[1], self.export(state)))
+            self.calls.append((s[1], self.export(state, s[2])))
             state = self.kill(state, [s[1]])
             if callee.code and callee.back:
                 self.calls.append((callee.back, self.export(state)))
