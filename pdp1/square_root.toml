@@ -1,0 +1,13 @@
+# sqt: a jda subroutine. The argument is its entry word, which doubles as
+# the remainder; the root comes back in AC; sq1 and sq2 follow the code.
+replaces = "lift/square_root.c"
+
+[[place]]
+processor = "square_root"
+convention = "JDA"
+entry = "square_root_call.entry"
+result = "square_root_call.root"
+io = ["input_bits"]
+
+[[place]]
+fields = ["square_root_call.passes_left", "square_root_call.root"]

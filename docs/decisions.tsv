@@ -21,3 +21,4 @@ ts	phase	decision	why	evidence	result
 2026-10-11T06:16:48Z	finding	mot reads past the outline array for torpedo slots	value goes to sp5, used only by the spaceship calc, set right before	oracle.lst line 865; lift/main_loop.c:307	inferred not observed; spaceship port will confirm
 2026-10-11T06:16:48Z	design	Network contracts: reads/writes; a top Network must declare its boundary	the game's boundary with presentation must be visible and thin	tools/runs.py check_contracts; runs/frame.runs	deleting writes: display fails to load
 2026-10-11T06:16:48Z	verify	re-ran square_root, calc routines (1000 each), frame (500)	evaluator changed	tools/check_*.py	65536/65536, 4000/4000, 500/500 match
+2026-10-11T07:25:54Z	start	new run: compile RUNS to the exact binary unit by unit; runs-spec rewrite in parallel	user asked for both, then went to bed	conversation 175574f3, after e043c53	open
