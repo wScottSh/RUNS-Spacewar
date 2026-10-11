@@ -1,5 +1,7 @@
-"""square_root.runs-prim against every input the original routine was run on
-in SIMH (RUNS-Spacewar's observed sqt vectors: all 65,536 inputs)."""
+"""The square_root Processor of arithmetic.runs-prim against every input the
+original routine was run on in SIMH (RUNS-Spacewar's observed sqt vectors:
+all 65,536 inputs). Each input goes into the routine's entry word, and the
+result is read from sq2."""
 import json
 import sys
 from pathlib import Path
@@ -15,7 +17,9 @@ def main() -> int:
     total = differ = 0
     for line in VECTORS.read_text().splitlines():
         v = json.loads(line)
-        got = m.call("square_root", [runs.W(int(v["in"], 8))])
+        m.state["square_root_call"]["entry"] = runs.W(int(v["in"], 8))
+        m.run("square_root")
+        got = m.state["square_root_call"]["root"]
         total += 1
         if got.v != int(v["ac"], 8):
             differ += 1

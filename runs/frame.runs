@@ -8,6 +8,7 @@ network frame                                               # ml0
   # one still has torpedoes, the restart delay is held; otherwise it counts
   # down, and then the survivors score.
   if objects.routine[0] == first_spaceship and objects.routine[1] == second_spaceship and (1 + ships.torpedoes[0] < 0 or 1 + ships.torpedoes[1] < 0):
+    run torpedo_life                                        # md1: xct tlf
     run hold_restart
   else:
     run count_down_restart
@@ -18,13 +19,14 @@ network frame                                               # ml0
   # The object loop (ml1): each active object that can collide is tested
   # against every later one that can, then its calc routine runs and its
   # time is charged to the frame. The last object has no later one to test,
-  # and is not counted.
+  # and is not counted. An explosion and a ship in hyperspace cannot
+  # collide; core keeps that in the routine word's sign bit.
   for slot in 0 .. 026:
     if objects.routine[slot] != none:
       run count_object
-      if collides(objects.routine[slot]):
+      if objects.routine[slot] != explosion and objects.routine[slot] != in_hyperspace:
         for other in slot + 1 .. 027:
-          if objects.routine[other] != none and collides(objects.routine[other]):
+          if objects.routine[other] != none and objects.routine[other] != explosion and objects.routine[other] != in_hyperspace:
             run collision(slot, other)
       run calc(slot)
       run charge_time(slot)

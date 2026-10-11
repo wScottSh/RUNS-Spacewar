@@ -1,15 +1,13 @@
 # The main loop's own Processors.
 
-function collides(routine: calc_routine) -> bool
-  return routine != explosion and routine != in_hyperspace
-
 processor begin_frame                                       # ml0
   writes: frame
   set frame.spare_time = -04000
 
 processor hold_restart                                      # md1: twice a torpedo's life
+  reads: handoff
   writes: frame
-  set frame.restart_delay = torpedo_life() << 1
+  set frame.restart_delay = handoff.torpedo_life << 1
 
 processor count_down_restart
   writes: frame

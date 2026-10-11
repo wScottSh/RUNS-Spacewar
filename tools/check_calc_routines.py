@@ -94,6 +94,7 @@ def main() -> int:
         for k, ((slot, st), w) in enumerate(zip(cases, want)):
             m.state.update(copy.deepcopy(st))
             m.state["display"] = []
+            m.fired = []
             m.run(routine, [slot])
             simh_records = b.read({p[3]: v for p, v in zip(places, w.watched)}, RECORDS)
             bad = [f"{rec}.{fld}[{s}] simh {b.encode(rec, fld, simh_records[rec][fld][s] if s is not None else simh_records[rec][fld]):06o}"

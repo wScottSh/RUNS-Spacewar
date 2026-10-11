@@ -1,8 +1,9 @@
 # Spacewar! 3.1: the game's state.
 #
 # Every word of core the game carries from one routine to another, or from
-# one frame to the next, is a field of a Record here. Scratch words a routine
-# sets before it reads them are not state: they are locals of the routine.
+# one frame to the next, is a field of a Record here. So is every value that
+# passes between two Processors. Scratch words a Processor sets before it
+# reads them, and never hands on, are locals of the Processor.
 
 type word
   bits: 18
@@ -53,7 +54,7 @@ record frame
   objects_seen: word = 0    # moc: counted, never read
 
 # The tunables at the head of the tape (words 3-116). The ones the original
-# keeps as instructions to execute are functions in tunables.runs-prim.
+# keeps as instructions to execute are Processors in tunables.runs-prim.
 record tunables
   collision_radius: word = 06000            # me1
   collision_radius_half: word = 03000       # me2
@@ -64,3 +65,27 @@ stream display
   x: word
   y: word
   intensity: int
+
+# The explosion's cloud, carried from one dot to the next.
+record explosion_cloud
+  particles: word = 0       # mxc: dots left to plot, counting up
+  spread: word = 0          # msh: which of mst's shifts spreads the dots, scr 1s or scr 3s
+  scatter: word = 0         # mi1: places the scl built from a random number shifts this dot
+
+# The integer square root's own words.
+record square_root_call
+  entry: word = 0           # sqt: jda leaves the argument here; it doubles as the remainder
+  passes_left: word = 0     # sq1
+  root: word = 0            # sq2: the result
+
+# Values the original hands from one rule to the next in AC and IO. Each is a
+# place only because a register carried it: into or out of a tunable the
+# original executes with xct, or into the diff macro.
+record handoff
+  coordinate: word = 0      # AC into `the`: a torpedo's coordinate, sar 9s
+  acceleration: word = 0    # AC into diff: from `the`, or 0 (cla)
+  jump_high: word = 0       # AC: hyperspace's random draw into and out of hr1, hr2;
+  jump_low: word = 0        # IO:   one 36-bit value, scaled as one
+  torpedo_life: word = 0    # AC out of tlf
+  breakout_time: word = 0   # AC out of hd2
+  recharge_time: word = 0   # AC out of hd3

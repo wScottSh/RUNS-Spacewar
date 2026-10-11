@@ -1,37 +1,49 @@
-# The arithmetic subroutines and the random number generator. Functions:
-# words in, words out, no Records.
+# The arithmetic subroutines and the macros. Each is a Processor over the
+# Records it hands its values through.
 
-# BBN integer square root (sqt). Binary point right of bit 17 on the way in,
-# between bits 8 and 9 on the way out. Two bits of input per pass, 18 passes.
-function square_root(input: word) -> word
-  let passes_left = -023
-  let root = 0
-  let input_bits = input
-  let remainder = 0
+# BBN integer square root (sqt), over its own words. Binary point right of
+# bit 17 in square_root_call.entry, between bits 8 and 9 in .root. Two bits
+# of input per pass, 18 passes.
+processor square_root                                       # sqt
+  writes: square_root_call
+  set square_root_call.passes_left = -023
+  set square_root_call.root = 0
+  let input_bits = square_root_call.entry
+  set square_root_call.entry = 0
   loop at most 023:
-    set passes_left = passes_left + 1
-    if passes_left >= 0:
-      return root
-    set root = root << 1
-    let next = remainder
+    set square_root_call.passes_left = square_root_call.passes_left + 1
+    if square_root_call.passes_left >= 0:
+      return
+    set square_root_call.root = square_root_call.root << 1
+    let next = square_root_call.entry
     set (next, input_bits) = rcl(next, input_bits, 2)
     if next == 0:
       continue
-    set remainder = next
-    set next = (root << 1) + 1 - remainder
+    set square_root_call.entry = next
+    set next = (square_root_call.root << 1) + 1 - square_root_call.entry
     if next > 0:
       continue
     if next < 0:
       set next = -next
-    set remainder = next
-    set root = root + 1
+    set square_root_call.entry = next
+    set square_root_call.root = square_root_call.root + 1
 
-# The `random` macro: the next value of the generator.
-function next_random(number: word) -> word
-  return (rar(number, 1) ^ 0355670) + 0355670
+# The `random` macro: the generator's next value.
+processor next_random
+  writes: random
+  set random.number = (rar(random.number, 1) ^ 0355670) + 0355670
 
 # The `diff` macro, inertia: the acceleration joins the velocity, and an
-# eighth of the velocity the position.
-function inertia(acceleration: word, velocity: word, position: word) -> (word, word)
-  let v = acceleration + velocity
-  return (v, (v >> 3) + position)
+# eighth of the velocity the position. The original passes the axis as the
+# macro's arguments; here each axis is its own Processor.
+processor inertia_x(slot)                                   # diff \mdx, mx1, (sar 3s
+  reads: handoff
+  writes: objects
+  set objects.dx[slot] = handoff.acceleration + objects.dx[slot]
+  set objects.x[slot] = (objects.dx[slot] >> 3) + objects.x[slot]
+
+processor inertia_y(slot)                                   # diff \mdy, my1, (sar 3s
+  reads: handoff
+  writes: objects
+  set objects.dy[slot] = handoff.acceleration + objects.dy[slot]
+  set objects.y[slot] = (objects.dy[slot] >> 3) + objects.y[slot]

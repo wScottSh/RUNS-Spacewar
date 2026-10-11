@@ -1,14 +1,17 @@
 """A reference evaluator for the RUNS draft used by this port.
 
 It reads .runs files (types, enums, records, streams, networks) and
-.runs-prim files (functions, processors), and runs a Network over Records.
+.runs-prim files (processors), and runs a Network over Records.
 
-The evaluator enforces the paradigm, not just the syntax:
-- a function touches no Record;
+The evaluator enforces the paradigm, not just the syntax. The topology is a
+Petri net: Records are places, Processors are transitions.
 - a processor reads only the Records it declares (reads or writes), and
-  writes only the ones it declares under writes;
-- a network writes nothing: it only fires processors and networks, and its
-  guards read Records.
+  writes only the ones it declares under writes; it fires no other routine;
+- a network writes nothing: it only fires processors and networks, chooses
+  with guards that read Records, and loops with a bound and a guarded exit;
+- nothing calls a routine from an expression. The only calls are the word's
+  own operators (rcl, scr, popcount, ...), so every value that passes from
+  one routine to another goes through a Record.
 
 The word type is the PDP-1's 18-bit ones' complement word, with the
 operations as the machine computes them."""
@@ -257,6 +260,8 @@ def postfix(c: Cursor):
             c.take("]")
             e = ("index", e, i)
         elif c.peek() == "(" and e[0] == "name":
+            if e[1] not in BUILTINS:
+                raise RunsError(f"{c.where}: {e[1]} is not an operator of the word; a routine is run, not called")
             c.take()
             args = []
             while c.peek() != ")":
@@ -347,9 +352,18 @@ def statement(line: Line):
             args.append(expr(c))
         return ("emit", t[1], args, where)
     if head == "run":
-        e = whole(t[1:], where)
-        name, args = (e[1], []) if e[0] == "name" else (e[1], e[2])
-        return ("run", name, args, where)
+        c = Cursor(t[2:], where)
+        args = []
+        if not c.done():
+            c.take("(")
+            while c.peek() != ")":
+                args.append(expr(c))
+                if c.peek() == ",":
+                    c.take()
+            c.take(")")
+        if not c.done():
+            raise RunsError(f"{where}: unexpected {c.peek()!r}")
+        return ("run", t[1], args, where)
     if head == "match":
         arms = {}
         for arm in line.children:
@@ -373,7 +387,7 @@ class Record:
 
 @dataclass
 class Routine:
-    kind: str                                      # function, processor, network
+    kind: str                                      # processor, network
     name: str
     params: list[str]
     body: list
@@ -423,11 +437,12 @@ def load(paths: list[Path]) -> Program:
                     eq = c.toks.index("=") if "=" in c.toks else len(c.toks)
                     fields[c.toks[0]] = (c.toks[2], whole(c.toks[eq + 1:], c.where) if eq < len(c.toks) else None)
                 prog.records[t[1]] = Record(t[1], count, fields, kind == "stream")
-            elif kind in ("function", "processor", "network"):
+            elif kind in ("processor", "network"):
                 r = Routine(kind, t[1], params_of(t), [])
                 body = []
+                headers = ("reads", "writes", "requires") if kind == "processor" else ("requires",)
                 for c in line.children:
-                    if kind == "processor" and c.toks[0] in ("reads", "writes", "requires") and c.toks[1] == ":":
+                    if c.toks[0] in headers and c.toks[1:2] == [":"]:
                         if c.toks[0] == "requires":
                             r.requires.append(whole(c.toks[2:], c.where))
                         else:
@@ -435,12 +450,49 @@ def load(paths: list[Path]) -> Program:
                     else:
                         body.append(c)
                 r.body = block(body)
+                shape(r.body, r, in_loop=False)
                 if r.name in prog.routines:
                     raise RunsError(f"{where}: {r.name} defined twice")
                 prog.routines[r.name] = r
             else:
                 raise RunsError(f"{where}: unknown declaration {kind!r}")
     return prog
+
+
+NETWORK_OPS = {"if", "for", "match", "run", "stop", "unreachable", "loop", "break"}
+FIRING_OPS = {"run", "stop", "match"}
+
+
+def guarded_exit(stmt) -> bool:
+    """An `if` whose arms only break: the exit of a network loop."""
+    return stmt[0] == "if" and all(body == [] or [s[0] for s in body] == ["break"]
+                                   for body in [b for _, b in stmt[1]] + [stmt[2]])
+
+
+def shape(stmts: list, r: Routine, in_loop: bool):
+    """What each kind may say, checked over the whole body before anything runs.
+    A network writes nothing: it has no let, set, emit or return. Its loop is
+    bounded and leaves only through an `if` on Records that breaks."""
+    for s in stmts:
+        op, where = s[0], s[-1]
+        if r.kind == "network":
+            if op not in NETWORK_OPS:
+                raise RunsError(f"{where}: a network only fires and chooses ({op})")
+            if op == "break" and not in_loop:
+                raise RunsError(f"{where}: break outside a loop")
+            if op == "loop" and not any(guarded_exit(x) for x in s[2]):
+                raise RunsError(f"{where}: a network loop needs an exit: if <guard>: break")
+        elif op in FIRING_OPS:
+            raise RunsError(f"{where}: {op} belongs to a network")
+        if op == "if":
+            for _, body in s[1]:
+                shape(body, r, in_loop)
+            shape(s[2], r, in_loop)
+        elif op in ("loop", "for"):
+            shape(s[-2], r, in_loop=in_loop or op == "loop")
+        elif op == "match":
+            for body in s[2].values():
+                shape(body, r, in_loop)
 
 
 # --------------------------------------------------------------- execution
@@ -483,7 +535,7 @@ class Machine:
 
     def fresh(self, rec: Record):
         def init(e):
-            return self.eval(e, Scope("function", {})) if e is not None else W(0)
+            return self.eval(e, Scope("initial", {})) if e is not None else W(0)
         if rec.count is None:
             return {f: init(e) for f, (_, e) in rec.fields.items()}
         return {f: [init(e) for _ in range(rec.count)] for f, (_, e) in rec.fields.items()}
@@ -496,8 +548,6 @@ class Machine:
             raise StopAt(name)
         if r is None:
             raise NotPorted(f"{name} is not ported")
-        if r.kind == "function":
-            raise RunsError(f"run {name}: a function is called, not run")
         self.fired.append((name, tuple(args)))
         scope = Scope(r.kind, dict(zip(r.params, args)), r)
         for cond in r.requires:
@@ -506,21 +556,9 @@ class Machine:
         try:
             self.block(r.body, scope)
         except Return:
-            if r.kind != "processor":
-                raise RunsError(f"{name}: a network does not return")
-
-    def call(self, name: str, args: list):
-        if name in BUILTINS:
-            return BUILTINS[name](*args)
-        r = self.prog.routines.get(name)
-        if r is None or r.kind != "function":
-            raise RunsError(f"{name} is not a function")
-        scope = Scope("function", dict(zip(r.params, args)), r)
-        try:
-            self.block(r.body, scope)
-        except Return as ret:
-            return ret.value
-        raise RunsError(f"{name}: no return")
+            pass
+        except (Break, Continue):
+            raise RunsError(f"{name}: break or continue outside a loop")
 
     def block(self, stmts: list, scope: "Scope"):
         for s in stmts:
@@ -528,11 +566,6 @@ class Machine:
 
     def stmt(self, s, scope: "Scope"):
         op = s[0]
-        net = scope.kind == "network"
-        if net and op not in ("if", "for", "match", "run", "stop", "unreachable"):
-            raise RunsError(f"{s[-1]}: a network only fires and chooses ({op})")
-        if not net and op in ("run", "stop", "match"):
-            raise RunsError(f"{s[-1]}: {op} belongs to a network")
         if op == "if":
             _, arms, other, _ = s
             for cond, body in arms:
@@ -660,7 +693,7 @@ class Machine:
             seq = self.eval(e[1], scope)
             return seq[as_count(self.eval(e[2], scope))]
         if op == "call":
-            return self.call(e[1], [self.eval(a, scope) for a in e[2]])
+            return BUILTINS[e[1]](*[self.eval(a, scope) for a in e[2]])
         if op == "neg":
             return W(as_word(self.eval(e[1], scope)).v ^ MASK)
         if op == "not":
@@ -718,8 +751,8 @@ class Scope:
     routine: Routine | None = None
 
     def check(self, record: str, write: bool):
-        if self.kind == "function":
-            raise RunsError(f"a function touches no Record ({record})")
+        if self.kind == "initial":
+            raise RunsError(f"an initial value touches no Record ({record})")
         if self.kind == "network":
             if write:
                 raise RunsError(f"a network writes no Record ({record})")
