@@ -1,8 +1,9 @@
 # The main loop's own Processors.
 
-processor begin_frame                                       # ml0
+processor begin_frame                                       # ml0: load \mtc, -4000
   writes: frame
-  set frame.spare_time = -04000
+  let budget = -04000
+  set frame.spare_time = budget
 
 processor hold_restart                                      # md1: twice a torpedo's life
   reads: handoff
@@ -58,3 +59,140 @@ processor spare_time
     set frame.spare_time = frame.spare_time + 1
     if frame.spare_time >= 0:
       break
+
+# The survivors score: a ship whose routine word is still its own calc
+# routine survived. Program flags 1 and 2 light for the survivors, but flag
+# 2 is cleared again at once.
+processor score_survivors                                   # mdn, once the delay runs out
+  reads: objects
+  writes: score, lights
+  set lights.first_survived = on                            # stf 1
+  set lights.second_survived = on                           # stf 2
+  if objects.routine[0] != first_spaceship:
+    set lights.first_survived = off
+  if objects.routine[0] == first_spaceship:
+    set score.first = score.first + 1
+  if objects.routine[1] != second_spaceship:
+    set lights.second_survived = off
+  if objects.routine[1] == second_spaceship:
+    set score.second = score.second + 1
+  set lights.second_survived = off
+
+processor use_test_word                                     # a1
+  writes: controls
+  set controls.source = test_word
+
+processor use_control_boxes                                 # a40
+  writes: controls
+  set controls.source = control_boxes
+
+processor count_game
+  writes: score
+  set score.games_left = score.games_left + 1
+
+# A tie at the end of a match: one more game.
+processor play_off
+  writes: score
+  set score.games_left = -1
+
+processor post_scores
+  reads: score
+  writes: scoreboard
+  emit scoreboard, score.first, score.second
+
+processor clear_scores
+  writes: score
+  set score.first = 0
+  set score.second = 0
+
+# The five test word switches above the scores switch give the number of
+# games in the match.
+processor count_games                                       # a6
+  reads: console
+  writes: score
+  let games = rar(console.test_word, 6) & 037
+  if games != 0:
+    set games = -games
+  set score.games_left = games
+
+processor clear_tables                                      # clear mtb, nnn-1
+  writes: objects, ships
+  for slot in 0 .. 027:
+    set objects.routine[slot] = none
+    set objects.x[slot] = 0
+    set objects.y[slot] = 0
+    set objects.counter[slot] = 0
+    set objects.cycles[slot] = 0
+    set objects.dx[slot] = 0
+    set objects.dy[slot] = 0
+  for ship in 0 .. 1:
+    set ships.angular_momentum[ship] = 0
+    set ships.angle[ship] = 0
+    set ships.fuel[ship] = 0
+    set ships.torpedoes[ship] = 0
+    set ships.outline[ship] = 0
+    set ships.previous_control[ship] = 0
+    set ships.saved_routine[ship] = none
+    set ships.jumps_left[ship] = 0
+    set ships.recharge[ship] = 0
+    set ships.uncertainty[ship] = 0
+
+processor place_ships
+  writes: objects, ships
+  set objects.routine[0] = first_spaceship
+  set objects.routine[1] = second_spaceship
+  let corner = 0200000
+  set objects.x[0] = corner
+  set objects.y[0] = corner
+  set corner = -corner
+  set objects.x[1] = corner
+  set objects.y[1] = corner
+  set ships.angle[0] = 0144420                              # pi
+
+processor outlines_from_free_core                           # law nnn; dac not
+  reads: outline_space
+  writes: outline_call, ships
+  set outline_call.code = outline_space.start
+  set ships.outline[0] = outline_call.code
+
+processor choose_needle
+  writes: outline_call
+  set outline_call.shape = needle
+
+processor second_outline                                    # a3
+  reads: outline_call
+  writes: ships, outline_call
+  set ships.outline[1] = outline_call.code
+  set outline_call.shape = wedge
+
+processor arm_ships
+  reads: handoff, tunables
+  writes: ships, objects
+  let torpedoes = handoff.torpedo_supply
+  set ships.torpedoes[0] = torpedoes
+  set ships.torpedoes[1] = torpedoes
+  let fuel = tunables.fuel_supply
+  set ships.fuel[0] = fuel
+  set ships.fuel[1] = fuel
+  # The calc routine's time for the first frame, before it has run.
+  let cycles = 02000
+  set objects.cycles[0] = cycles
+  set objects.cycles[1] = cycles
+
+processor give_jumps
+  reads: handoff
+  writes: ships
+  let jumps = handoff.hyperspace_shots
+  set ships.jumps_left[0] = jumps
+  set ships.jumps_left[1] = jumps
+
+# The control word getters (mg1, mg2): each leaves the control word in IO.
+processor read_control_boxes                                # mg1
+  reads: console
+  writes: handoff
+  set handoff.control_word = console.control_boxes
+
+processor read_test_word                                    # mg2
+  reads: console
+  writes: handoff
+  set handoff.control_word = console.test_word

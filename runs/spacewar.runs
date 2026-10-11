@@ -50,9 +50,66 @@ record random
 
 record frame
   spare_time: word = 0      # mtc: the frame's instruction budget, counting up
-  restart_delay: word = 0   # ntd: frames until the next game, counting up
+  restart_delay: word = 0   # ntd: frames until the next game, counting up. The tape does not
+                            # load it, but every game sets it before it counts it down.
   objects_seen: word = 0    # moc: counted, never read. The tape does not load it, so on the
                             # PDP-1 it counts up from core's power-on contents (reach_oracle).
+
+# The scores, and the games left in the match. The tape does not load these
+# words, and the first game reads them before it sets them, so the first
+# match starts from whatever core held at power-on. They come in at the
+# boundary: no initial value.
+record score
+  first: word               # 1sc
+  second: word              # 2sc
+  games_left: word          # gct: counting up; 0 when no match is on
+
+# What the operator and the players set at the console. It comes in.
+record console
+  test_word: word           # the test word switches: the controls when started at 5, the
+                            # match's setup, and whether to halt and show the scores
+  control_boxes: word       # the control boxes' buttons
+
+# Where each frame's control word comes from: the start address picks it.
+enum control_source
+  test_word                 # mg2
+  control_boxes             # cwr, the control word routine: the boxes, or the operator's own
+
+record controls
+  source: control_source    # cwg: set at the start, before any frame reads it
+
+# Program flags 1 and 2 light on the console for the ship that survived a
+# game. Flag 2 goes out again at once, and nothing reads them.
+enum light
+  off
+  on
+
+record lights
+  first_survived: light     # program flag 1
+  second_survived: light    # program flag 2
+
+# The scores, shown on the console lights while the machine waits between
+# games. They leave the game; the top Networks' contracts declare them.
+stream scoreboard
+  first: word               # AC
+  second: word              # IO
+
+# The ship outlines are presentation: the outline compiler (oc) lays each
+# one out as code, which the spaceship jumps into to draw the ship. The
+# game hands it where to start and keeps where each outline went in
+# ships.outline.
+enum outline
+  needle                    # ot1: the first ship's
+  wedge                     # ot2: the second ship's, and the first's too when it shares
+
+record outline_call
+  code: word = 0            # AC into and out of oc: where the outline goes, then where it ended
+  shape: outline = needle   # the word after the call
+
+# Where the compiled outlines may go: the free core after the object table.
+# Presentation hands the game this address; it comes in.
+record outline_space
+  start: word               # nnn
 
 # The "interesting and often changed constants" at the head of the tape.
 # The ones the original keeps as instructions to execute are Processors in
@@ -154,3 +211,4 @@ record handoff
   hyperspace_time: word = 0     # AC out of hd1
   breakout_time: word = 0   # AC out of hd2
   recharge_time: word = 0   # AC out of hd3
+  control_word: word = 0    # IO out of the control word routine (jsp i \cwg)

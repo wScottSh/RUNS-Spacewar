@@ -36,6 +36,8 @@ FIELDS = {
     ("ships", "uncertainty"): "nh4",
     ("random", "number"): "ran",
     ("frame", "spare_time"): "mtc", ("frame", "restart_delay"): "ntd", ("frame", "objects_seen"): "moc",
+    ("score", "first"): "1sc", ("score", "second"): "2sc", ("score", "games_left"): "gct",
+    ("controls", "source"): "cwg",
     ("tunables", "fuel_supply"): "foo", ("tunables", "angular_acceleration"): "maa",
     ("tunables", "star_capture_radius"): "str",
     ("tunables", "collision_radius"): "me1", ("tunables", "collision_radius_half"): "me2",
@@ -60,6 +62,13 @@ INSTRUCTION_FIELDS = {("explosion_cloud", "spread"): "msh", ("explosion_cloud", 
 # calc_routine: the routine's entry, and the sign bit when it does not collide.
 ROUTINE_WORDS = {"none": None, "first_spaceship": "ss1", "second_spaceship": "ss2",
                  "torpedo": "tcr", "explosion": "-mex", "in_hyperspace": "-hp1", "breakout": "hp3"}
+# Each enum stored in core: its members' words, as routine addresses.
+ENUM_WORDS = {"calc_routine": ROUTINE_WORDS,
+              "control_source": {"test_word": "mg2", "control_boxes": "cwr"}}
+
+# Fields the PDP-1 keeps in its program flags (light: off, on); SIMH's PF
+# holds flag n as bit 1 << (6 - n).
+FLAGS = {("lights", "first_survived"): 1, ("lights", "second_survived"): 2}
 
 DPY = 0o720007              # dpy, intensity in bits 6-8
 DPY_NOWAIT = 0o724007
@@ -69,27 +78,41 @@ class Binding:
     def __init__(self, prog: runs.Program):
         self.prog = prog
         self.sym = oracle_symbols()
-        self.routine_word = {}
-        for name, s in ROUTINE_WORDS.items():
-            self.routine_word[name] = 0 if s is None else \
-                (self.sym[s.lstrip("-")] | (runs.SIGN if s.startswith("-") else 0))
-        self.routine_of = {w: n for n, w in self.routine_word.items()}
+        self.enum_word = {enum: {name: 0 if s is None else
+                                 (self.sym[s.lstrip("-")] | (runs.SIGN if s.startswith("-") else 0))
+                                 for name, s in words.items()}
+                          for enum, words in ENUM_WORDS.items()}
+        self.enum_of = {enum: {w: n for n, w in words.items()} for enum, words in self.enum_word.items()}
+        self.routine_word = self.enum_word["calc_routine"]
 
     def address(self, record: str, fld: str, slot: int | None = None) -> int:
         return self.sym[FIELDS[(record, fld)]] + (slot or 0)
 
     def encode(self, record: str, fld: str, value) -> int:
         if isinstance(value, runs.Member):
-            return self.routine_word[value.name]
+            return self.enum_word[value.enum][value.name]
         return value.v
 
     def decode(self, record: str, fld: str, word: int):
         typ = self.prog.records[record].fields[fld][0]
-        if typ == "calc_routine":
-            if word not in self.routine_of:
-                raise ValueError(f"{record}.{fld}: {word:06o} is no calc routine")
-            return runs.Member("calc_routine", self.routine_of[word])
+        if typ in self.enum_of:
+            if word not in self.enum_of[typ]:
+                raise ValueError(f"{record}.{fld}: {word:06o} is no {typ}")
+            return runs.Member(typ, self.enum_of[typ][word])
         return runs.W(word)
+
+    @staticmethod
+    def flags_word(state: dict) -> int:
+        """The program flags that hold Record fields, as SIMH's PF."""
+        return sum(1 << (6 - n) for (rec, fld), n in FLAGS.items()
+                   if state[rec][fld] == runs.Member("light", "on"))
+
+    @staticmethod
+    def read_flags(pf: int) -> dict:
+        out: dict = {}
+        for (rec, fld), n in FLAGS.items():
+            out.setdefault(rec, {})[fld] = runs.Member("light", "on" if pf >> (6 - n) & 1 else "off")
+        return out
 
     def places(self, records: list[str]):
         """Every (record, field, slot, address) of the named Records."""

@@ -11,7 +11,12 @@ Petri net: Records are places, Processors are transitions.
   with guards that read Records, and loops with a bound and a guarded exit;
 - nothing calls a routine from an expression. The only calls are the word's
   own operators (rcl, scr, popcount, ...), so every value that passes from
-  one routine to another goes through a Record.
+  one routine to another goes through a Record;
+- a field with no initial value is unknown until the game sets it or the
+  world gives it: reading it unknown is an error, and a top Network whose
+  Processors read it declares its Record under reads:;
+- `wait` hands the world the firing: the host shows what has left the game
+  and may change what comes in, then the firing goes on.
 
 The word type is the PDP-1's 18-bit ones' complement word, with the
 operations as the machine computes them."""
@@ -353,7 +358,7 @@ def statement(line: Line):
         dots = t.index("..")
         return ("for", t[1], whole(t[3:dots], where), whole(t[dots + 1:-1], where),
                 block(line.children), where)
-    if head in ("break", "continue", "stop", "unreachable"):
+    if head in ("break", "continue", "stop", "unreachable", "wait"):
         return (head, where)
     if head == "return":
         return ("return", whole(t[1:], where) if len(t) > 1 else None, where)
@@ -472,8 +477,8 @@ def load(paths: list[Path]) -> Program:
     return prog
 
 
-NETWORK_OPS = {"if", "for", "match", "run", "stop", "unreachable", "loop", "break"}
-FIRING_OPS = {"run", "stop", "match"}
+NETWORK_OPS = {"if", "for", "match", "run", "stop", "unreachable", "loop", "break", "wait"}
+FIRING_OPS = {"run", "stop", "match", "wait"}
 
 
 def guarded_exit(stmt) -> bool:
@@ -529,6 +534,17 @@ class StopAt(Exception):
         self.name = name
 
 
+class Unknown:
+    """The value of a field with no initial value, until the game sets it or
+    the world gives it."""
+
+    def __repr__(self) -> str:
+        return "unknown"
+
+
+UNKNOWN = Unknown()
+
+
 @dataclass(frozen=True)
 class Member:
     enum: str
@@ -543,12 +559,13 @@ class Machine:
         self.state: dict[str, object] = {}
         self.stop_before: set[str] = set()
         self.fired: list[tuple[str, tuple]] = []
+        self.on_wait = lambda machine: None     # the host's turn at a wait
         for rec in prog.records.values():
             self.state[rec.name] = [] if rec.stream else self.fresh(rec)
 
     def fresh(self, rec: Record):
         def init(e):
-            return self.eval(e, Scope("initial", {})) if e is not None else W(0)
+            return self.eval(e, Scope("initial", {})) if e is not None else UNKNOWN
         if rec.count is None:
             return {f: init(e) for f, (_, e) in rec.fields.items()}
         return {f: [init(e) for _ in range(rec.count)] for f, (_, e) in rec.fields.items()}
@@ -633,6 +650,8 @@ class Machine:
             self.block(arms[v.name], scope)
         elif op == "stop":
             raise Stop()
+        elif op == "wait":
+            self.on_wait(self)
         elif op == "unreachable":
             raise RunsError(f"{s[1]}: reached unreachable")
 
@@ -701,10 +720,10 @@ class Machine:
             base = self.eval(e[1], scope)
             if not (isinstance(base, tuple) and base[:1] == ("record",)):
                 raise RunsError(f"{e[2]}: field of a non-Record")
-            return self.state[base[1]][e[2]]
+            return known(self.state[base[1]][e[2]], f"{base[1]}.{e[2]}")
         if op == "index":
             seq = self.eval(e[1], scope)
-            return seq[as_count(self.eval(e[2], scope))]
+            return known(seq[as_count(self.eval(e[2], scope))], repr(e[1]))
         if op == "call":
             return BUILTINS[e[1]](*[self.eval(a, scope) for a in e[2]])
         if op == "neg":
@@ -719,6 +738,12 @@ class Machine:
                 return self.truth(self.eval(l, scope)) or self.truth(self.eval(r, scope))
             return binary(o, self.eval(l, scope), self.eval(r, scope))
         raise RunsError(f"cannot evaluate {e!r}")
+
+
+def known(value, what: str):
+    if value is UNKNOWN:
+        raise RunsError(f"{what} is unknown: the game has not set it, so the world gives it")
+    return value
 
 
 def binary(o: str, a, b):
@@ -813,6 +838,31 @@ def fires(prog: Program, name: str, seen: set[str]) -> set[str]:
     return seen
 
 
+def reads_of(tree, records: set[str]) -> set[str]:
+    """The Records a body reads: every Record it mentions, except as the
+    Record a set writes."""
+    if isinstance(tree, tuple) and tree and tree[0] == "set":
+        target = tree[1]
+        targets = target[1] if target[0] == "tuple" else [target]
+        inner = [t[2] for t in targets if t[0] == "index"]
+        return mentions(tree[2], records) | mentions(inner, records)
+    if isinstance(tree, (list, tuple)):
+        return set().union(*(reads_of(s, records) for s in tree)) if tree else set()
+    return mentions(tree, records)
+
+
+def check_inputs(prog: Program, n: Routine, inside: set[str]) -> None:
+    """A field with no initial value comes in from outside the game: a top
+    Network whose routines read its Record declares it under reads:."""
+    unknown = {name for name, r in prog.records.items()
+               if not r.stream and any(e is None for _, e in r.fields.values())}
+    for name in sorted(inside):
+        r = prog.routines[name]
+        for rec in sorted(reads_of(r.body, unknown) - n.reads):
+            raise RunsError(f"network {n.name}: {rec} comes in from outside the game ({r.name} reads it "
+                            f"and it has fields with no initial value); declare reads: {rec}")
+
+
 def check_contracts(prog: Program) -> None:
     """A Network that declares reads or writes states its contract with the
     world outside it, as a Processor does. A top Network, one that nothing
@@ -821,9 +871,15 @@ def check_contracts(prog: Program) -> None:
     unless a Processor it does not fire touches it too, or it is a stream:
     those cross its boundary and must be declared. A Processor that nothing
     fires (a tunable whose caller is not ported yet) shares nothing at run
-    time. Each declared Record must be touched inside."""
+    time. Each declared Record must be touched inside.
+
+    A game may have several top Networks: the start Networks, which the
+    host fires once, and the frame, which it fires each frame. Together
+    they are the game, so a Record they share does not cross the boundary."""
     records = set(prog.records)
     fired = set().union(*(runs_of(r.body) - {r.name} for r in prog.routines.values()))
+    tops = [n.name for n in prog.routines.values() if n.kind == "network" and n.name not in fired]
+    game = set().union(*(fires(prog, t, set()) for t in tops))
     for n in prog.routines.values():
         if n.kind != "network" or not (n.reads or n.writes or n.name not in fired):
             continue
@@ -834,7 +890,8 @@ def check_contracts(prog: Program) -> None:
         guarded = set().union(*(mentions(prog.routines[r].body, records) for r in inside
                                 if prog.routines[r].kind == "network"))
         outside = [r for name, r in prog.routines.items()
-                   if name not in inside and name in fired and r.kind == "processor"]
+                   if name not in inside and name in fired and r.kind == "processor"
+                   and (n.name in fired or name not in game)]
         shared = set().union(*(p.reads | p.writes for p in outside))
         for rec in sorted(written & (shared | {r for r in records if prog.records[r].stream})):
             if rec not in n.writes:
@@ -846,6 +903,8 @@ def check_contracts(prog: Program) -> None:
             raise RunsError(f"network {n.name} declares writes: {stale}, but nothing inside writes them")
         if stale := sorted(n.reads - read - guarded):
             raise RunsError(f"network {n.name} declares reads: {stale}, but nothing inside reads them")
+        if n.name not in fired:
+            check_inputs(prog, n, inside)
 
 
 def program(root: Path) -> Program:
