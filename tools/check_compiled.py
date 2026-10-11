@@ -10,8 +10,8 @@ routine and field the bindings compile, one change at a time:
 - each set of a field at a Processor's top level made a local of the
   field's name, which the Processor's later statements read instead;
 
-and deletes each key line of each binding, which must then build another
-image or be refused: a key that changes nothing is dead.
+and deletes each key line and each section of each binding, which must
+then build another image or be refused: a key that changes nothing is dead.
 
 Each mutant is classified. It changes the image; or the evaluator rejects
 the text before anything runs (runs.check); or runsc refuses it with a
@@ -52,7 +52,8 @@ OPERATORS = {"+": "-", "-": "+", "&": "|", "|": "&", "^": "|", "<<": ">>", ">>":
 STATEMENTS = {"let", "set", "if", "loop", "for", "break", "continue", "stop", "unreachable", "wait",
               "return", "jump", "emit", "run", "match"}
 TRIALS = 200                # seeded Record states a silent mutant is fired on
-CLEAN = TRIALS // 4         # firings that must run without error
+CLEAN = TRIALS // 4         # firings that must run without error and reach the mutated routine
+EDGES = [0, runs.MASK, 1, runs.MASK ^ 1, 0o377777, 0o400000, 0o777, 0o400777]   # 0, -0, 1, -1, the extremes
 
 
 @dataclasses.dataclass(frozen=True)
@@ -83,6 +84,17 @@ def replaced_all(tree, old, new):
         return tuple(replaced_all(t, old, new) for t in tree)
     if isinstance(tree, dict):
         return {k: replaced_all(v, old, new) for k, v in tree.items()}
+    return tree
+
+
+def unplaced(tree):
+    """tree without the source lines its statements carry."""
+    if isinstance(tree, tuple) and tree and tree[0] in STATEMENTS and isinstance(tree[-1], str):
+        return tuple(unplaced(x) for x in tree[:-1])
+    if isinstance(tree, (list, tuple)):
+        return type(tree)(unplaced(x) for x in tree)
+    if isinstance(tree, dict):
+        return {k: unplaced(v) for k, v in tree.items()}
     return tree
 
 
@@ -260,14 +272,18 @@ def call_arguments(prog: runs.Program) -> dict[str, list[list]]:
 
 
 def random_state(prog: runs.Program, rng: random.Random) -> dict:
-    """Every word of every Record drawn at random, every enum field a member
-    drawn at random; instructions and streams as the program starts them."""
+    """Every word of every Record drawn at random, a quarter of them from the
+    words at the edges, every enum field a member drawn at random;
+    instructions and streams as the program starts them."""
     m = runs.Machine(prog)
+
+    def word() -> runs.W:
+        return runs.W(rng.choice(EDGES) if rng.random() < 0.25 else rng.randrange(1 << 18))
     for name, rec in prog.records.items():
         if rec.stream:
             continue
         for fld, (typ, _) in rec.fields.items():
-            draw = (lambda: runs.W(rng.randrange(1 << 18))) if typ == "word" else \
+            draw = word if typ == "word" else \
                 (lambda t=typ: runs.Member(t, rng.choice(prog.enums[t]))) if typ in prog.enums else None
             if draw is None:
                 continue
@@ -288,32 +304,36 @@ def arguments(prog: runs.Program, name: str, calls: dict, rng: random.Random) ->
 
 def fire(prog: runs.Program, name: str, args: list, state: dict):
     """What one firing leaves: the Records and the routine code jumped to,
-    or the error it stopped with."""
+    or the error it stopped with; and the routines it ran."""
     m = runs.Machine(prog)
     m.state = copy.deepcopy(state)
     try:
         m.run(name, args)
     except runs.Stop:
-        return "stop", m.state
+        return ("stop", m.state), {n for n, _ in m.fired}
     except (runs.RunsError, runs.Return, runs.Break, runs.Continue) as e:
-        return f"error {type(e).__name__}: {e}", None
-    return m.jumped_to, m.state
+        return (f"error {type(e).__name__}: {e}", None), {n for n, _ in m.fired}
+    return (m.jumped_to, m.state), {n for n, _ in m.fired}
 
 
-def same_game(prog: runs.Program, mutated: runs.Program, name: str, seed: str) -> tuple[bool, str]:
+def same_game(prog: runs.Program, mutated: runs.Program, name: str, seed: str,
+              mutated_routine: str | None = None) -> tuple[bool, str]:
+    """Fire name before and after the mutation on the same seeded Records:
+    the same Records, points and error every time, with enough firings
+    that run clean through the mutated routine."""
     rng = random.Random(zlib.crc32(seed.encode()))
     calls = call_arguments(prog)
     clean = 0
     for k in range(TRIALS):
         state = random_state(prog, rng)
         args = arguments(prog, name, calls, rng)
-        a, b = fire(prog, name, args, state), fire(mutated, name, args, state)
+        (a, ran), (b, _) = fire(prog, name, args, state), fire(mutated, name, args, state)
         if a != b:
             return False, f"{name}{tuple(args)} trial {k}: {str(a[0])[:80]} / {str(b[0])[:80]}"
-        clean += not str(a[0]).startswith("error")
+        clean += not str(a[0]).startswith("error") and (mutated_routine or name) in ran
     if clean < CLEAN:
-        return False, f"{name}: only {clean} of {TRIALS} firings ran clean"
-    return True, f"{name}: {TRIALS} firings, {clean} clean"
+        return False, f"{name}: only {clean} of {TRIALS} firings ran clean through {mutated_routine or name}"
+    return True, f"{name}: {TRIALS} firings, {clean} clean through {mutated_routine or name}"
 
 
 def equivalent(prog: runs.Program, mutated: runs.Program, m: Mutant) -> tuple[bool, str]:
@@ -321,9 +341,11 @@ def equivalent(prog: runs.Program, mutated: runs.Program, m: Mutant) -> tuple[bo
     before and after on the same seeded Records."""
     if m.routine is None:
         return False, "an initial value"
+    if unplaced(mutated.routines[m.routine].body) == unplaced(prog.routines[m.routine].body):
+        return True, "the same text (identical statements swapped)"
     why = []
     for name in [m.routine] + [o for o in owners(prog).get(m.routine, []) if o != m.routine]:
-        ok, how = same_game(prog, mutated, name, m.label)
+        ok, how = same_game(prog, mutated, name, m.label, m.routine)
         if ok:
             return True, how
         why.append(how)
@@ -332,29 +354,33 @@ def equivalent(prog: runs.Program, mutated: runs.Program, m: Mutant) -> tuple[bo
 
 # ---------------------------------------------------------------- the binding
 
-def key_lines() -> list[tuple[str, int]]:
-    """(binding file, line) of each whole key = value line."""
+def key_lines() -> list[tuple[str, int, int]]:
+    """(binding file, first line, past the last) of each whole key = value
+    line, and of each [section] or [[place]] with its keys."""
     out = []
     for b in sorted(runsc.BINDINGS.glob("*.toml")):
-        for n, text in enumerate(b.read_text().splitlines()):
+        lines = b.read_text().splitlines()
+        heads = [n for n, text in enumerate(lines) if text.startswith("[")] + [len(lines)]
+        out += [(b.name, a, z) for a, z in zip(heads, heads[1:])]
+        for n, text in enumerate(lines):
             s = text.strip()
             if s and not s.startswith(("#", "[")) and "=" in s and s.count("[") == s.count("]") \
                     and s.count("{") == s.count("}"):
-                out.append((b.name, n))
+                out.append((b.name, n, n + 1))
     return out
 
 
-def without_key(where: tuple[str, int]) -> tuple[str, str]:
-    """A binding with one key line deleted must build another image or be
-    refused: a key that changes nothing is dead."""
-    name, n = where
+def without_key(where: tuple[str, int, int]) -> tuple[str, str]:
+    """A binding with one key line, or one section, deleted must build
+    another image or be refused: a key that changes nothing is dead."""
+    name, n, past = where
     prog = runs.program(runs.source())
     home = runsc.BINDINGS
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         shutil.copytree(home, tmp / "pdp1")
         lines = (tmp / "pdp1" / name).read_text().splitlines()
-        del lines[n]
+        del lines[n:past]
         (tmp / "pdp1" / name).write_text("\n".join(lines) + "\n")
         runsc.BINDINGS = tmp / "pdp1"
         try:
@@ -410,7 +436,7 @@ def main() -> int:
     with ProcessPoolExecutor(mp_context=multiprocessing.get_context("fork")) as pool:
         results = list(pool.map(verdict, built, chunksize=4))
         kept = list(pool.map(without_key, keys))
-    dead = [f"{name}:{n + 1} {what.upper()} {how}" for (name, n), (what, how) in zip(keys, kept)
+    dead = [f"{name}:{n + 1} {what.upper()} {how}" for (name, n, _), (what, how) in zip(keys, kept)
             if what in ("dead", "crash")]
     for where in dead:
         print(f"  binding key {where}")
@@ -432,7 +458,7 @@ def main() -> int:
           f"{total['changed']} change the image, {total['refused']} refused by runsc, "
           f"{total['rejected']} rejected by the evaluator, {total['equivalent']} silent and the same game, "
           f"{total['silent']} silent and not shown the same, {total['crash']} crash; {len(bounds)} loop bounds; "
-          f"{len(keys) - len(dead)}/{len(keys)} binding keys live")
+          f"{len(keys) - len(dead)}/{len(keys)} binding keys and sections live")
     return 1 if failed else 0
 
 

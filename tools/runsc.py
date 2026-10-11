@@ -55,6 +55,18 @@ class BindError(Exception):
     pass
 
 
+class Section(dict):
+    """A part of the bindings: a key it lacks, which the RUNS needs, is a
+    BindError that says what is missing."""
+
+    def __init__(self, what: str, *args):
+        super().__init__(*args)
+        self.what = what
+
+    def __missing__(self, key):
+        raise BindError(f"no binding gives {self.what} {key!r}")
+
+
 def octal(n: int) -> str:
     return f"0{n:o}" if n > 7 else str(n)
 
@@ -320,55 +332,107 @@ class Bound:
         return f"{conv}{skips} {ret}{'' if ret.endswith('*') else ' '}{self.block if block else self.name}({params})"
 
 
-# The keys a binding may hold, by where they stand.
+def _name(v) -> bool:
+    return isinstance(v, str) and re.fullmatch(r"[A-Za-z_]\w*", v) is not None
+
+
+def _field(v) -> bool:
+    return isinstance(v, str) and re.fullmatch(r"[A-Za-z_]\w*\.[A-Za-z_]\w*", v) is not None
+
+
+def _int(v) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def _list(item, n: int | None = None):
+    return lambda v: isinstance(v, list) and all(item(x) for x in v) and (n is None or len(v) == n)
+
+
+def _dict(key, value):
+    return lambda v: isinstance(v, dict) and all(key(k) and value(x) for k, x in v.items())
+
+
+def _one_of(*words):
+    return lambda v: isinstance(v, str) and v in words
+
+
+def _either(*kinds):
+    return lambda v: any(k(v) for k in kinds)
+
+
+_BOOL = lambda v: isinstance(v, bool)               # noqa: E731
+_TRUE = lambda v: v is True                         # noqa: E731
+_TEXT = lambda v: isinstance(v, str)                # noqa: E731
+_LOCAL = _either(_name, _field)
+_SPELLED = _either(_int, _dict(_one_of("routine", "sign", "literal"), _either(_name, _BOOL)))
+_DEVICE = _either(_name, _dict(_one_of("read", "or_into_io", "sense"), _either(_name, _BOOL, _int)))
+_SECTION = lambda v: isinstance(v, dict)            # noqa: E731
+_PLACES = _list(_SECTION)
+
+# The keys a binding may hold, by where they stand, and the kind of value
+# each takes: a field (record.field), a name (a routine, a local, a C word),
+# a number, a flag, or one of a few words.
 SCHEMA = {
-    "unit": {"replaces", "registers", "pool", "repeat", "moves", "place", "inline", "code", "share",
-             "into", "spell", "flags", "homes", "addresses", "table", "cursors", "walk", "streams"},
-    "devices": {"console", "lights", "start"},
-    "start": {"at", "network", "tape"},
-    "walk": {"set_after", "index", "homes", "home_in", "carry", "stray", "other"},
-    "stray": {"after", "cursor"},
-    "table": {"at", "records", "clear"},
-    "routine": {"routine", "convention", "entry", "ac_param", "io_param", "byname", "result", "io", "cells",
-                "skips", "block", "block_takes_entry", "loops", "shifts", "pool", "spill", "inline", "io_reads",
-                "args_done", "data", "flags", "homes", "into", "arms", "exit_after", "pulse"},
-    "inline": {"routine", "ac_param", "result", "shifts"},
-    "code": {"routine", "pulse"},
-    "fields": {"fields"},
-    "slots": {"slots", "range", "reserve", "at"},
-    "machine": {"machine", "reserve"},
-    "jsp_slot": {"jsp_slot", "at", "returns", "jump", "reserve"},
-    "exit": {"exit"},
-    "table place": {"table"},
-    "shifts": {"shifts"},
+    "unit": {"replaces": _TEXT, "registers": _list(_name), "pool": _list(_field), "repeat": _name,
+             "moves": _one_of("swap"), "place": _PLACES, "inline": _PLACES, "code": _PLACES,
+             "share": _dict(_field, _field), "into": _dict(_field, _field),
+             "spell": _dict(_name, _dict(_name, _SPELLED)), "flags": _dict(_field, _int),
+             "homes": _dict(_field, _one_of("table", "built", "pointer")),
+             "addresses": _dict(_field, _one_of("after table")), "table": _SECTION,
+             "cursors": _dict(_field, _either(_name, _dict(_field, _name))), "walk": _SECTION,
+             "streams": _dict(_name, _one_of("dpy", "hlt"))},
+    "devices": {"console": _dict(_field, _DEVICE), "lights": _dict(_field, _int), "start": _PLACES},
+    "start": {"at": _int, "network": _name, "tape": _BOOL},
+    "walk": {"set_after": _name, "index": _field, "homes": _list(_field), "home_in": _dict(_field, _name),
+             "carry": _list(_name), "stray": _SECTION, "other": _dict(_field, _name)},
+    "stray": {"after": _field, "cursor": _name},
+    "table": {"at": _name, "records": _list(_name), "clear": _name},
+    "routine": {"routine": _name, "convention": _one_of("JDA", "JSP", "XCT", "BLOCK"), "entry": _field,
+                "ac_param": _field, "io_param": _field, "byname": _field, "result": _list(_field),
+                "io": _list(_LOCAL), "cells": _list(_field), "skips": lambda v: _list(_TEXT, 2)(v) and _field(v[0]) and _name(v[1]),
+                "block": _name, "block_takes_entry": _BOOL, "loops": _one_of("exit first"),
+                "shifts": _one_of("xct"), "pool": _list(_LOCAL), "spill": _list(_name), "inline": _field,
+                "io_reads": _list(_field), "args_done": _name, "data": _list(_LOCAL),
+                "flags": _dict(_name, _int), "homes": _dict(_name, _one_of("pointer")),
+                "into": _dict(_name, _field), "arms": _one_of("apart"), "exit_after": _name, "pulse": _BOOL},
+    "inline": {"routine": _name, "ac_param": _field, "result": _list(_field), "shifts": _one_of("xct")},
+    "code": {"routine": _name, "pulse": _BOOL},
+    "fields": {"fields": _list(_field)},
+    "slots": {"slots": _field, "range": _list(_int, 2), "reserve": _int, "at": _int},
+    "machine": {"machine": _one_of("constants", "variables", "patch space", "sequence break",
+                                   "sequence break flush", "start vectors"), "reserve": _int},
+    "jsp_slot": {"jsp_slot": _name, "at": _int, "returns": _one_of("io", "ac"), "jump": _name, "reserve": _int},
+    "exit": {"exit": _name},
+    "table place": {"table": _TRUE},
+    "shifts": {"shifts": _field},
 }
 # The keys each must hold.
 REQUIRED = {"unit": {"replaces", "place"}, "routine": {"convention"}, "inline": {"routine"}, "code": {"routine"},
             "slots": {"range"}, "jsp_slot": {"at", "returns", "jump"}, "table": {"at", "records"},
-            "stray": {"after", "cursor"}}
-VALUES = {"convention": {"JDA", "JSP", "XCT", "BLOCK"}, "loops": {"exit first"}, "shifts": {"xct"},
-          "arms": {"apart"}, "moves": {"swap"}, "returns": {"io", "ac"},
-          "machine": {"constants", "variables", "patch space", "sequence break", "sequence break flush",
-                      "start vectors"}}
+            "stray": {"after", "cursor"}, "start": {"at", "network"}}
+
+
+def check_keys(path: Path, d, kind: str, where: str):
+    """Each key is one runsc knows where it stands, with a value of its kind."""
+    if not isinstance(d, dict):
+        raise BindError(f"{path.name}: {where} is a table of keys")
+    if unknown := set(d) - set(SCHEMA[kind]):
+        raise BindError(f"{path.name}: {where}: unknown keys {sorted(unknown)}")
+    if missing := REQUIRED.get(kind, set()) - set(d):
+        raise BindError(f"{path.name}: {where}: missing {sorted(missing)}")
+    for k, v in d.items():
+        if not SCHEMA[kind][k](v):
+            raise BindError(f"{path.name}: {where}: {k} = {v!r} is not a value {k} takes")
 
 
 def check_schema(path: Path, spec: dict):
-    """Each key of a binding is one runsc knows where it stands, and each
-    value of a closed kind one it knows."""
-    def keys(d: dict, kind: str, where: str):
-        if unknown := set(d) - SCHEMA[kind]:
-            raise BindError(f"{path.name}: {where}: unknown keys {sorted(unknown)}")
-        if missing := REQUIRED.get(kind, set()) - set(d):
-            raise BindError(f"{path.name}: {where}: missing {sorted(missing)}")
-        for k, v in d.items():
-            if k in VALUES and not (k == "shifts" and kind == "shifts") and v not in VALUES[k]:
-                raise BindError(f"{path.name}: {where}: {k} = {v!r} is none of {sorted(VALUES[k])}")
-    keys(spec, "unit", "the unit")
-    keys(spec.get("walk", {}), "walk", "[walk]")
+    """Every key of a binding, its kind of value, and the keys it needs."""
+    check_keys(path, spec, "unit", "the unit")
+    check_keys(path, spec.get("walk", {}), "walk", "[walk]")
     if "stray" in spec.get("walk", {}):
-        keys(spec["walk"]["stray"], "stray", "[walk] stray")
+        check_keys(path, spec["walk"]["stray"], "stray", "[walk] stray")
     if "table" in spec:
-        keys(spec["table"], "table", "[table]")
+        check_keys(path, spec["table"], "table", "[table]")
     for section in ("place", "inline", "code"):
         for p in spec.get(section, []):
             kind = section if section != "place" else next(
@@ -376,7 +440,7 @@ def check_schema(path: Path, spec: dict):
                 "table place" if "table" in p else "shifts" if "shifts" in p else None)
             if kind is None:
                 raise BindError(f"{path.name}: a place is a routine, fields, slots or a machine word: {p}")
-            keys(p, kind, f"[[{section}]] {p.get(kind if kind in p else 'routine', '')}")
+            check_keys(path, p, kind, f"[[{section}]] {p.get(kind if kind in p else 'routine', '')}")
 
 
 def routine_locals(r: runs.Routine) -> set[str]:
@@ -405,7 +469,7 @@ class Bindings:
         self.prog = prog
         self.specs = {p: tomllib.loads(p.read_text()) for p in paths if p.name != DEVICES}
         self.starts: list[dict] = []           # the start vectors: address, top Network, the tape's own
-        self.bound: dict[str, Bound] = {}
+        self.bound: dict[str, Bound] = Section("the routine")
         self.placed: dict[str, Path] = {}       # field -> the unit that lays out its data word
         self.cell_of: dict[str, str] = {}       # field -> the JDA routine whose entry word holds it
         self.io_fields: set[str] = set()
@@ -419,7 +483,7 @@ class Bindings:
         self.flags: dict[str, int] = {}         # field -> the program flag that holds it
         self.pointers: set[str] = set()         # fields that hold addresses
         self.addresses: dict[str, str] = {}     # field -> the address it always holds
-        self.table: dict = {}                   # the Records laid out field after field in one array
+        self.table: dict = Section("[table]")   # the Records laid out field after field in one array
         self.jsp_slots: dict[str, dict] = {}    # a JSP slot's name -> what it jumps to
         self.slot_cursors: dict[str, dict] = {} # a field holding a slot -> field -> the cursor on it
         self.carried: set[str] = set()          # code routines whose jump's word a walk carries
@@ -430,6 +494,9 @@ class Bindings:
         self.insns = {f"{r}.{f}" for r, rec in prog.records.items() for f, (typ, _) in rec.fields.items()
                       if typ == "insn"}
         self.device_file(next((p for p in paths if p.name == DEVICES), None))
+        for word in ("constants", "variables"):
+            if sum(p.get("machine") == word for s in self.specs.values() for p in s.get("place", [])) != 1:
+                raise BindError(f"the assembler's {word} are laid out once, by a place machine = {word!r}")
         for path, spec in self.specs.items():
             check_schema(path, spec)
             for f, target in spec.get("into", {}).items():
@@ -491,8 +558,9 @@ class Bindings:
         if path is None:
             raise BindError(f"no {DEVICES}: the devices are bound in one place")
         spec = tomllib.loads(path.read_text())
-        if unknown := set(spec) - SCHEMA["devices"]:
-            raise BindError(f"{path.name}: unknown keys {sorted(unknown)}")
+        check_keys(path, spec, "devices", "the devices")
+        for v in spec.get("start", []):
+            check_keys(path, v, "start", "[[start]]")
         for f, how in spec.get("console", {}).items():
             self.check_field(path, f)
             self.devices[f] = how if isinstance(how, dict) else {"read": how}
@@ -501,8 +569,7 @@ class Bindings:
             self.flags[f] = n
         fired = set().union(set(), *(runs.runs_of(r.body) for r in self.prog.routines.values()))
         for v in spec.get("start", []):
-            if set(v) - SCHEMA["start"] or "at" not in v or v.get("network") not in self.prog.routines \
-                    or v["network"] in fired:
+            if v["network"] not in self.prog.routines or v["network"] in fired:
                 raise BindError(f"{path.name}: a start is an address and a top Network: {v}")
             self.starts.append(v)
         if self.starts and sum(bool(v.get("tape")) for v in self.starts) != 1:
@@ -511,8 +578,14 @@ class Bindings:
 
     def check_names(self):
         """Every value of a binding that names a field, a routine, a member
-        or a local names one the RUNS text has."""
+        or a local names one the RUNS text has, and no two fields share a
+        cursor."""
         bound = set(self.bound)
+        cursors = list(self.cursors.values()) + [c for m in self.slot_cursors.values() for c in m.values()] \
+            + [c for s in self.specs.values() for c in s.get("walk", {}).get("other", {}).values()] \
+            + [self.table[k] for k in ("clear",) if k in self.table]
+        if twice := sorted({c for c in cursors if cursors.count(c) > 1}):
+            raise BindError(f"cursors {twice} each point at two fields' words")
         for path, spec in self.specs.items():
             def routine(name: str, what: str):
                 if name not in self.prog.routines:
@@ -602,6 +675,8 @@ class Bindings:
         return set().union(*(routine_locals(self.prog.routines[r]) for r in own_routines(self.prog, name, bound)))
 
     def check_field(self, path: Path, dotted: str):
+        if not _field(dotted):
+            raise BindError(f"{path.name}: {dotted!r} is no record.field")
         rec, fld = dotted.split(".")
         if rec not in self.prog.records or fld not in self.prog.records[rec].fields:
             raise BindError(f"{path.name}: no field {dotted}")
@@ -720,7 +795,7 @@ class Unit:
         self.pool_locals: set[str] = set()
         self.tables: dict[str, list[int]] = {}  # table-held field -> the shift counts it takes, in text order
         self.kinds: dict[str, str] = {}         # field held in a shift -> the shift it is
-        self.walk = self.spec.get("walk", {})   # the cursors' walk over the table's slots
+        self.walk = Section(f"{path.name} [walk]", self.spec.get("walk", {}))  # the cursors' walk over the slots
         self.homed: dict[str, str | None] = {}  # cursor -> the Processor its home is in (None: first access)
         for f in self.walk.get("homes", []):
             self.homed[binds.cursors[f]] = None

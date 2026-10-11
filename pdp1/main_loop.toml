@@ -106,10 +106,6 @@ routine = "between_games"
 convention = "BLOCK"
 
 [[place]]
-routine = "ask"
-convention = "BLOCK"
-
-[[place]]
 routine = "show_scores"
 convention = "BLOCK"
 
