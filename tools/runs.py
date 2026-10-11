@@ -1627,6 +1627,11 @@ def check(prog: Program) -> Program:
             raise RunsError(f"{r.name} fires itself: a recursion is a stack Record and a bounded Network loop")
     check_types(prog)
     check_contracts(prog)
+    for rec in prog.records.values():
+        for fld, (_, init) in rec.fields.items():
+            if init is not None and init[0] == "slots" and len(init[1]) != rec.count:
+                raise RunsError(f"{rec.name}.{fld}: {len(init[1])} initial values for {rec.count} slots")
+    Machine(prog)                               # every initial value is a value of its field
     return prog
 
 

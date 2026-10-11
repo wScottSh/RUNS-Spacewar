@@ -553,6 +553,9 @@ class Bindings:
                 if "slots" in p:
                     self.check_field(path, p["slots"])
                     lo, hi = p["range"]
+                    count = self.prog.records[p["slots"].split(".")[0]].count
+                    if count is None or not 0 <= lo <= hi < count:
+                        raise BindError(f"{path.name}: slots {p['slots']} {p['range']}: slots of a collection")
                     self.pieces.setdefault(p["slots"], []).append((lo, hi, f"{self.c_name(p['slots'])}_{octal(lo)}"))
                     self.placed[p["slots"]] = path
         self.check_names()
@@ -594,10 +597,11 @@ class Bindings:
                                 f"not {f} itself, and not shared with a third")
         made = self.made_names()
         taken = set(self.prog.routines) | set(self.prog.records) | {self.c_name(f) for f in self.field_names()} \
-            | C_WORDS
+            | set(self.prog.enums) | {m for ms in self.prog.enums.values() for m in ms} \
+            | set().union(*(routine_locals(r) for r in self.prog.routines.values())) | C_WORDS
         if clash := sorted({n for n in made if made.count(n) > 1 or n in taken}):
             raise BindError(f"{clash}: a name a binding gives a cursor, the table, a block, an exit or a slot "
-                            f"names nothing else")
+                            f"names nothing else, in the RUNS or in C")
         for r in self.table.get("records", []):
             if self.prog.records.get(r) is None or self.prog.records[r].count is None or self.prog.records[r].stream:
                 raise BindError(f"[table] records: {r!r} is no collection of the RUNS")
@@ -987,9 +991,9 @@ class Unit:
     def check_unstored(self):
         """A field with no data word cannot carry an initial value onto the
         tape: an entry word is punched as 0, a register holds what the
-        caller left, a pool word or an instruction what the program first
-        stores there. Its RUNS initial value must be 0."""
-        fields = set(self.binds.pool) | set(self.binds.homes) \
+        caller left, a pool word, a cursor or an instruction what the
+        program first stores there. Its RUNS initial value must be 0."""
+        fields = set(self.binds.pool) | set(self.binds.homes) | set(self.binds.slot_cursors) \
             | {f for f in self.binds.field_names() if self.binds.in_register(f, self.path)}
         for p in self.spec.get("place", []) + self.spec.get("inline", []):
             if "routine" in p:
