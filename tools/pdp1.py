@@ -43,6 +43,7 @@ FIELDS = {
     ("square_root_call", "root"): "sq2",
     ("multiply_call", "entry"): "mpy", ("multiply_call", "partial"): "mp2",
     ("integer_multiply_call", "entry"): "imp",
+    ("divide_call", "high"): "dvd", ("divide_call", "quotient"): "idv",
 }
 
 # Fields the original keeps inside an instruction, not in a word of their

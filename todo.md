@@ -23,5 +23,5 @@
 
 ## Round 3 (autonomous): compile multiply, divide, sincos from RUNS
 - [x] multiply: RUNS mpy + imp Network, check_multiply vs SIMH, pdp1/multiply.toml, runsc networks/calls/byname/dword, MATCH, gate
-- [ ] divide
+- [x] divide: RUNS dvd + idv Network, division enum for the skip, check_divide vs SIMH, block/skips/io_param/cells in the binding, MATCH, gate
 - [ ] sincos

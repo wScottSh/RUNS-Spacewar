@@ -94,6 +94,27 @@ record integer_multiply_call
   factor: word = 0          # the second factor
   product: word = 0         # AC at return: the product's low 17 bits and its sign
 
+# Whether a quotient fits a word. The caller sees it as a skip: dvd and idv
+# return past one more word when it fits.
+enum division
+  fits
+  overflows                 # |high dividend| >= |divisor|
+
+# The divide subroutines' own words (dvd, idv). The divisor is the word after
+# the call, like multiply's second factor.
+record divide_call
+  high: word = 0            # dvd: jda leaves the dividend's high half here; the remainder at return
+  low: word = 0             # IO: the dividend's low half
+  divisor: word = 0
+  quotient: word = 0        # idv: |divisor|, then the quotient's magnitude
+  result: word = 0          # AC at return: the quotient, or |divisor| signed like one on overflow
+  outcome: division = overflows
+
+record integer_divide_call
+  dividend: word = 0        # idv: jda leaves the dividend here
+  low: word = 0             # IO on entry: its sign lands in the low half's lowest bit
+  divisor: word = 0
+
 # Values the original hands from one rule to the next in AC and IO. Each is a
 # place only because a register carried it: into or out of a tunable the
 # original executes with xct, or into the diff macro.

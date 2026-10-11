@@ -468,6 +468,9 @@ class Function:
             return 1
         if op == "let":
             name = s[1][1]
+            if name in self.b.io and (held := self.expr(s[2])) in self.io_resident():
+                self.alias[name] = held             # already in IO: no move
+                return 1
             self.emit(depth, f"{'register word' if name in self.b.io else 'word'} {name} = {self.expr(s[2])};")
             self.scopes[-1].add(name)
             return 1
