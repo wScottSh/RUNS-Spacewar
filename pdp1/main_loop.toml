@@ -1,0 +1,181 @@
+# The main loop and the game control around it (source lines 664-941):
+# the frame, the start vectors' routines, the match between
+# games, the new game, the control word getters and the object loop. Each
+# Network is a block the others jump to; the frame starts again where a
+# firing ends.
+replaces = "lift/main_loop.c"
+include = ["object_table.h", "control_word.h"]
+registers = ["handoff", "outline_call"]
+pool = ["frame.spare_time", "frame.restart_delay", "frame.objects_seen",
+        "score.first", "score.second", "score.games_left", "controls.source"]
+# The Network the PDP-1 runs again whenever a firing ends: the host's loop.
+repeat = "frame"
+# A value moves from AC to IO by the swap macro (rcl 9s, rcl 9s).
+moves = "swap"
+# The fields that hold addresses: the C dialect types them as pointers.
+pointers = ["outline_call.code", "outline_call.shape", "outline_space.start"]
+
+[names]
+"controls.source" = "control_word_getter"
+
+[addresses]
+"outline_space.start" = "after table"
+
+# The object table: objects then ships, field after field, each field's
+# slots together, from object_table (core_layout.c). The clearing loop's
+# cursor is homed in its dzm.
+[table]
+at = "object_table"
+records = ["objects", "ships"]
+clear = "clearing"
+
+# A Record field indexed by a slot the main loop's cursors point at is the
+# word the cursor points at (object_table.h). The objects unit's calc
+# routines use them too.
+[cursors]
+"objects.routine" = "routine_slot"
+"objects.x" = "x_slot"
+"objects.y" = "y_slot"
+"objects.counter" = "counter_slot"
+"objects.cycles" = "cycles_slot"
+"objects.dx" = "dx_slot"
+"objects.dy" = "dy_slot"
+"ships.angular_momentum" = "angular_momentum_slot"
+"ships.angle" = "angle_slot"
+"ships.fuel" = "fuel_slot"
+"ships.torpedoes" = "torpedoes_slot"
+"ships.outline" = "outline_slot"
+"ships.previous_control" = "previous_control_slot"
+"ships.saved_routine" = "saved_routine_slot"
+"ships.jumps_left" = "jumps_left_slot"
+"ships.recharge" = "recharge_slot"
+"ships.uncertainty" = "uncertainty_slot"
+
+# The walk over the slots. The cursors are set after begin_frame; the
+# routine word's cursor is the index. A cursor homed here lives in the
+# address field of the first instruction of this unit that reads or writes
+# its field, or of the first in the named Processor. A walk from the slot
+# after another uses the other cursors (ml2, mx2, ...). The current
+# object's outline is carried to the spaceship in draw_outline's home (sp5,
+# the jump into the compiled outline), loaded as the second walk begins: for
+# a torpedo it reads past the outline array (reach_oracle), and only the
+# spaceship, which a ship's own slot sets it for, jumps through it. mas is
+# stepped with the cursors, and nothing reads it.
+[walk]
+set_after = "begin_frame"
+index = "objects.routine"
+homes = ["objects.routine", "objects.x", "objects.y", "objects.counter", "ships.outline"]
+home_in = { "objects.cycles" = "charge_time" }
+carry = { "ships.outline" = "draw_outline" }
+stray = { after = "ships.angle", cursor = "stray_cursor" }
+
+[walk.other]
+"objects.routine" = "other_routine_slot"
+"objects.x" = "other_x_slot"
+"objects.y" = "other_y_slot"
+"objects.counter" = "other_counter_slot"
+"objects.cycles" = "other_cycles_slot"
+
+# The console: lat reads the test word into AC; iot 11 ors the control
+# boxes into IO.
+[devices]
+"console.test_word" = "lat"
+"console.control_boxes" = { read = "control_boxes", or_into_io = true }
+
+[flags]
+"lights.first_survived" = 1
+"lights.second_survived" = 2
+
+[spell.light]
+off = 0
+on = 1
+
+[spell.control_source]
+test_word = { routine = "read_test_word" }
+control_boxes = { routine = "control_word_routine" }
+
+[spell.outline]
+needle = { data = "needle_outline" }
+wedge = { data = "wedge_outline" }
+
+[streams]
+scoreboard = "hlt"
+
+# Routines of lifted C the main loop runs.
+[[extern]]
+routine = "compile_outline"
+name = "outline_compiler"
+convention = "JDA"
+entry = "outline_call.code"
+inline = "outline_call.shape"
+result = ["outline_call.code"]
+
+[[extern]]
+routine = "expensive_planetarium"
+convention = "JSP"
+
+[[extern]]
+routine = "central_star"
+convention = "JSP"
+
+[[extern]]
+routine = "first_spaceship"
+convention = "JSP"
+
+[[extern]]
+routine = "second_spaceship"
+convention = "JSP"
+
+[[place]]
+routine = "frame"
+convention = "BLOCK"
+io = ["budget"]
+
+[[place]]
+routine = "start_with_test_word"
+convention = "BLOCK"
+
+[[place]]
+routine = "start_with_control_boxes"
+convention = "BLOCK"
+
+[[place]]
+routine = "between_games"
+convention = "BLOCK"
+
+[[place]]
+routine = "ask"
+convention = "BLOCK"
+
+[[place]]
+routine = "show_scores"
+convention = "BLOCK"
+
+[[place]]
+routine = "new_match"
+convention = "BLOCK"
+
+# AC holds where the outlines go, so the guard on separate_outlines reads
+# it into IO (lio ddd).
+[[place]]
+routine = "new_game"
+convention = "BLOCK"
+io_reads = ["tunables.separate_outlines"]
+
+[[place]]
+routine = "read_control_boxes"
+convention = "JSP"
+result = ["handoff.control_word"]
+io = ["handoff.control_word"]
+
+[[place]]
+routine = "read_test_word"
+convention = "JSP"
+result = ["handoff.control_word"]
+io = ["handoff.control_word"]
+
+# |dx| is kept in a pool word (mt1) while AC computes |dy|.
+[[place]]
+routine = "object_loop"
+convention = "BLOCK"
+spill = ["dx"]

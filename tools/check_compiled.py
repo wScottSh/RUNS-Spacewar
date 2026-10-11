@@ -51,7 +51,8 @@ def sites(prog: runs.Program):
     value of each field they place or hand a routine."""
     specs = [tomllib.loads(b.read_text()) for b in sorted(runsc.BINDINGS.glob("*.toml"))]
     places = [p for spec in specs for p in spec["place"] + spec.get("inline", [])]
-    bound = {p["routine"] for p in places if "routine" in p}
+    bound = {p["routine"] for p in places if "routine" in p} | \
+        {e["routine"] for spec in specs for e in spec.get("extern", [])}
     fields = []
     for place in places:
         if name := place.get("routine"):

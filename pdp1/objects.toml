@@ -6,22 +6,6 @@ include = ["object_table.h"]
 registers = ["handoff"]
 pool = ["explosion_cloud.particles"]
 
-# A Record field indexed by the routine's slot is the word the main loop's
-# cursor points at (object_table.h, homed in the main loop's code).
-[cursors]
-"objects.routine" = "routine_slot"
-"objects.x" = "x_slot"
-"objects.y" = "y_slot"
-"objects.counter" = "counter_slot"
-"objects.cycles" = "cycles_slot"
-"objects.dx" = "dx_slot"
-"objects.dy" = "dy_slot"
-"ships.angle" = "angle_slot"
-"ships.saved_routine" = "saved_routine_slot"
-"ships.jumps_left" = "jumps_left_slot"
-"ships.recharge" = "recharge_slot"
-"ships.uncertainty" = "uncertainty_slot"
-
 # Fields held in a shift instruction: spread as the address field of the
 # xct that runs one of a table of shifts (msh, xct .), scatter as the
 # shift itself, built at run time where it runs (mi1).
