@@ -400,7 +400,7 @@ class Bindings:
         self.table: dict = {}                   # the Records laid out field after field in one array
         self.jsp_slots: dict[str, dict] = {}    # a JSP slot's name -> what it jumps to
         self.slot_cursors: dict[str, dict] = {} # a field holding a slot -> field -> the cursor on it
-        self.carried: set[str] = set()          # homed jumps a walk carries a field's word into
+        self.carried: set[str] = set()          # code routines whose jump's word a walk carries
         self.into: dict[str, str] = {}          # field -> the collection's field it holds a place in
         self.pieces: dict[str, list] = {}       # collection field -> (first slot, last slot, C name) laid out
         self.shared: dict[str, str] = {}        # field -> the field whose word it lives in
@@ -426,7 +426,7 @@ class Bindings:
                     self.slot_cursors[f] = cursor
                 else:
                     self.cursors[f] = cursor
-            self.carried |= set(spec.get("walk", {}).get("carry", {}).values())
+            self.carried |= set(spec.get("walk", {}).get("carry", []))
             for f in spec.get("pool", []):
                 self.check_field(path, f)
                 self.pool.add(f)
@@ -2057,6 +2057,7 @@ class Function:
             raise BindError(f"{where}: a walk over the slots ends at a slot by number")
         if lo == ("num", 0):
             cursors, outer = self.binds.cursors, True
+            self.check_carry(body, where)
         elif lo[0] == "bin" and lo[1] == "+" and lo[2][0] == "name" and lo[3][0] == "num" and self.slot_maps:
             outer_var, outer_cursors = self.slot_maps[-1]
             if lo[2][1] != outer_var:
@@ -2064,7 +2065,8 @@ class Function:
             cursors, outer = walk["other"], False
             for f in self.table_order(cursors):
                 self.emit(depth, f"{cursors[f]} = {octal(lo[3][1])} + {outer_cursors[f]};")
-            for f, into in walk.get("carry", {}).items():
+            for into in walk.get("carry", []):
+                f = self.carried_field(into)
                 self.unit.typedefs.add("typedef void block_code(void) BLOCK;")
                 self.unit.carried[into] = f
                 read = self.cursor(("index", as_field(f), ("name", outer_var)))
@@ -2091,6 +2093,101 @@ class Function:
         self.emit(depth + 1, f"goto {top};")
         if outer:
             self.resting = (hi[1] + 1, cursors)
+
+    def carried_field(self, into: str) -> str:
+        """The field whose word a walk carries into the homed jump of code a
+        Record holds: the one the code's jump goes through at its slot
+        (draw_outline: jump outline_code.insn[ships.outline[slot]]), which
+        holds its place in that code."""
+        b, r = self.binds.bound.get(into), self.unit.prog.routines.get(into)
+        if b is None or not b.code:
+            raise BindError(f"{self.unit.path.name}: [walk] carry: {into} is no [[code]] routine")
+        (_, target, _, where), = r.body
+        index = target[2] if target[0] == "index" else None
+        if not (r.params and index and index[0] == "index" and index[2] == ("name", r.params[0])):
+            raise BindError(f"{where}: {into}'s jump is carried by the walk only through a field at its slot")
+        f = dotted_of(index[1])
+        if f not in self.binds.cursors or self.binds.into.get(f) != dotted_of(target[1]):
+            raise BindError(f"{where}: {into} jumps through {f}, which holds no place in {dotted_of(target[1])} "
+                            f"the walk's cursors reach ([cursors], [into])")
+        return f
+
+    def check_carry(self, body: list, where: str):
+        """A walk carries a jump's word as the walk from the slot after this
+        one begins (mot); the RUNS reads it at the jump. They agree only when
+        every slot whose calc reaches the jump has run that walk earlier in
+        the same pass, and nothing the slot's rules run writes the field."""
+        carry = self.unit.walk.get("carry", [])
+        if not carry:
+            return
+        prog = self.unit.prog
+        walks, sites = [], []
+
+        def visit(stmts, guards, pos):
+            for k, s in enumerate(stmts):
+                here = pos + (k,)
+                if s[0] == "slots":
+                    walks.append((here, guards))
+                elif s[0] == "if":
+                    taken = []
+                    for c, b in s[1]:
+                        visit(b, guards + taken + [(c, True)], here)
+                        taken.append((c, False))
+                    visit(s[2], guards + taken, here)
+                elif s[0] == "loop":
+                    visit(s[2], guards + [(None, True)], here)
+                elif s[0] in ("dispatch", "call"):
+                    sites.append((here, guards, s))
+        visit(body, [], ())
+
+        def plain(e):
+            return e[:3] if isinstance(e, tuple) and e[:1] == ("index",) else e
+
+        def value(c, e, member):
+            """The guard c when the field e holds member; None: undecided."""
+            if c[0] == "bin" and c[1] in ("and", "or"):
+                a, b = value(c[2], e, member), value(c[3], e, member)
+                if c[1] == "and":
+                    return False if False in (a, b) else None if None in (a, b) else True
+                return True if True in (a, b) else None if None in (a, b) else False
+            if c[0] == "not":
+                v = value(c[1], e, member)
+                return None if v is None else not v
+            if c[0] == "bin" and c[1] in ("==", "!=") and plain(c[2]) == plain(e) and c[3][0] == "member" \
+                    and member is not None:
+                return (c[3][2] == member) == (c[1] == "==")
+            return None
+
+        for into in carry:
+            f = self.carried_field(into)
+            jump_at = prog.routines[into].body[0][-1]
+            if f.split(".")[0] in prog.routines[into].writes:
+                raise BindError(f"{jump_at}: {into} may write {f.split('.')[0]}, whose {f} the walk carries")
+            for here, guards, s in sites:
+                targets = s[3] if s[0] == "dispatch" else [s[1]]
+                for t in targets:
+                    if into not in runs.fires(prog, t, set()):
+                        continue
+                    member = None
+                    if s[0] == "dispatch":
+                        enum = field_type(prog, plain(s[1]))
+                        member = next((m for m, how in self.binds.spelled.get(enum, {}).items()
+                                       if isinstance(how, dict) and how.get("routine") == t), None)
+                    e = s[1] if s[0] == "dispatch" else None
+                    if not any(pos < here and all(g in guards or (g[0] is not None and value(g[0], e, member) == g[1])
+                                                  for g in wguards) for pos, wguards in walks):
+                        raise BindError(
+                            f"{jump_at}: {into} jumps through {f} at its slot, which the binding loads as the walk "
+                            f"from the slot after it begins ([walk] carry); a slot whose calc is {member or t} "
+                            f"reaches the jump ({s[2] if s[0] == 'dispatch' else s[-1]}) without that walk "
+                            f"({where})")
+            fired = set().union(set(), *(runs.fires(prog, t, set())
+                                         for _, _, s in sites for t in (s[3] if s[0] == "dispatch" else [s[1]])))
+            stmts = list(walk(body)) + [x for r in sorted(fired) for x in walk(prog.routines[r].body)]
+            if written := [s for s in stmts if s[0] == "set" and s[1][0] != "tuple"
+                           and dotted_of(s[1][1] if s[1][0] == "index" else s[1]) == f]:
+                raise BindError(f"{written[0][-1]}: this writes {f}, which the walk carries to {into}'s jump "
+                                f"before the slot's calc runs ([walk] carry)")
 
     def search(self, s):
         """A loop that steps a field holding a slot and stops when it

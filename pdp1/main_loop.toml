@@ -54,19 +54,20 @@ clear = "clearing"
 # routine word's cursor is the index. A cursor homed here lives in the
 # address field of the first instruction of this unit that reads or writes
 # its field, or of the first in the named Processor. A walk from the slot
-# after another uses the other cursors (ml2, mx2, ...). The current
-# object's outline is carried to the spaceship in draw_outline's home (sp5,
-# the jump into the compiled outline), loaded as the second walk begins: for
-# a torpedo it reads past the outline array (reach_oracle), and only the
-# spaceship, which a ship's own slot sets it for, jumps through it. Play
-# never observes the read past the array (check_frame.py poison, INTENT.md).
-# mas is stepped with the cursors, and nothing reads it.
+# after another uses the other cursors (ml2, mx2, ...). The word
+# draw_outline's jump goes through (ships.outline at the slot, as its RUNS
+# says) is carried into its home (sp5, the jump into the compiled outline)
+# as the second walk begins (mot). runsc refuses the carry unless every
+# calc that reaches the jump runs after that walk in the same slot, and
+# nothing in the slot writes the field. For a torpedo the load reads past
+# the outline array (reach_oracle), and nothing jumps through it (check_frame
+# poison, INTENT.md). mas is stepped with the cursors, and nothing reads it.
 [walk]
 set_after = "begin_frame"
 index = "objects.routine"
 homes = ["objects.routine", "objects.x", "objects.y", "objects.counter", "ships.outline"]
 home_in = { "objects.cycles" = "charge_time" }
-carry = { "ships.outline" = "draw_outline" }
+carry = ["draw_outline"]
 stray = { after = "ships.angle", cursor = "stray_cursor" }
 
 [walk.other]
