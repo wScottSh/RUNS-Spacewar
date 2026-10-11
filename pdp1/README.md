@@ -100,6 +100,8 @@ A `[[place]]` may instead lay out words that the PDP-1 and its operator need and
 - `machine = "sequence break"`: words 0-2, where a sequence break saves AC, PC and IO (not punched), and word 3, a jump to the flush. `machine = "sequence break flush"`: the flush, which resumes the interrupted program. Play never raises a sequence break (spacewar-c's README: the frame check never runs these words).
 - `jump`: a start address, a jump to the named routine. `start = true` makes it the tape's own start.
 - `jsp_slot`: a JSP routine the operator may rewrite in place, laid out `at` an address. By default it jumps to `jump` and returns what that returns (`returns`: `ac` or `io`); `reserve` words of room follow it.
+- `machine = "constants"` and `machine = "variables"`: where the assembler lays out its literal constants and its pool words. `machine = "patch space"`: `reserve` words of room for the operator's patches (`p, . 200/`). No rule reads any of them as a place: a constant is a number of the RUNS text, and a pool word is a field.
+- `table = true`: the object table's words, from `[table] at`. The tape does not load them and a new game clears them before anything reads them, so `runsc` requires each table field's RUNS initial value to be its zero word.
 
 A field with no data word of its own (an entry word, a register) has no value on the tape, so its RUNS initial value must be 0; `runsc` refuses any other.
 

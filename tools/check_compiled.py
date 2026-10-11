@@ -53,8 +53,11 @@ def sites(prog: runs.Program):
     places = [p for spec in specs for p in spec["place"] + spec.get("inline", [])]
     bound = {p["routine"] for p in places if "routine" in p} | \
         {e["routine"] for spec in specs for e in spec.get("extern", [])}
+    table = {k: v for spec in specs for k, v in spec.get("table", {}).items()}
     fields = []
     for place in places:
+        if place.get("table"):
+            fields += [f"{r}.{f}" for r in table["records"] for f in prog.records[r].fields]
         if name := place.get("routine"):
             for proc in dict.fromkeys(compiled(prog, name, bound)):
                 for path, n in numbers(prog.routines[proc].body):

@@ -389,6 +389,18 @@ class Unit:
         e = self.prog.records[rec].fields[fld][1]
         return Function.constant(e) if e is not None else "0"
 
+    def table_words(self) -> str:
+        """The object table's words. The tape does not load them, and a new
+        game clears them before anything reads them: each field's RUNS
+        initial value is its zero word."""
+        for f in self.binds.table_fields():
+            rec, fld = f.split(".")
+            e = self.prog.records[rec].fields[fld][1]
+            if not (e == ("num", 0) or e[0] == "name" and self.binds.spelled.get(
+                    self.prog.member(e[1]), {}).get(e[1]) == 0):
+                raise BindError(f"{self.path.name}: {f} is not on the tape, so it starts at its zero word")
+        return f"RESERVE word {self.binds.table['at']}[{octal(self.binds.table_size())}];"
+
     def check_unstored(self):
         """A field with no data word cannot carry an initial value onto the
         tape: an entry word is punched as 0, a register holds what the
@@ -634,7 +646,15 @@ class Unit:
         and runs word 3, a jump to the flush, which resumes the interrupted
         program. A jump: a start address, the tape's own when `start`. A JSP
         slot: a routine the operator may rewrite in place, by default a
-        jump to another, with room after it."""
+        jump to another, with room after it. The assembler's pools: the
+        literal constants and the pool words. The patch space: room for the
+        operator's patches."""
+        if p.get("machine") == "constants":
+            return ["CONSTANTS();"]
+        if p.get("machine") == "variables":
+            return ["VARIABLES();"]
+        if p.get("machine") == "patch space":
+            return [f"RESERVE word patch_space[{octal(p['reserve'])}];"]
         if p.get("machine") == "sequence break":
             head += ["typedef void resume_point(word ac, register word io) BLOCK;",
                      "BLOCK void flush_sequence_break(void);"]
@@ -672,6 +692,8 @@ class Unit:
             elif "exit" in p:
                 head.append(f"BLOCK void {p['exit']}(void);")
                 body += [f"BLOCK void {p['exit']}(void)", "{", "}"]
+            elif p.get("table"):
+                body.append(self.table_words())
             elif "shifts" in p:
                 f = p["shifts"]
                 entries = ", ".join(f"I_{self.kinds[f].upper()}({octal(n)})" for n in self.tables[f])

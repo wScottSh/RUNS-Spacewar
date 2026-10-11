@@ -1,0 +1,20 @@
+# Core after the code (source lines 1357-1366): the assembler's literal
+# constants and pool words, the patch space and the object table. Where
+# they lie is the PDP-1's layout. The compiled outlines follow the table
+# (pdp1/main_loop.toml, [addresses]).
+replaces = "lift/core_layout.c"
+
+[[place]]
+machine = "constants"
+
+[[place]]
+machine = "variables"
+
+# Room for the operator's patches (p, . 200/).
+[[place]]
+machine = "patch space"
+reserve = 0o200
+
+# The object table (mtb): pdp1/main_loop.toml, [table].
+[[place]]
+table = true
