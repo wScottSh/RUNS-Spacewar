@@ -208,8 +208,8 @@ class Bound:
     c_name: str | None = None           # a routine of lifted C, not compiled from RUNS: its name there
     pointers: set[str] = field(default_factory=set)     # fields that hold addresses (word *)
     io_reads: set[str] = field(default_factory=set)     # fields a guard reads into IO, AC being busy
-    back: str | None = None             # an extern block: the routine it jumps back to
-    pulse: bool = False                 # an extern block that waits for a display completion pulse
+    back: str | None = None             # code a Record holds: the routine it jumps back to
+    pulse: bool = False                 # that code waits for a display completion pulse
     insns: set[str] = field(default_factory=set)        # fields that hold instructions
     code: bool = False                  # a Processor whose body jumps into code a Record holds
     args_done: str | None = None        # the Processor after which the routine steps past its inline words
@@ -359,7 +359,7 @@ class Bindings:
                   tuple(p["skips"]) if "skips" in p else None, set(p.get("io", [])), p.get("cells", []),
                   p.get("loops"), p.get("shifts"), set(p.get("pool", [])), set(p.get("spill", [])),
                   p.get("inline"), p.get("name"), self.pointers, set(p.get("io_reads", [])),
-                  p.get("back"), p.get("pulse", False), self.insns, p.get("code", False),
+                  None, p.get("pulse", False), self.insns, p.get("code", False),
                   p.get("args_done"), p.get("data", []))
         for f in [b.entry, b.ac_param, b.io_param, b.byname, b.inline, *b.result, *b.cells] + \
                 ([b.skips[0]] if b.skips else []):

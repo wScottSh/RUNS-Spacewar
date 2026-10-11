@@ -45,4 +45,14 @@
 - [x] check_spaceship vs SIMH: 3000 calls through the compiled outline (tools/outline.py stand-in); 17 mutations (14 caught, 1 after one-free-slot tables, 2 equivalent)
 - [x] check_frame with flying ships: 1500 frames; poison mode for the mot verdict, with its control
 - [x] pdp1/spaceship.toml + runsc rules (exit, back/pulse externs, carried homed jump, slot-field cursors and search, sense/flag guards, shared Network tail, pool-word dispatch); MATCH; gate 357/357
-- [ ] Open: the outline compiler and outlines (presentation); tools/outline.py stands in for them in the checks
+- [x] The outline compiler and outlines (presentation): ported in round 7; tools/outline.py deleted
+
+## Round 7 (autonomous): port the outline compiler, the outlines and the core layout
+- [x] Design: instructions as values of the machine description's type insn in a Record (outline_code), run by `jump` with the PDP-1's rules; compiler as a Network cut at the original's labels. Alternatives weighed: one Processor (cannot call ocs; its order is not the original's), raw words (would put macro1's pool addresses in the text)
+- [x] Evaluator: type insn, instruction constructors, jump with contract and bound, initial values a slot, slots past a collection are errors, Network loop exit that runs things first
+- [x] RUNS: outlines.runs, outlines.runs-prim; outlines, outline_code, outline_compiler Records; pen.saved_x/y; outline_space and the outline enum gone; frame contract without pen
+- [x] Bindings: core_layout.toml, outlines.toml, outline_compiler.toml; [[code]] draw_outline; [into]; MATCH; check_compiled 423/423
+- [x] check_outline_compiler vs SIMH (9 outlines, 6 ddd settings); 10 compiler mutations caught; check_spaceship/check_frame through the ported code; `moved` relocation; 5 machine-rule mutations caught
+- [x] reach_oracle re-run: same findings, code space named outline_code
+- [ ] Open: the heavens and the star catalog
+- [ ] Open: runsc's layout rules grow per unit (jump table, rotated loop); an independent review should judge whether each is general

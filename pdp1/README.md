@@ -36,12 +36,13 @@ A `[[place]]` with `fields` lays out those Record fields as data words, with the
 - `spill`: AC locals kept in a pool word from their last set on, and read from there (`dac \mt1`).
 - `result` with the field in `io`, for `JSP`: the routine returns in IO (`io_word`).
 
-An `[[extern]]` entry takes the same keys and binds a routine of lifted C that RUNS runs but does not have yet (the outline compiler, the heavens, a ship's compiled outline). `name` gives its C name when it differs. Two more keys bind code that is entered by a jump and jumps back:
+An `[[extern]]` entry takes the same keys and binds a routine of lifted C that RUNS runs but does not have yet (the heavens). `name` gives its C name when it differs.
 
-- `back`: the routine the code jumps back to when it is done. The RUNS text runs that routine right after the extern; the run compiles to nothing, for the code's own jump is the run.
-- `pulse = true`: the code waits for the display's completion pulse before its first point and leaves its last point's pulse pending. So the point the RUNS text plots just before the run asks for a pulse (`dpy-4000`, at intensity 0), and the `back` routine waits for it first (`ioh`). It is the display's handshake, which play cannot observe.
+A `[[code]]` entry binds a Processor whose body is a `jump` into code a Record holds (`draw_outline`). It has no code of its own: the Record's words are its code. Its run is a jump to them, and the run the RUNS text makes right after it is where the code jumps back, so that run compiles to nothing. It is a calling convention.
 
-An extern named as the home a walk carries a field's word into (`carry`) is reached through that word: its run is a jump through the homed word (`sp5, jmp .`), and the unit that runs it holds the home.
+- `pulse = true`: the code waits for the display's completion pulse before its first point and leaves its last point's pending. So the point the RUNS text plots just before the run asks for a pulse (`dpy-4000`, at intensity 0), and the routine the code jumps back to waits for it first (`ioh`). It is the display's handshake, which play cannot observe.
+
+An extern or code entry named as the home a walk carries a field's word into (`carry`) is reached through that word: its run is a jump through the homed word (`sp5, jmp .`), and the unit that runs it holds the home.
 
 A Network bound as one routine runs its Processors inline, under its guards and loops. A `run` of another bound routine is a call: the sets of that routine's parameter fields just before the run are its arguments, and a parameter field that lives in a register is passed in it. A two-word result is read from the returned AC:IO pair. A one-word result is in AC when the call returns, so the statement right after the run takes it from there, as `xct hd2 / dac i ma1` does; when that statement does not read it, the call stands alone.
 
@@ -68,6 +69,12 @@ The keys that hold for a whole unit:
 - `[spell.<enum>]` with `literal = true` on a routine member: its word is taken from a constant (`lac (tcr`) where the others are built by `law`. The two are the same word; which the original wrote is an encoding.
 - `[walk] homes` also serves a unit that holds no walk: the cursors the main loop steps whose homes are in this unit's instructions (`mom`, `mth`, `mco`).
 - `moves = "swap"`: a value moves from AC to IO by the `swap` macro.
+- `[into]`: a field that holds a place in a collection (`outline_call.code`, a slot of `outline_code`) holds that place's address. The C dialect types it as a pointer. A number set into it is the address of that slot; reading the collection at the field is reading through it, and stepping the field steps the pointer (`idx`). It is storage.
+- `[homes]` with `"pointer"`: an `[into]` field held in the address field of the first instruction that reads through it (`ocg, lio .`).
+- `[addresses]` with a collection's field: the collection lies at an address the layout fixes, not at a place of its own. `"after table"`: the first word after the object table (`outline_code`, nnn).
+- `[[place]]` with `slots`, `range` and `reserve`: the slots `range` of a collection's field laid out as data words with their RUNS initial values, then `reserve` words of room no rule reads (the five spare words after each outline, for an operator to make it longer).
+- `data`: fields laid out as data words inside the routine's code, at its first point control cannot reach (`ocm`, `ocn` after `oc`'s return).
+- `args_done`: the Processor after which the routine steps its return address past the words after its call (`idx ocx`). Where it does so is a choice of code layout; pdp1cc needs AC dead there.
 
 `runsc` lays code out by rules of its own, from the shape of the RUNS text, the same for every binding:
 
@@ -93,7 +100,13 @@ The keys that hold for a whole unit:
 - `stop` is a halt that halts again when continued (`hlt / jmp .-1`).
 - A loop that steps a field holding a slot, then stops when it reaches a slot by number, is a search: one index of the first cursor and a test of its home instruction against the one past the last slot (`index sr1, (lac mtb nob, sr1`).
 - In the slot a field holds, a store of a plain value goes through IO while AC builds the cursors' chain; any statement that wants AC first finishes the chain. `set f = f & 0770000 | n` with n an address is a store of the address part (`dap`).
-- A pool field is declared by the unit, unless a lifted header the unit includes declares it.
+- A pool field is declared by the unit that names it, unless a lifted header the unit includes declares it.
+- An instruction is the dialect's constructor of its word: `lac(pen.x)` is `I_LAC(&pen_x)`, `jmp(after_outline)` is `I_JMP(after_outline)`, `dpy` is `I_DPY_NOWAIT` (`dpy-4000`). These are the PDP-1 back end's encodings, as `jda` is.
+- `set c[p] = v` then `set p = p + 1`, with p an `[into]` field of c, is one store through the pointer and a step (`*p++ = v`: `dac i oc / idx oc`).
+- Setting a data word that holds a jump (its initial value is one) to `jmp(c[p + k])` stores only the address (`f.addr = p + k`, `dap`).
+- An if-chain with no else whose guards test one value for `== n`, or an `or` of such tests, over 0 to some n, is a jump table (`switch`, `add (T / dap J / J, jmp .`). The arm of n lies in the table and must end in a jump; the other arms lie apart. The first lies right after the table and falls into the code after the chain; the rest lie after the routine's code, each jumping back to that code. A Network that the arms run last is laid out in the first arm, and the others jump to it (`jmp oce`). A jump after an arm's last if/else goes into both of its branches. The arms share their locals, which are declared at the routine's top.
+- A loop whose body ends with `if c: X`, no else, is laid out with the test at the bottom: back to the top while c fails, then X. When X ends with the statements just before the loop, they are laid out once and X jumps back to them, the loop's second entry (`jmp ocj`, then `och`). A break of a loop that is the routine's last statement is its return.
+- An entry word of another unit's routine is, to the caller, AC: a value carried into the call and out of it (`jda oc`).
 
 A `[[place]]` may instead lay out words that the PDP-1 and its operator need and that no game rule reads. `runsc` knows each kind as the PDP-1 back end, the way it knows `jda`:
 
@@ -107,7 +120,7 @@ A field with no data word of its own (an entry word, a register) has no value on
 
 ## Names the lifted C still uses
 
-Lifted units call the ported routines by their C names. `runsc` names each C function after its RUNS routine, and the lifted names are the same: `square_root`, `multiply`, `integer_multiply`, `integer_divide`, `sine`, `cosine`, the twelve XCT tunables, `read_control_boxes` and the start Networks (`lift/spaceship.c`, `lift/heavens.c`, `pdp1/tunables.toml`). The compiled main loop calls the lifted routines it runs by their names (`[[extern]]`), and names the lifted arrays and words it uses (`needle_outline`, `draw_outline`, `control_word_getter`). A field's C name is `record_field`, unless the binding's `[names]` table gives the one the lifted units use (`tunables.collision_radius` is `collision_radius`). The routines a `jump` or `jsp_slot` names are the compiled main loop's. The spaceship names the pool words it shares with the lifted outline compiler and heavens as they do (`ship_x`, `down_step_x`, `star_vector_x`), and the block after the outline `outline_drawn`, the name the outline compiler writes its jump back to. These names stop mattering when the last lifted unit that uses them is ported.
+Lifted units call the ported routines by their C names. `runsc` names each C function after its RUNS routine, and the lifted names are the same: `square_root`, `multiply`, `integer_multiply`, `integer_divide`, `sine`, `cosine`, the twelve XCT tunables, `read_control_boxes` and the start Networks (`lift/heavens.c`, `pdp1/tunables.toml`). The compiled main loop calls the lifted routines it runs by their names (`[[extern]]`), and names the words it uses (`control_word_getter`). A field's C name is `record_field`, unless the binding's `[names]` table gives the one the lifted units use (`tunables.collision_radius` is `collision_radius`). The routines a `jump` or `jsp_slot` names are the compiled main loop's. The spaceship names the pool words it shares with the lifted heavens as they do (`star_vector_x`). These names stop mattering when the last lifted unit that uses them is ported.
 
 ## What a binding may not say
 

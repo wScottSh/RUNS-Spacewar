@@ -5,9 +5,10 @@ replaces = "lift/outline_compiler.c"
 registers = ["handoff"]
 pool = ["outline_compiler.codes_left", "outline_compiler.codes_rest", "pen.saved_x", "pen.saved_y"]
 
-# The flag that says what the next 6 code compiles. The spaceship holds
-# spaceship.rocket in flag 6 too: the compiler clears the flag before it
-# reads it, and the spaceship sets rocket before it reads it, every frame.
+# The flag that says what the next 6 code compiles. Flag 6 also holds
+# spaceship.rocket and the central star's mirror bit: each of the three
+# sets or clears it before it reads it (clf 6 here, at the star's start,
+# and in steer).
 [flags]
 "outline_compiler.six" = 6
 
