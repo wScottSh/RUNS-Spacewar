@@ -16,7 +16,7 @@ processor take_second_controls                              # rir 4s; dio \scw
 # momentum, which builds up; otherwise they turn the ship directly, faster.
 # The rocket fires while its button is held and fuel is left.
 processor steer(slot)                                       # sc1
-  reads: spaceship, tunables, console
+  reads: tunables, console
   writes: spaceship, ships, sine_call
   let controls = spaceship.controls
   set spaceship.rocket = off
@@ -53,14 +53,14 @@ processor take_sine                                         # dac \sn; dzm \bx; 
 
 # Gravity. Each coordinate is scaled down by 2^11 and squared.
 processor square_x(slot)                                    # lac i mx1; sar 9s; sar 2s
-  reads: objects, spaceship
+  reads: objects
   writes: spaceship, integer_multiply_call
   set spaceship.operand = objects.x[slot] >> 11
   set integer_multiply_call.entry = spaceship.operand
   set integer_multiply_call.factor = spaceship.operand
 
 processor square_y(slot)
-  reads: objects, integer_multiply_call, spaceship
+  reads: objects
   writes: spaceship, integer_multiply_call
   set spaceship.x_squared = integer_multiply_call.product
   set spaceship.operand = objects.y[slot] >> 11
@@ -73,7 +73,7 @@ processor measure_capture                                   # add \t2; sub str
   set handoff.capture_margin = integer_multiply_call.product + spaceship.x_squared - tunables.star_capture_radius
 
 processor take_root                                         # add str; dac \t1; jda sqt
-  reads: handoff, tunables, spaceship
+  reads: handoff, tunables
   writes: spaceship, square_root_call
   set spaceship.operand = handoff.capture_margin + tunables.star_capture_radius
   set square_root_call.entry = spaceship.operand
@@ -97,7 +97,7 @@ processor scale_distance                                    # scr 2s; szs i 20; 
 # The pull: minus the position over the distance cubed. The second divide
 # takes in IO what the first left there, its remainder.
 processor aim_pull_x(slot)                                  # dio \t1; lac i mx1; cma; jda idv
-  reads: handoff, objects, spaceship
+  reads: handoff, objects
   writes: spaceship, integer_divide_call
   set spaceship.operand = handoff.distance_low
   set integer_divide_call.dividend = -objects.x[slot]
@@ -105,7 +105,7 @@ processor aim_pull_x(slot)                                  # dio \t1; lac i mx1
   set integer_divide_call.divisor = spaceship.operand
 
 processor aim_pull_y(slot)                                  # dac \bx; lac i my1; cma; jda idv
-  reads: divide_call, objects, spaceship
+  reads: divide_call, objects
   writes: spaceship, integer_divide_call
   set spaceship.gravity_x = divide_call.result
   set integer_divide_call.dividend = -objects.y[slot]
@@ -127,13 +127,13 @@ processor check_fuel(slot)                                  # cla; sad i \mfu; c
   set cosine_call.angle = ships.angle[slot]
 
 processor aim_thrust_y                                      # dac \cs; sar 9s
-  reads: sine_call, spaceship
+  reads: sine_call
   writes: spaceship, handoff
   set spaceship.cosine = sine_call.result
   set handoff.thrust_direction = spaceship.cosine >> 9
 
 processor push_y                                            # szf i 6; cla; add \by
-  reads: handoff, spaceship
+  reads: spaceship
   writes: handoff
   let push = handoff.thrust
   if spaceship.rocket == off:
@@ -146,7 +146,7 @@ processor aim_thrust_x                                      # lac \sn; sar 9s
   set handoff.thrust_direction = spaceship.sine >> 9
 
 processor push_x                                            # cma; szf i 6; cla; add \bx
-  reads: handoff, spaceship
+  reads: spaceship
   writes: handoff
   let push = -handoff.thrust
   if spaceship.rocket == off:
@@ -156,7 +156,7 @@ processor push_x                                            # cma; szf i 6; cla;
 # The outline starts at the tip, a 32nd of the heading ahead, and a torpedo
 # starts as far again.
 processor aim_outline(slot)                                 # sp1 .. sp5
-  reads: spaceship, objects, pen
+  reads: objects
   writes: pen, spaceship
   set pen.down_x = spaceship.sine >> 5
   set pen.down_y = spaceship.cosine >> 5
@@ -192,7 +192,7 @@ processor draw_outline(slot)                                # sp5, jmp .
 # the tail, each burning a unit of fuel. The count and the fuel are the
 # game; the dots are presentation.
 processor exhaust(slot)                                     # sq6
-  reads: random, spaceship, pen, ships
+  reads: random
   writes: spaceship, pen, ships, display
   let dots = random.number >> 13
   if dots >= 0:
@@ -254,13 +254,13 @@ processor place_torpedo(slot)                               # sr2
   set handoff.torpedo_direction = spaceship.sine
 
 processor take_torpedo_dx(slot)
-  reads: launch, handoff, objects, spaceship
+  reads: launch, spaceship
   writes: objects, handoff
   set objects.dx[launch.slot] = -handoff.torpedo_velocity + objects.dx[slot]
   set handoff.torpedo_direction = spaceship.cosine
 
 processor take_torpedo_dy(slot)
-  reads: launch, handoff, objects
+  reads: launch, handoff
   writes: objects
   set objects.dy[launch.slot] = handoff.torpedo_velocity + objects.dy[slot]
 
@@ -272,7 +272,7 @@ processor reload_tube(slot)                                 # dac i ma1: the tub
 # The torpedo calc's length goes into the address part of its time word
 # (law 20; dap); the rest of the word stays.
 processor arm_torpedo                                       # trf
-  reads: launch, handoff, objects
+  reads: launch, handoff
   writes: objects
   set objects.counter[launch.slot] = handoff.torpedo_life
   set objects.cycles[launch.slot] = objects.cycles[launch.slot] & 0770000 | 020
@@ -288,7 +288,6 @@ processor recharged(slot)                                   # dzm i \mh3
   set ships.recharge[slot] = 0
 
 processor enter_hyperspace(slot)                            # sr5
-  reads: objects
   writes: ships, objects
   set ships.saved_routine[slot] = objects.routine[slot]
   set objects.routine[slot] = in_hyperspace
@@ -304,7 +303,7 @@ processor time_hyperspace(slot)                             # dac i ma1; law 3; 
 # of being drawn, waits out a count from its calc routine's time in the
 # pen's first step. A ship's time is positive, so the wait is one step.
 processor spaceship_in_star(slot)                           # pof
-  reads: console, objects
+  reads: console
   writes: objects, pen
   set objects.dx[slot] = 0
   set objects.dy[slot] = 0

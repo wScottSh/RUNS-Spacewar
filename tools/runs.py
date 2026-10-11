@@ -1108,6 +1108,7 @@ def check_contracts(prog: Program) -> None:
     fired = set().union(*(runs_of(r.body) - {r.name} for r in prog.routines.values()))
     tops = [n.name for n in prog.routines.values() if n.kind == "network" and n.name not in fired]
     game = set().union(*(fires(prog, t, set()) for t in tops))
+    game_read = set().union(*(touches(prog, prog.routines[r])[0] for r in game))
     for n in prog.routines.values():
         if n.kind != "network" or not (n.reads or n.writes or n.name not in fired):
             continue
@@ -1133,6 +1134,9 @@ def check_contracts(prog: Program) -> None:
             raise RunsError(f"network {n.name} declares reads: {stale}, but nothing inside reads them")
         if n.name not in fired:
             check_inputs(prog, n, inside)
+            for rec in sorted(written - game_read - n.writes):
+                raise RunsError(f"network {n.name}: nothing in the game reads {rec}, so it leaves the game; "
+                                f"declare writes: {rec}")
 
 
 def check_scope(prog: Program, r: Routine) -> None:
@@ -1295,14 +1299,331 @@ def check_scope(prog: Program, r: Routine) -> None:
     block(r.body, set(r.params))
 
 
+def expr_touches(e, prog: Program, read: set[str]) -> None:
+    """The Records an expression reads. Building an instruction reads only
+    its operand's slot expression: the word it names is not read until the
+    instruction runs."""
+    op = e[0]
+    if op in ("field", "index"):
+        base = e[1] if op == "index" else e
+        if base[0] == "field" and base[1][0] == "name" and base[1][1] in prog.records:
+            read.add(base[1][1])
+        if op == "index":
+            expr_touches(e[2], prog, read)
+    elif op == "call" and instruction_call(e[1], e[2]):
+        if e[2] and e[2][0][0] == "index":
+            expr_touches(e[2][0][2], prog, read)
+    elif op == "call":
+        for a in e[2]:
+            expr_touches(a, prog, read)
+    elif op in ("neg", "not"):
+        expr_touches(e[1], prog, read)
+    elif op == "bin":
+        expr_touches(e[2], prog, read)
+        expr_touches(e[3], prog, read)
+    elif op == "tuple":
+        for x in e[1]:
+            expr_touches(x, prog, read)
+
+
+def code_touches(prog: Program) -> tuple[set[str], set[str]]:
+    """What code a `jump` runs may read and write: the operands of every
+    instruction the program's text builds, and the display `dpy` plots on."""
+    read: set[str] = set()
+    written: set[str] = set()
+
+    def visit(tree):
+        if isinstance(tree, tuple) and tree[:1] == ("call",) and instruction_call(tree[1], tree[2]):
+            x = tree[2][0] if tree[2] else None
+            base = x[1] if x is not None and x[0] == "index" else x
+            if OPERANDS[tree[1]] == "place" and base[0] == "field" and base[1][0] == "name":
+                (written if tree[1] in ("dac", "dio") else read).add(base[1][1])
+        elif tree == ("name", "dpy") and "dpy" in prog.instructions:
+            written.add(prog.display)
+        if isinstance(tree, (list, tuple)):
+            for t in tree:
+                visit(t)
+        elif isinstance(tree, dict):
+            visit(list(tree.values()))
+    visit([r.body for r in prog.routines.values()])
+    visit([e for rec in prog.records.values() for _, e in rec.fields.values()])
+    return read, written
+
+
+def touches(prog: Program, r: Routine) -> tuple[set[str], set[str]]:
+    """The Records a routine's text reads and writes. A `jump` reads the
+    code's Record and may touch whatever the code's instructions name."""
+    read: set[str] = set()
+    written: set[str] = set()
+
+    def block(stmts: list):
+        for s in stmts:
+            op = s[0]
+            if op in ("let", "set"):
+                expr_touches(s[2], prog, read)
+                for t in s[1][1] if s[1][0] == "tuple" else [s[1]]:
+                    if t[0] == "index":
+                        expr_touches(t[2], prog, read)
+                        t = t[1]
+                    if t[0] == "field":
+                        written.add(t[1][1])
+            elif op == "if":
+                for c, body in s[1]:
+                    expr_touches(c, prog, read)
+                    block(body)
+                block(s[2])
+            elif op == "loop":
+                expr_touches(s[1], prog, read)
+                block(s[2])
+            elif op == "for":
+                expr_touches(s[2], prog, read)
+                expr_touches(s[3], prog, read)
+                block(s[4])
+            elif op == "return" and s[1] is not None:
+                expr_touches(s[1], prog, read)
+            elif op == "emit":
+                written.add(s[1])
+                for a in s[2]:
+                    expr_touches(a, prog, read)
+            elif op == "run":
+                for a in s[2]:
+                    expr_touches(a, prog, read)
+            elif op == "match":
+                expr_touches(s[1], prog, read)
+                for body in s[2].values():
+                    block(body)
+            elif op == "jump":
+                expr_touches(s[1], prog, read)
+                expr_touches(s[2], prog, read)
+                code_read, code_written = code_touches(prog)
+                read.update(code_read)
+                written.update(code_written)
+    for c in r.requires:
+        expr_touches(c, prog, read)
+    block(r.body)
+    return read, written
+
+
+def check_declarations(prog: Program, r: Routine) -> None:
+    """A Processor's contract is what its text does, in both directions:
+    it declares every Record it reads (reads:) or writes (writes:, which lets
+    it read the Record too), once, and each Record it declares is used."""
+    read, written = touches(prog, r)
+    if twice := sorted(r.reads & r.writes):
+        raise RunsError(f"{r.name} declares {twice} under reads: and writes:; writes: lets it read them")
+    for rec in sorted(written - r.writes):
+        raise RunsError(f"{r.name} writes {rec}; declare writes: {rec}")
+    for rec in sorted(read - r.reads - r.writes):
+        raise RunsError(f"{r.name} reads {rec}; declare reads: {rec}")
+    for rec in sorted(r.reads - read):
+        raise RunsError(f"{r.name} declares reads: {rec}, but nothing in it reads {rec}")
+    for rec in sorted(r.writes - written):
+        raise RunsError(f"{r.name} declares writes: {rec}, but nothing in it writes {rec}")
+
+
+NUMBER, BOOL, INSN = "number", "bool", "insn"
+PAIR = ("pair", NUMBER, NUMBER)
+
+
+def check_types(prog: Program) -> None:
+    """What each expression computes, checked before anything runs, so that
+    a value of the wrong kind is an error of the text and not of a run: a
+    number (a word or a count; which one is the evaluator's check of the
+    value), a condition, an instruction, a member of an enum, or a pair.
+    A member's type is the enums that have a member of its name. A local
+    takes the type of its let; a parameter, of what every run passes it."""
+    params: dict[tuple[str, str], object] = {}
+
+    def fits(want, got) -> bool:
+        if want is None or got is None:
+            return True
+        if isinstance(want, frozenset) and isinstance(got, frozenset):
+            return bool(want & got)
+        return want == got
+
+    def field_type(rec: str, fld: str):
+        typ = prog.records[rec].fields[fld][0]
+        return frozenset({typ}) if typ in prog.enums else INSN if typ == INSN else NUMBER
+
+    def routine(r: Routine, passes: dict) -> None:
+        local: dict[str, object] = {p: params.get((r.name, p)) for p in r.params}
+
+        def fail(at: str, what: str):
+            raise RunsError(f"{at}: {what}")
+
+        def want(at: str, typ, e, what: str):
+            got = expr(e, at)
+            if not fits(typ, got):
+                fail(at, f"{what} takes {name_of(typ)}, not {name_of(got)}: {e!r}")
+            return got
+
+        def expr(e, at: str):
+            op = e[0]
+            if op == "num":
+                return NUMBER
+            if op == "bool":
+                return BOOL
+            if op == "name":
+                if e[1] in local:
+                    return local[e[1]]
+                if members := frozenset(n for n, ms in prog.enums.items() if e[1] in ms):
+                    return members
+                return INSN                         # an instruction with no operand (check_scope)
+            if op in ("field", "index"):
+                base = e[1] if op == "index" else e
+                if op == "index":
+                    want(at, NUMBER, e[2], "a slot")
+                return field_type(base[1][1], base[2])
+            if op == "call" and instruction_call(e[1], e[2]):
+                if e[2] and e[2][0][0] == "index":
+                    want(at, NUMBER, e[2][0][2], "a slot")
+                return INSN
+            if op == "call":
+                for a in e[2]:
+                    want(at, NUMBER, a, e[1])
+                return NUMBER if e[1] in ("ral", "rar", "popcount") else PAIR
+            if op == "neg":
+                return want(at, NUMBER, e[1], "-")
+            if op == "not":
+                return want(at, BOOL, e[1], "not")
+            if op == "tuple":
+                return ("pair", *(expr(x, at) for x in e[1]))
+            _, o, a, b = e
+            if o in ("and", "or"):
+                want(at, BOOL, a, o)
+                want(at, BOOL, b, o)
+                return BOOL
+            left = expr(a, at)
+            if left is None:
+                expr(b, at)
+                return BOOL if o in ("==", "!=", "<", "<=", ">", ">=") else NUMBER
+            if o in ("==", "!=") and isinstance(left, frozenset):
+                want(at, left, b, o)
+                return BOOL
+            if left is not None and left != NUMBER:
+                fail(at, f"{o} takes numbers, not {name_of(left)}: {a!r}")
+            want(at, NUMBER, b, o)
+            return BOOL if o in ("==", "!=", "<", "<=", ">", ">=") else NUMBER
+
+        def store(t, got, at: str, new: bool):
+            if t[0] == "tuple":
+                if not (isinstance(got, tuple) and got[:1] == ("pair",) and len(got) == len(t[1]) + 1):
+                    fail(at, f"cannot spread {name_of(got)} over {len(t[1])} names")
+                for x, g in zip(t[1], got[1:]):
+                    store(x, g, at, new)
+                return
+            if t[0] == "name":
+                if t[1] in local and not fits(local[t[1]], got):
+                    fail(at, f"{t[1]} holds {name_of(local[t[1]])}, not {name_of(got)}")
+                if new or local.get(t[1]) is None:
+                    local[t[1]] = got
+                return
+            base = t[1] if t[0] == "index" else t
+            if t[0] == "index":
+                want(at, NUMBER, t[2], "a slot")
+            typ = field_type(base[1][1], base[2])
+            if not fits(typ, got):
+                fail(at, f"{base[1][1]}.{base[2]} holds {name_of(typ)}, not {name_of(got)}")
+
+        def block(stmts: list):
+            for s in stmts:
+                op, at = s[0], s[-1]
+                if op in ("let", "set"):
+                    store(s[1], expr(s[2], at), at, new=op == "let")
+                elif op == "if":
+                    for c, body in s[1]:
+                        want(at, BOOL, c, "a guard")
+                        block(body)
+                    block(s[2])
+                elif op == "loop":
+                    want(at, NUMBER, s[1], "a loop's bound")
+                    block(s[2])
+                elif op == "for":
+                    want(at, NUMBER, s[2], "a counted loop")
+                    want(at, NUMBER, s[3], "a counted loop")
+                    local[s[1]] = NUMBER
+                    block(s[4])
+                elif op == "return" and s[1] is not None:
+                    expr(s[1], at)
+                elif op == "emit":
+                    for a in s[2]:
+                        want(at, NUMBER, a, s[1])
+                elif op == "run":
+                    for p, a in zip(prog.routines[s[1]].params, s[2]):
+                        passes.setdefault((s[1], p), []).append((expr(a, at), at))
+                elif op == "match":
+                    got = expr(s[1], at)
+                    arms = frozenset(n for n, ms in prog.enums.items() if set(s[2]) <= set(ms))
+                    if not fits(got, arms) or not isinstance(got, (frozenset, type(None))):
+                        fail(at, f"a match on {name_of(got)} with arms {sorted(s[2])}")
+                    for body in s[2].values():
+                        block(body)
+                elif op == "jump":
+                    if expr(s[1], at) != INSN:
+                        fail(at, "a jump goes to a word of code")
+                    want(at, NUMBER, s[2], "a jump's bound")
+        for c in r.requires:
+            want(r.name, BOOL, c, "requires")
+        block(r.body)
+
+    for rec in prog.records.values():
+        for fld, (typ, init) in rec.fields.items():
+            values = [] if init is None else init[1] if init[0] == "slots" else [init]
+            for v in values:
+                got = check_initial(prog, v)
+                if not (fits(field_type(rec.name, fld), got) or typ == INSN and got == NUMBER):
+                    raise RunsError(f"{rec.name}.{fld} holds {name_of(field_type(rec.name, fld))}, "
+                                    f"not {name_of(got)}: {v!r}")
+    while True:
+        passes: dict = {}
+        for r in prog.routines.values():
+            routine(r, passes)
+        found = {}
+        for key, given in passes.items():
+            types = {g for g, _ in given if g is not None}
+            if len(types) > 1 and not (all(isinstance(t, frozenset) for t in types)
+                                       and frozenset.intersection(*types)):
+                raise RunsError(f"{given[0][1]}: {key[0]}'s {key[1]} is passed {sorted(map(name_of, types))}")
+            if types:
+                found[key] = frozenset.intersection(*types) if all(isinstance(t, frozenset) for t in types) \
+                    else types.pop()
+        if found == params:
+            return
+        params = found
+
+
+def check_initial(prog: Program, e):
+    """The type of an initial value: an expression of numbers, a member or
+    an instruction, which touches no Record."""
+    if e[0] == "name" and (members := frozenset(n for n, ms in prog.enums.items() if e[1] in ms)):
+        return members
+    if e[0] == "name" or e[0] == "call" and instruction_call(e[1], e[2]):
+        return INSN
+    return NUMBER
+
+
+def name_of(typ) -> str:
+    if typ is None:
+        return "anything"
+    if isinstance(typ, frozenset):
+        return " or ".join(sorted(typ))
+    if isinstance(typ, tuple):
+        return "a pair"
+    return {NUMBER: "a number", BOOL: "a condition", INSN: "an instruction"}[typ]
+
+
 def check(prog: Program) -> Program:
     """Everything the evaluator checks before anything runs: what each kind
-    may say, the names each routine uses, and the contracts."""
+    may say, the names each routine uses, the types of what it computes, and
+    the contracts."""
     declared_instructions.clear()
     declared_instructions.update(prog.instructions)
     for r in prog.routines.values():
         shape(r.body, r, in_loop=False)
         check_scope(prog, r)
+        if r.kind == "processor":
+            check_declarations(prog, r)
+    check_types(prog)
     check_contracts(prog)
     return prog
 

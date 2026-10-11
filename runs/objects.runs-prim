@@ -34,7 +34,7 @@ processor scatter_particle
 # The dot is presentation. The random numbers drawn for it, and the count of
 # dots left, are the game: hyperspace draws from the same generator.
 processor plot_particle(slot)
-  reads: random, objects, handoff
+  reads: random, objects
   writes: explosion_cloud, display, handoff
   let high = random.number
   # scr 9s; sir 9s pushes all of IO's old value, the last dot's y, out.
@@ -65,7 +65,6 @@ processor warp_from_x(slot)                                 # lac i mx1; sar 9s
   set handoff.coordinate = objects.x[slot] >> 9
 
 processor warp_from_y                                      # diff leaves y in AC; sar 9s
-  reads: handoff
   writes: handoff
   set handoff.coordinate = handoff.position >> 9
 
@@ -85,7 +84,7 @@ processor begin_breakout(slot)
 # sign, for hr1 or hr2 to scale. The original shifts it into IO, which
 # holds whatever came before; the shifts push all of that out.
 processor draw_jump
-  reads: random, handoff
+  reads: random
   writes: handoff
   set handoff.jump_high = random.number
   set (handoff.jump_high, handoff.jump_low) = scr(handoff.jump_high, handoff.jump_low, 9)

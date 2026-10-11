@@ -8,7 +8,6 @@ processor start_reading                                     # dap ocg
 
 # One word of code (plinst).
 processor lay_out(instruction)
-  reads: outline_call
   writes: outline_code, outline_call
   set outline_code.insn[outline_call.code] = instruction
   set outline_call.code = outline_call.code + 1
@@ -23,13 +22,12 @@ processor store_first                                       # clf 6
   set outline_compiler.six = store
 
 processor take_word                                         # setup \occ, 6; ocg, lio .
-  reads: outlines, outline_compiler
+  reads: outlines
   writes: outline_compiler, handoff
   set outline_compiler.codes_left = -6
   set handoff.codes = outlines.codes[outline_compiler.table]
 
 processor take_code                                         # och
-  reads: handoff
   writes: handoff, outline_compiler
   set handoff.direction = 0                                 # cla
   set (handoff.direction, handoff.codes) = rcl(handoff.direction, handoff.codes, 3)
@@ -38,7 +36,7 @@ processor take_code                                         # och
 
 # Half a swap, twice: AC and IO change places in the code (ocs).
 processor compile_swap
-  reads: handoff, outline_call
+  reads: handoff
   writes: outline_code, outline_call
   set outline_code.insn[outline_call.code] = handoff.swap
   set outline_call.code = outline_call.code + 1
@@ -51,7 +49,7 @@ processor pend(instruction)
   set handoff.pending = instruction
 
 processor lay_out_pending                                   # dac i oc; idx oc
-  reads: handoff, outline_call
+  reads: handoff
   writes: outline_code, outline_call
   set outline_code.insn[outline_call.code] = handoff.pending
   set outline_call.code = outline_call.code + 1
@@ -79,7 +77,6 @@ processor six_restored                                      # clf 6
 
 # The first side's jump past the return, four words on (add (4; dap ocn).
 processor jump_to_other_side
-  reads: outline_call
   writes: outline_compiler, outline_code, outline_call
   set outline_compiler.to_other_side = jmp(outline_code.insn[outline_call.code + 4])
   set outline_code.insn[outline_call.code] = outline_compiler.to_other_side
@@ -87,7 +84,7 @@ processor jump_to_other_side
 
 # Back to the second side's start (plinst ocm).
 processor jump_to_start
-  reads: outline_compiler, outline_call
+  reads: outline_compiler
   writes: outline_code, outline_call
   set outline_code.insn[outline_call.code] = outline_compiler.start_over
   set outline_call.code = outline_call.code + 1

@@ -160,7 +160,6 @@ processor choose_needle
   set outline_call.table = 0                                # ot1
 
 processor second_outline                                    # a3
-  reads: outline_call
   writes: ships, outline_call
   set ships.outline[1] = outline_call.code
   set outline_call.table = 010                              # ot2

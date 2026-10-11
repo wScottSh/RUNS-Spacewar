@@ -64,7 +64,7 @@ processor skip_a_frame
 # is plotted moves the cursor past it, so later scans skip it. star_x and
 # star_y are where the star's x and y lie (fin, fyn).
 processor show_magnitude(m, first, past, intensity)
-  reads: star_catalog, planetarium, magnitudes
+  reads: star_catalog, planetarium
   writes: magnitudes, display
   let scan = looking                                        # clf 5
   let scan_start = magnitudes.cursor[m]                     # lac flo; dap fpo
@@ -106,7 +106,6 @@ processor count_steps
 
 # The window moves one step left, round the sky.
 processor move_window
-  reads: planetarium
   writes: planetarium
   set planetarium.window_steps = -020
   let margin = -1 + planetarium.right_margin

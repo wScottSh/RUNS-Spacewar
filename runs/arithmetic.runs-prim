@@ -57,14 +57,12 @@ processor sine_reduce                                       # sin .. si3, mult (
   set multiply_call.factor = 0242763                        # 2/pi
 
 processor sine_x                                            # dac sin, mult sin
-  reads: multiply_call
   writes: sine_call, multiply_call
   set sine_call.x = multiply_call.partial
   set multiply_call.entry = sine_call.x
   set multiply_call.factor = sine_call.x
 
 processor sine_x_squared                                    # dac cos, mult (756103
-  reads: multiply_call
   writes: sine_call, multiply_call
   set sine_call.x_squared = multiply_call.partial
   set multiply_call.entry = sine_call.x_squared
@@ -233,7 +231,6 @@ processor next_random
 # macro's arguments; here each axis is its own Processor. The new position
 # is left in AC, where the torpedo takes it up.
 processor inertia_x(slot)                                   # diff \mdx, mx1, (sar 3s
-  reads: handoff
   writes: objects, handoff
   let velocity = handoff.acceleration + objects.dx[slot]
   set objects.dx[slot] = velocity
@@ -241,7 +238,6 @@ processor inertia_x(slot)                                   # diff \mdx, mx1, (s
   set objects.x[slot] = handoff.position
 
 processor inertia_y(slot)                                   # diff \mdy, my1, (sar 3s
-  reads: handoff
   writes: objects, handoff
   let velocity = handoff.acceleration + objects.dy[slot]
   set objects.dy[slot] = velocity
