@@ -2,7 +2,6 @@
 # hp1 and hp3, jsp routines the main loop enters with its cursors on the
 # current object. The random and diff macros are laid out at each use.
 replaces = "lift/objects.c"
-include = ["object_table.h"]
 registers = ["handoff"]
 pool = ["explosion_cloud.particles"]
 

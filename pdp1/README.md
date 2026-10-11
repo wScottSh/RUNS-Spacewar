@@ -1,6 +1,6 @@
 # The PDP-1 binding
 
-`tools/runsc.py` compiles the RUNS text in `runs/` to the original Spacewar! 3.1 tape image. Each file here binds one unit of spacewar-c's `lift.toml`: it says how the PDP-1 carries the RUNS routines and fields of that unit. `runsc` emits spacewar-c's C dialect from the RUNS text and the binding, and spacewar-c's `pdp1cc` compiles that to the image. A unit with no binding here still comes from the lifted C.
+`tools/runsc.py` compiles the RUNS text in `runs/` to the original Spacewar! 3.1 tape image. Each file here binds one unit of spacewar-c's `lift.toml`: it says how the PDP-1 carries the RUNS routines and fields of that unit. `runsc` emits spacewar-c's C dialect from the RUNS text and the binding, and spacewar-c's `pdp1cc` compiles that to the image. Every unit has a binding: the generated C stands alone, and no file of spacewar-c's `lift/` takes part in the build (`build/lift` holds only the thirteen generated files).
 
 ## What a binding may say
 
@@ -10,7 +10,6 @@ A binding holds only choices that play cannot observe:
 - **Calling convention.** How a routine is entered and left: `JDA`, `JSP`, `BLOCK`, `XCT`, laid out in place, a skip return.
 - **Storage.** Which register or word carries a value: an AC or IO local, a JDA entry word, a pool word, the address field of an instruction (a cursor), the word after a call (by name).
 - **Layout of code.** Where a block of a routine's code lies when the original lays it out of order.
-- **Names the lifted C still uses.** While a unit that refers to a name is still lifted C, the binding gives the C name. These go when the last such unit is ported.
 
 ## The vocabulary
 
@@ -36,8 +35,6 @@ A `[[place]]` with `fields` lays out those Record fields as data words, with the
 - `spill`: AC locals kept in a pool word from their last set on, and read from there (`dac \mt1`).
 - `result` with the field in `io`, for `JSP`: the routine returns in IO (`io_word`).
 
-An `[[extern]]` entry takes the same keys and binds a routine of lifted C that RUNS runs but does not have yet (the heavens). `name` gives its C name when it differs.
-
 A `[[code]]` entry binds a Processor whose body is a `jump` into code a Record holds (`draw_outline`). It has no code of its own: the Record's words are its code. Its run is a jump to them, and the run the RUNS text makes right after it is where the code jumps back, so that run compiles to nothing. It is a calling convention.
 
 - `pulse = true`: the code waits for the display's completion pulse before its first point and leaves its last point's pending. So the point the RUNS text plots just before the run asks for a pulse (`dpy-4000`, at intensity 0), and the routine the code jumps back to waits for it first (`ioh`). It is the display's handshake, which play cannot observe.
@@ -48,14 +45,13 @@ A Network bound as one routine runs its Processors inline, under its guards and 
 
 The keys that hold for a whole unit:
 
-- `include`: lifted headers the generated C includes, for the names they declare (the cursors of `object_table.h`).
 - `registers`: Records whose fields live in AC or IO, never in a word of their own (`handoff`). A field there is a local of the routine that uses it.
 - `pool`: fields that live in a pool word (`\mxc`).
 - `[cursors]`: a field to the cursor on the current object's slot. In a routine whose parameter is the slot the main loop's cursors point at, `objects.x[slot]` is `*x_slot`. `pdp1/main_loop.toml`, the unit that holds the walk, binds them all; every unit uses them.
 - `[homes]`: fields held in a shift instruction. `"table"`: a pointer in the address field of the `xct` that runs one shift of a table (`msh, xct .`); the table's entries are the counts the RUNS text sets the field to, in text order, and a `[[place]]` with `shifts` lays the table out. Setting the field to the next entry steps the pointer (`idx msh`), to the first sets it (`law mst / dap msh`). `"built"`: the shift instruction itself, built at run time from `popcount(w & m)` and run where it stands (`mi1`). The shift is the pair operator that takes the field as its count; the pair it shifts is one AC:IO local.
 - `[spell.<enum>]`: the word each member is: a number, or a routine's address, with the sign bit when `sign` is set (the object does not collide).
 - `[streams]`: the instruction that takes a stream's values, its first in AC and its second in IO: `dpy` plots a point; `hlt` shows the two on the console lights, and must be followed by the Network's `wait`, which the halt is.
-- `[spell.<enum>]` may also spell a member as the address of an array of lifted C (`data`), and a member of an enum held in a program flag as 0 or 1.
+- `[spell.<enum>]` may also spell a member of an enum held in a program flag as 0 or 1.
 - `[devices]`: a field read by an instruction of the console (`lat`, `control_boxes`), not from core. `or_into_io`: the device ors into IO, so IO is cleared first.
 - `[flags]`: a field held in a program flag; setting it to the member spelled 1 is `stf`, to the one spelled 0 `clf`.
 - `pointers`: fields that hold addresses, which the C dialect types as `word *`.
@@ -109,7 +105,8 @@ The keys that hold for a whole unit:
 - `stop` is a halt that halts again when continued (`hlt / jmp .-1`).
 - A loop that steps a field holding a slot, then stops when it reaches a slot by number, is a search: one index of the first cursor and a test of its home instruction against the one past the last slot (`index sr1, (lac mtb nob, sr1`).
 - In the slot a field holds, a store of a plain value goes through IO while AC builds the cursors' chain; any statement that wants AC first finishes the chain. `set f = f & 0770000 | n` with n an address is a store of the address part (`dap`).
-- A pool field is declared by the unit that names it, unless a lifted header the unit includes declares it.
+- A pool field is declared by each unit that names it; they are one word. One that holds a member of an enum whose members are all spelled as routines holds a routine's address, and is declared a pointer to the routines' type, which the enum names (`controls.source`: `typedef io_word control_source(void) JSP`).
+- A cursor the unit's code names and does not hold itself is declared as another unit holds it: homed in an instruction (`extern HOMED`), else a pool word. The object table is declared where another unit lays it out.
 - An instruction is the dialect's constructor of its word: `lac(pen.x)` is `I_LAC(&pen_x)`, `jmp(after_outline)` is `I_JMP(after_outline)`, `dpy` is `I_DPY_NOWAIT` (`dpy-4000`). These are the PDP-1 back end's encodings, as `jda` is.
 - `set c[p] = v` then `set p = p + 1`, with p an `[into]` field of c, is one store through the pointer and a step (`*p++ = v`: `dac i oc / idx oc`).
 - Setting a data word that holds a jump (its initial value is one) to `jmp(c[p + k])` stores only the address (`f.addr = p + k`, `dap`).
@@ -132,9 +129,9 @@ A `[[place]]` may instead lay out words that the PDP-1 and its operator need and
 
 A field with no data word of its own (an entry word, a register) has no value on the tape, so its RUNS initial value must be 0; `runsc` refuses any other.
 
-## Names the lifted C still uses
+## Names
 
-Lifted units call the ported routines by their C names. `runsc` names each C function after its RUNS routine, and the lifted names are the same: `square_root`, `multiply`, `integer_multiply`, `integer_divide`, `sine`, `cosine`, the twelve XCT tunables, `read_control_boxes` and the start Networks (`lift/heavens.c`, `pdp1/tunables.toml`). The compiled main loop calls the lifted routines it runs by their names (`[[extern]]`), and names the words it uses (`control_word_getter`). A field's C name is `record_field`, unless the binding's `[names]` table gives the one the lifted units use (`tunables.collision_radius` is `collision_radius`). The routines a `jump` or `jsp_slot` names are the compiled main loop's. The spaceship names the pool words it shares with the lifted heavens as they do (`star_vector_x`). These names stop mattering when the last lifted unit that uses them is ported.
+A C function is named after its RUNS routine, and a field's word `record_field`. Two fields that share a word (`[share]`) take the name of the one they share. A copy's own locals and slots take the copy's number or the slot's (`star_x_1`, `magnitudes_cursor_0`). The names do not reach the image.
 
 ## What a binding may not say
 

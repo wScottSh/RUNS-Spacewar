@@ -3,18 +3,12 @@
 # the blocks they jump through. Every block that runs off its end leaves
 # through the shared exit, srt, which returns to the main loop.
 replaces = "lift/spaceship.c"
-include = ["object_table.h", "control_word.h"]
 registers = ["handoff"]
 pool = ["spaceship.controls", "spaceship.sine", "spaceship.cosine", "spaceship.gravity_x",
         "spaceship.gravity_y", "spaceship.operand", "spaceship.x_squared", "spaceship.torpedo_x",
         "spaceship.torpedo_y", "spaceship.flame",
         "pen.x", "pen.y", "pen.down_x", "pen.down_y", "pen.out_x", "pen.out_y", "pen.out_down_x",
         "pen.out_down_y", "pen.in_down_x", "pen.in_down_y"]
-
-# The pool words the lifted heavens use too.
-[names]
-"spaceship.gravity_x" = "star_vector_x"
-"spaceship.gravity_y" = "star_vector_y"
 
 [flags]
 "spaceship.rocket" = 6

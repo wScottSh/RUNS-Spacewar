@@ -4,7 +4,6 @@
 # Network is a block the others jump to; the frame starts again where a
 # firing ends.
 replaces = "lift/main_loop.c"
-include = ["object_table.h", "control_word.h"]
 registers = ["handoff", "outline_call"]
 pool = ["frame.spare_time", "frame.restart_delay", "frame.objects_seen",
         "score.first", "score.second", "score.games_left", "controls.source"]
@@ -12,9 +11,6 @@ pool = ["frame.spare_time", "frame.restart_delay", "frame.objects_seen",
 repeat = "frame"
 # A value moves from AC to IO by the swap macro (rcl 9s, rcl 9s).
 moves = "swap"
-
-[names]
-"controls.source" = "control_word_getter"
 
 # The compiled outlines lie in the free core right after the table (nnn).
 [addresses]
@@ -33,8 +29,8 @@ records = ["objects", "ships"]
 clear = "clearing"
 
 # A Record field indexed by a slot the main loop's cursors point at is the
-# word the cursor points at (object_table.h). The objects unit's calc
-# routines use them too.
+# word the cursor points at. The objects unit's calc routines use them
+# too.
 [cursors]
 "objects.routine" = "routine_slot"
 "objects.x" = "x_slot"

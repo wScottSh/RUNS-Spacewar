@@ -6,15 +6,6 @@
 # The ones the original executes with xct are XCT routines.
 replaces = "lift/tunables.c"
 
-[names]
-"tunables.fuel_supply" = "fuel_supply"
-"tunables.angular_acceleration" = "angular_acceleration"
-"tunables.star_capture_radius" = "star_capture_radius"
-"tunables.collision_radius" = "collision_radius"
-"tunables.collision_radius_half" = "collision_radius_half"
-"tunables.separate_outlines" = "separate_outlines"
-"tunables.hyperspatial_uncertainty" = "hyperspatial_uncertainty"
-
 [[place]]
 machine = "sequence break"
 

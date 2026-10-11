@@ -13,8 +13,8 @@ sets of that routine's parameter fields just before the run become the
 call's arguments, and its result fields read after the run are AC, or the
 halves of the returned pair. A macro is a routine laid out at each run.
 
-A unit of spacewar-c's lift.toml that has a binding is compiled from RUNS;
-the others still come from the lifted C, until each is ported."""
+Every unit of spacewar-c's lift.toml has a binding and is compiled from
+RUNS: the C this writes stands alone, with no file of spacewar-c's lift."""
 from __future__ import annotations
 
 import contextlib
@@ -205,7 +205,6 @@ class Bound:
     pool: set[str] = field(default_factory=set)     # locals that live in a pool word
     spill: set[str] = field(default_factory=set)    # AC locals kept in a pool word from their last set on
     inline: str | None = None           # a constant word after the call (INLINE)
-    c_name: str | None = None           # a routine of lifted C, not compiled from RUNS: its name there
     pointers: set[str] = field(default_factory=set)     # fields that hold addresses (word *)
     io_reads: set[str] = field(default_factory=set)     # fields a guard reads into IO, AC being busy
     back: str | None = None             # code a Record holds: the routine it jumps back to
@@ -219,10 +218,6 @@ class Bound:
     into: dict[str, str] = field(default_factory=dict)      # locals that hold a place in a collection
     arms: str | None = None             # "apart": see Function.apart_loop
     exit_after: str | None = None       # the exit lies in the guard after this Processor: see Function.guards
-
-    @property
-    def symbol(self) -> str:
-        return self.c_name or self.name
 
     def typed(self, dotted: str, name: str) -> str:
         return f"word *{name}" if dotted in self.pointers else f"word {name}"
@@ -257,7 +252,7 @@ class Bound:
         skips = " SKIPS" if self.skips else ""
         params = ", ".join(d for _, d in self.params(block)) or "void"
         ret = self.returns()
-        return f"{conv}{skips} {ret}{'' if ret.endswith('*') else ' '}{self.block if block else self.symbol}({params})"
+        return f"{conv}{skips} {ret}{'' if ret.endswith('*') else ' '}{self.block if block else self.name}({params})"
 
 
 class Bindings:
@@ -270,7 +265,6 @@ class Bindings:
         self.placed: dict[str, Path] = {}       # field -> the unit that lays out its data word
         self.cell_of: dict[str, str] = {}       # field -> the JDA routine whose entry word holds it
         self.io_fields: set[str] = set()
-        self.names: dict[str, str] = {}         # field -> the C name the lifted units use
         self.registers: set[str] = set()        # Records whose fields live in AC or IO
         self.cursors: dict[str, str] = {}       # field -> the cursor on the current object's slot
         self.pool: set[str] = set()             # fields that live in a pool word
@@ -296,9 +290,6 @@ class Bindings:
                 self.check_field(path, target)
                 self.into[f] = target
                 self.pointers.add(f)
-            for f, name in spec.get("names", {}).items():
-                self.check_field(path, f)
-                self.names[f] = name
             for f, other in spec.get("share", {}).items():
                 self.check_field(path, f)
                 self.check_field(path, other)
@@ -338,7 +329,6 @@ class Bindings:
                 if "jsp_slot" in p:
                     self.jsp_slots[p["jsp_slot"]] = p
             for p in spec.get("place", []) + [{**i, "convention": "INLINE"} for i in spec.get("inline", [])] \
-                    + [{**e, "extern": True} for e in spec.get("extern", [])] \
                     + [{**c, "convention": "BLOCK", "code": True} for c in spec.get("code", [])]:
                 if "routine" in p:
                     self.bind(path, p)
@@ -357,19 +347,17 @@ class Bindings:
             raise BindError(f"{path.name}: no field {dotted}")
 
     def bind(self, path: Path, p: dict):
-        """A routine compiled from RUNS, or (extern) one of lifted C that a
-        compiled routine runs, which RUNS does not have yet."""
+        """A routine compiled from RUNS."""
         name = p["routine"]
-        extern = p.get("extern", False)
-        if (name in self.prog.routines) == extern:
-            raise BindError(f"{path.name}: {name} is {'ported' if extern else 'no routine'}")
+        if name not in self.prog.routines:
+            raise BindError(f"{path.name}: {name} is no routine")
         if p.get("code") and [x[0] for x in self.prog.routines[name].body] != ["jump"]:
             raise BindError(f"{path.name}: {name} is code a Record holds only if its body is one jump")
         b = Bound(name, path, p["convention"], p.get("entry"), p.get("ac_param"), p.get("io_param"),
                   p.get("byname"), p.get("result", []), p.get("block"), p.get("block_takes_entry", False),
                   tuple(p["skips"]) if "skips" in p else None, set(p.get("io", [])), p.get("cells", []),
                   p.get("loops"), p.get("shifts"), set(p.get("pool", [])), set(p.get("spill", [])),
-                  p.get("inline"), p.get("name"), self.pointers, set(p.get("io_reads", [])),
+                  p.get("inline"), self.pointers, set(p.get("io_reads", [])),
                   None, p.get("pulse", False), self.insns, p.get("code", False),
                   p.get("args_done"), p.get("data", []), dict(p.get("flags", {})), dict(p.get("homes", {})),
                   dict(p.get("into", {})), p.get("arms"), p.get("exit_after"))
@@ -379,7 +367,7 @@ class Bindings:
                 ([b.skips[0]] if b.skips else []):
             if f:
                 self.check_field(path, f)
-        for f in [b.entry, *b.cells] if not extern else []:
+        for f in [b.entry, *b.cells]:
             if f:
                 self.cell_of[f] = name
         self.io_fields |= {f for f in b.io if "." in f}
@@ -387,10 +375,35 @@ class Bindings:
             self.io_fields.add(b.io_param)
         self.bound[name] = b
 
+    def all_cursors(self) -> set[str]:
+        """Every cursor of the main loop's walks and of the slot a field holds."""
+        out = set(self.cursors.values())
+        for spec in self.specs.values():
+            walk = spec.get("walk", {})
+            out |= set(walk.get("other", {}).values())
+            if "stray" in walk:
+                out.add(walk["stray"]["cursor"])
+        for cursors in self.slot_cursors.values():
+            out |= set(cursors.values())
+        if "clear" in self.table:
+            out.add(self.table["clear"])
+        return out
+
+    def homed_cursors(self) -> set[str]:
+        """The cursors some unit holds in an instruction's address field."""
+        out = {self.table["clear"]} if "clear" in self.table else set()
+        for spec in self.specs.values():
+            walk = spec.get("walk", {})
+            out |= {self.cursors[f] for f in walk.get("homes", []) + list(walk.get("home_in", {}))}
+            out |= set(walk.get("other", {}).values())
+        for cursors in self.slot_cursors.values():
+            out |= set(cursors.values())
+        return out
+
     def c_name(self, dotted: str) -> str:
         if dotted in self.shared:
             return self.c_name(self.shared[dotted])
-        return self.names.get(dotted, dotted.replace(".", "_"))
+        return dotted.replace(".", "_")
 
     def address(self, dotted: str, slot: int) -> tuple[str, str | None]:
         """The address of a slot of a collection's field, as the C names it,
@@ -459,7 +472,7 @@ class Unit:
                     self.homed[c] = None
         self.home_kind: dict[str, str] = {}     # cursor -> its home's instruction ("LAC" in a guard), once laid out
         self.named: set[str] = set()            # routines a member's word names
-        self.named_data: set[str] = set()       # arrays of lifted C a member's word names
+        self.named_data: set[str] = set()       # arrays another unit lays out that the code names
         self.typedefs: set[str] = set()
         self.carried: dict[str, str] = {}      # a jump's home -> the field whose word it carries
         self.cleared: str | None = None        # the cursor the table's clearing loop is homed in
@@ -477,6 +490,44 @@ class Unit:
         self.home_kinds: dict[str, str] = {}   # a homed local -> the instruction its home is ("LIO")
         self.spellings: dict[str, str] = {}    # a data local -> the instruction it is spelled as
         self.home_laid_out: set[str] = set()   # those whose home is laid out already
+
+    def pool_word(self, f: str) -> str:
+        """A pool word's declaration. One that holds a member of an enum
+        whose members are spelled as routines holds a routine's address: a
+        pointer to the routines' type, which the enum names."""
+        rec, fld = f.split(".")
+        enum = self.prog.records[rec].fields[fld][0]
+        spelled = self.binds.spelled.get(enum, {})
+        routines = [how["routine"] for how in spelled.values() if isinstance(how, dict) and "routine" in how]
+        if enum not in self.prog.enums or not routines or len(routines) != len(spelled):
+            return f"POOL word {self.binds.c_name(f)};"
+        kinds = set()
+        for r in routines:
+            if r in self.binds.jsp_slots:
+                kinds.add(("JSP", {"io": "io_word", "ac": "word"}[self.binds.jsp_slots[r]["returns"]]))
+            elif self.binds.bound[r].params():
+                raise BindError(f"{self.path.name}: {r}, which {f} may name, takes arguments")
+            else:
+                kinds.add((self.binds.bound[r].convention, self.binds.bound[r].returns()))
+        if len(kinds) != 1:
+            raise BindError(f"{self.path.name}: the routines {f} may name differ in type")
+        (conv, ret), = kinds
+        self.typedefs.add(f"typedef {ret} {enum}(void) {conv};")
+        return f"POOL {enum} *{self.binds.c_name(f)};"
+
+    def held_elsewhere(self, text: str) -> list[str]:
+        """The words the unit's code names that the main loop's walk holds:
+        a cursor homed in another unit's instruction, else a pool word, and
+        the object table, which another unit lays out."""
+        out = []
+        own = set(self.homed) | {self.cleared} | ({self.walk["stray"]["cursor"]} if "stray" in self.walk else set())
+        for c in sorted(self.binds.all_cursors() - own):
+            if re.search(rf"\b{c}\b", text):
+                out.append(f"extern HOMED word *{c};" if c in self.binds.homed_cursors() else f"POOL word *{c};")
+        table = self.binds.table.get("at")
+        if table and re.search(rf"\b{table}\b", text) and not any(p.get("table") for p in self.spec["place"]):
+            out.append(f"extern word {table}[];")
+        return out
 
     def copy_words(self) -> list[str]:
         """The words the copies of a Processor keep their own: homed locals
@@ -529,7 +580,7 @@ class Unit:
             return f"{ctor}({octal(x[1])})"
         if x[0] == "name" and x[1] in self.prog.routines:
             self.named.add(x[1])
-            return f"{ctor}({self.binds.bound[x[1]].symbol})"
+            return f"{ctor}({self.binds.bound[x[1]].name})"
         if (d := dotted_of(x)) is None:
             raise BindError(f"{self.path.name}: an instruction names a field, a routine or a number: {x!r}")
         return f"{ctor}(&{word(d)})"
@@ -685,7 +736,7 @@ class Unit:
         for n, s in enumerate(items):
             op = s[0]
             if back and op == "run" and s[1] == back:
-                back = None                 # the extern jumps back into it
+                back = None                 # the code jumps back into it
                 continue
             if op == "if":
                 out.append(("if", [(c, self.flat_body(b, r, in_slots)) for c, b in s[1]],
@@ -894,7 +945,7 @@ class Unit:
             if "routine" in p:
                 self.shift_homes(self.flat_routine(self.prog.routines[p["routine"]]))
         body: list[str] = []
-        head: list[str] = [f'#include "{h}"' for h in self.spec.get("include", [])]
+        head: list[str] = []
         for p in self.spec["place"]:
             if "routine" in p:
                 for f in p.get("data", []):
@@ -939,10 +990,7 @@ class Unit:
         head += [f"extern word {self.binds.c_name(f)};" for f in sorted(self.externs)]
         head += [f"ENTRY_CELL({self.binds.cell_of[f]}) word {'*' if f in self.binds.pointers else ''}"
                  f"{self.binds.c_name(f)};" for f in sorted(self.cells_used)]
-        # A pool field a lifted header of the unit names is declared there.
-        headers = "".join((SPACEWAR_C / "lift" / h).read_text() for h in self.spec.get("include", []))
-        head += [f"POOL word {self.binds.c_name(f)};" for f in sorted(set(self.spec.get("pool", [])) | self.pools_used)
-                 if not re.search(rf"\b{self.binds.c_name(f)}\b", headers)]
+        head += [self.pool_word(f) for f in sorted(set(self.spec.get("pool", [])) | self.pools_used)]
         head += [f"POOL word {name};" for name in sorted(self.pool_locals)]
         for name in sorted(self.named):
             if name in self.binds.bound:
@@ -961,9 +1009,8 @@ class Unit:
             head.append(f"POOL word *{stray['cursor']};")
         if self.cleared:
             head.append(f"HOMED word *{self.cleared} = 0;")
-        head = [h for h in head if not h.startswith("#include")]
-        head = [f'#include "{h}"' for h in self.spec.get("include", [])] + sorted(self.typedefs) \
-            + list(dict.fromkeys(head))
+        head += self.held_elsewhere("\n".join(inline + body))
+        head = sorted(self.typedefs) + list(dict.fromkeys(head))
         for f in sorted(self.kinds):
             name = self.binds.c_name(f)
             if self.binds.homes[f] == "table":
@@ -1197,9 +1244,6 @@ class Function:
             raise BindError(f"{self.b.name}: the binding spells no word for {enum} {name}")
         if isinstance(how, int):
             return octal(how)
-        if "data" in how:
-            self.unit.named_data.add(how["data"])
-            return how["data"]
         self.unit.named.add(how["routine"])
         if how.get("sign"):
             return f"{how['routine']} | (word){octal(runs.SIGN)}"
@@ -2458,7 +2502,7 @@ class Function:
         _, name, args, where = s
         callee = self.binds.bound[name]
         jump = self.unit.jumps(callee, s, self.stmts)
-        target = callee.block if jump else callee.symbol
+        target = callee.block if jump else callee.name
         text = f"{target}({', '.join(self.value(f, args[f]) for f, _ in callee.params(block=jump))})"
         if callee.convention == "BLOCK":
             # A run of a block is a jump to it; the firing goes on there.
@@ -2621,25 +2665,22 @@ class Function:
 
 
 def write_tree(prog: runs.Program, out: Path) -> Path:
-    """spacewar-c's lift.toml under out: each bound unit compiled from RUNS,
-    the rest linked to the lifted C. Returns the toml."""
+    """spacewar-c's lift.toml under out, each unit compiled from RUNS: out's
+    lift/ holds the generated C and nothing else. Returns the toml."""
     lift = tomllib.loads((SPACEWAR_C / "lift.toml").read_text())
     paths = sorted(BINDINGS.glob("*.toml"))
     binds = Bindings(prog, paths)
     bound = {spec["replaces"]: p for p, spec in binds.specs.items()}
-    lifted = out / "lift"
-    if lifted.exists():
-        for f in lifted.iterdir():
+    generated = out / "lift"
+    if generated.exists():
+        for f in generated.iterdir():
             f.unlink()
-    lifted.mkdir(parents=True, exist_ok=True)
-    for f in (SPACEWAR_C / "lift").iterdir():
-        (lifted / f.name).symlink_to(f)
+    generated.mkdir(parents=True, exist_ok=True)
     units = []
     for u in lift["unit"]:
-        if u["c"] in bound:
-            c = out / u["c"]
-            c.unlink()
-            c.write_text(Unit(binds, bound.pop(u["c"])).compile())
+        if u["c"] not in bound:
+            raise BindError(f"no binding replaces {u['c']}: every unit comes from RUNS")
+        (out / u["c"]).write_text(Unit(binds, bound.pop(u["c"])).compile())
         units.append(f'[[unit]]\nc = "{u["c"]}"\nprefix = "{u["prefix"]}"\n')
     if bound:
         raise BindError(f"bindings replace no lift unit: {sorted(bound)}")

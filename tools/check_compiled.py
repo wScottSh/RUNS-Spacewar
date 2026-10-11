@@ -1,5 +1,4 @@
-"""The image must come from the RUNS text, not from the lifted C or the
-binding. Builds the image once (it must match the oracle), then changes
+"""The image must come from the RUNS text, not from the binding. Builds the image once (it must match the oracle), then changes
 each number in each routine and field the bindings compile, one at a time,
 and requires the image to change. A loop's bound is RUNS's check, not
 code; it is listed apart and not built.
@@ -52,8 +51,7 @@ def sites(prog: runs.Program):
     value of each field they place or hand a routine."""
     specs = [tomllib.loads(b.read_text()) for b in sorted(runsc.BINDINGS.glob("*.toml"))]
     places = [p for spec in specs for p in spec["place"] + spec.get("inline", [])]
-    bound = {p["routine"] for p in places if "routine" in p} | \
-        {e["routine"] for spec in specs for e in spec.get("extern", [])}
+    bound = {p["routine"] for p in places if "routine" in p}
     table = {k: v for spec in specs for k, v in spec.get("table", {}).items()}
     fields = []
     for place in places:
