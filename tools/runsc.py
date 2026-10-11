@@ -1443,6 +1443,9 @@ class Function:
         return text
 
     def where_is(self, dotted: str) -> str:
+        if "sense" in self.binds.devices.get(dotted, {}):
+            raise BindError(f"{self.b.name}: {dotted} is sense switch {self.binds.devices[dotted]['sense']}: "
+                            f"a guard compares it with a member; it is no word to read")
         if dotted in self.binds.devices:
             return f"{self.binds.devices[dotted]['read']}()"
         if dotted in self.binds.addresses:
