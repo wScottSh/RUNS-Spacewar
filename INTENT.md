@@ -24,7 +24,7 @@ The topology is a Petri net. Records are the places and Processors are the trans
 
 A Network can state a contract the way a Processor does, with `reads:` and `writes:`. The Records it declares cross its boundary. Every other Record its Processors touch is its own. A top Network, one that nothing fires, is a whole game, and it must state its contract: that contract is the game's boundary with presentation.
 
-The evaluator in `tools/runs.py` enforces these rules before anything runs. A call of anything but a word operator is an error. A Processor that fires a routine is an error. A Network with `let`, `set`, `emit` or `return` is an error, and so is a Network loop without a guarded exit. A Network whose Processors write a stream, or touch a Record that Processors outside it touch, must declare it. While the game runs, a Processor that reads or writes a Record it did not declare is an error.
+The evaluator in `tools/runs.py` enforces these rules before anything runs. A call of anything but a word operator is an error. A Processor that fires a routine is an error. A Network with `let`, `set`, `emit` or `return` is an error, and so is a Network loop without a guarded exit. A top Network, or a Network that states a contract, must declare each stream its Processors write and each Record they share with Processors outside it. While the game runs, a Processor that reads or writes a Record it did not declare is an error.
 
 ## Gameplay and presentation
 

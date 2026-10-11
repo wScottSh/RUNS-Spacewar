@@ -46,3 +46,5 @@ ts	phase	decision	why	evidence	result
 2026-10-11T08:19:49Z	verify	check_sincos mutations: C5 +1, tail 2pi +1	a match could be vacuous	31+29 and 640+605 of 2046 calls differ	check sees both
 2026-10-11T08:19:49Z	verify	check_all.sh fails on a failing check (pipefail)	user asked for it	RUNS_SOURCE with C1 mutated: exit=1 at runsc	verified
 2026-10-11T08:19:50Z	verify	sincos unit: runsc MATCH, check_compiled 81/81 (21 refused), check_sincos 262144+262144 full, 20046 sample in check_all, check_all green	unit done criteria	check outputs	done
+2026-10-11T08:31:23Z	verify	re-ran the arithmetic agent's claims myself: runsc MATCH, check_compiled 81/81, four units generated not symlinked	own the subagent's work	commits 5e5ed81 fb57c2c 548c3f4	confirmed
+2026-10-11T08:31:23Z	evaluator	fixed: requires must be a condition; 08/09 literals are RunsErrors; removed * and / (RUNS has no multiply; it is a Processor); INTENT states which Networks must declare streams	gaps found by the runs-spec agent	tools/runs.py, INTENT.md; check_all green	fixed

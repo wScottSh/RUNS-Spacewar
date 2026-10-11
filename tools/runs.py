@@ -172,7 +172,7 @@ class RunsError(Exception):
     pass
 
 
-TOKEN = re.compile(r"\s*(?:(\d+)|([A-Za-z_][A-Za-z0-9_]*)|(\.\.|->|==|!=|<=|>=|<<|>>|[-+*/&|^~<>=()\[\],:.]))")
+TOKEN = re.compile(r"\s*(?:(\d+)|([A-Za-z_][A-Za-z0-9_]*)|(\.\.|->|==|!=|<=|>=|<<|>>|[-+&|^~<>=()\[\],:.]))")
 
 
 def tokens(text: str, where: str) -> list[str]:
@@ -234,7 +234,7 @@ class Cursor:
 
 
 BINARY = [("or",), ("and",), (), ("==", "!=", "<", "<=", ">", ">="), ("|",), ("^",), ("&",),
-          ("<<", ">>"), ("+", "-"), ("*", "/")]
+          ("<<", ">>"), ("+", "-")]
 
 
 def expr(c: Cursor, level: int = 0):
@@ -288,6 +288,8 @@ def postfix(c: Cursor):
 def primary(c: Cursor):
     t = c.take()
     if t.isdigit():
+        if t[0] == "0" and not set(t) <= set("01234567"):
+            raise RunsError(f"{c.where}: {t} is not an octal number")
         return ("num", int(t, 8) if len(t) > 1 and t[0] == "0" else int(t))
     if t in ("true", "false"):
         return ("bool", t == "true")
@@ -562,7 +564,7 @@ class Machine:
         self.fired.append((name, tuple(args)))
         scope = Scope(r.kind, dict(zip(r.params, args)), r)
         for cond in r.requires:
-            if not self.eval(cond, scope):
+            if not self.truth(self.eval(cond, scope)):
                 raise RunsError(f"{name}{tuple(args)}: precondition fails")
         try:
             self.block(r.body, scope)
