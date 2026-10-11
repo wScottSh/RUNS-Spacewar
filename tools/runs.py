@@ -642,6 +642,9 @@ class Machine:
         self.fired: list[tuple[str, tuple]] = []
         self.on_wait = lambda machine: None     # the host's turn at a wait
         self.jumped_to: str | None = None       # the routine code jumped to as it left
+        # The locals each Processor's last firing left, by (name, arguments):
+        # a check compares them with the words the original keeps them in.
+        self.left: dict[tuple, dict] = {}
         declared_instructions.clear()
         declared_instructions.update(prog.instructions)
         for rec in prog.records.values():
@@ -678,6 +681,8 @@ class Machine:
             pass
         except (Break, Continue):
             raise RunsError(f"{name}: break or continue outside a loop")
+        if r.kind == "processor":
+            self.left[(name, tuple(args))] = scope.locals
 
     def block(self, stmts: list, scope: "Scope"):
         for k, s in enumerate(stmts):

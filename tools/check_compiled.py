@@ -67,7 +67,7 @@ def sites(prog: runs.Program):
             fields += place.get("result", []) + place.get("cells", []) + place.get("data", [])
         fields += place.get("fields", []) + ([place["slots"]] if "slots" in place else [])
     fields += [f for spec in specs for f in spec.get("pool", []) + list(spec.get("homes", {}))]
-    for dotted in dict.fromkeys(f for f in fields if f):
+    for dotted in dict.fromkeys(f for f in fields if f and "." in f):     # a local has no initial value
         rec, fld = dotted.split(".")
         init = prog.records[rec].fields[fld][1]
         for path, n in numbers(init):
@@ -79,9 +79,11 @@ def is_bound(prog, site) -> bool:
         return False
     _, name, path, _ = site
     node = prog.routines[name].body
-    for k in path[:-1]:
+    for k in path:                              # a number anywhere in a loop's bound expression
+        if isinstance(node, tuple) and (node[:1] == ("loop",) and k == 1 or node[:1] == ("jump",) and k == 2):
+            return True
         node = node[k]
-    return node[0] == "loop" and path[-1] == 1 or node[0] == "jump" and path[-1] == 2
+    return False
 
 
 def mutate(prog: runs.Program, site) -> runs.Program:

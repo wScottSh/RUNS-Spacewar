@@ -1,0 +1,60 @@
+# The heavens (source lines 510-653): blp, the central star, and bpt, its
+# line, jsp routines; then bck, the Expensive Planetarium, a jsp routine
+# that lays out the dislis macro once for each magnitude; then its words.
+replaces = "lift/heavens.c"
+pool = ["central_star.slope_x", "central_star.slope_y"]
+
+# The star's slope lives in the pool words of the ship's gravity pull (bx,
+# by). Each user sets them before it reads them: the star at its start, the
+# spaceship with dzm before its gravity (oracle.lst 530, 536, 1120-1121).
+[share]
+"central_star.slope_x" = "spaceship.gravity_x"
+"central_star.slope_y" = "spaceship.gravity_y"
+
+[devices]
+"console.no_planetarium" = { sense = 4 }
+
+# Each magnitude's cursor holds its place in the catalog as an address.
+[into]
+"magnitudes.cursor" = "star_catalog.words"
+
+[spell.half]
+first = 0
+mirrored = 1
+
+[spell.scan]
+looking = 0
+plotted = 1
+
+[[place]]
+routine = "central_star"
+convention = "JSP"
+
+# The line's points ask the display for a completion pulse; each waits for
+# the one before, and central_star waits for the last (ioh). Its mirror bit
+# is program flag 6, which the outline compiler and the spaceship use too;
+# each clears or sets it before it reads it.
+[[place]]
+routine = "star_line"
+convention = "JSP"
+io = ["y"]
+flags = { half = 6 }
+pulse = true
+
+# Each magnitude's scan keeps where the star's x and y lie in the address
+# fields of the instructions that read them (fin, lac; fyn, lio), and where
+# it began in a word laid out in its code (fpo, an lio), with the cursor
+# (flo). The first arm of each if with an else lies apart, after the scan's
+# loop, and jumps back. The exit lies in the skip of the frame count.
+[[place]]
+routine = "expensive_planetarium"
+convention = "JSP"
+flags = { scan = 5 }
+homes = { star_x = "pointer", star_y = "pointer" }
+into = { star_x = "star_catalog.words", star_y = "star_catalog.words", scan_start = "star_catalog.words" }
+data = ["scan_start", "magnitudes.cursor"]
+arms = "apart"
+exit_after = "count_frames"
+
+[[place]]
+fields = ["planetarium.alternate_frames", "planetarium.window_steps", "planetarium.right_margin"]

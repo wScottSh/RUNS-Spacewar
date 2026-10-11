@@ -101,15 +101,6 @@ control_boxes = { routine = "control_word_routine" }
 [streams]
 scoreboard = "hlt"
 
-# Routines of lifted C the main loop runs.
-[[extern]]
-routine = "expensive_planetarium"
-convention = "JSP"
-
-[[extern]]
-routine = "central_star"
-convention = "JSP"
-
 [[place]]
 routine = "frame"
 convention = "BLOCK"

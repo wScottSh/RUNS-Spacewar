@@ -56,3 +56,21 @@
 - [x] reach_oracle re-run: same findings, code space named outline_code
 - [ ] Open: the heavens and the star catalog
 - [ ] Open: runsc's layout rules grow per unit (jump table, rotated loop); an independent review should judge whether each is general
+
+## Round 8 (autonomous): port the heavens and the star catalog; every unit from RUNS
+Playbook (autonomous run), verbatim:
+- [ ] 1. State the exit condition as a checkable predicate before the first iteration (tests green, repro fixed, all N PRs merged, pixel-diff zero).
+- skip: 2. Pick the wake mechanism (loop skill): no external event to watch; every check runs in the foreground
+- [ ] 3. Each iteration makes the smallest change the evidence justifies, verifies it against the predicate, commits if it advanced, discards changes that didn't help.
+- [ ] 4. Mid-run discoveries are yours.
+- [ ] 5. Checkpoint every iteration via the show-me-your-work skill.
+- [ ] 6. Stop when the predicate is met.
+
+Predicate: runsc MATCH 8744e9c9 with all 13 build/lift/*.c generated, none symlinked, and build/lift holding only generated files; check_compiled passes; check_heavens (central_star, expensive_planetarium vs SIMH, wrap paths, mutations) passes; check_frame runs whole frames; check_all.sh passes.
+
+- [ ] RUNS: central_star, star_line, star_slope, draw_star; expensive_planetarium, show_magnitude, move_window; star_catalog Record; sense switch 4
+- [ ] Evaluator check vs SIMH (check_heavens.py): seeded + edge cases + scan-wrap paths; mutations caught
+- [ ] check_frame through the heavens (whole frames)
+- [ ] Bindings pdp1/heavens.toml, pdp1/star_catalog.toml + runsc rules; MATCH; check_compiled
+- [ ] Remove bridges to lifted C ([names] for lifted callers, [[extern]], lifted includes); build/lift fully generated
+- [ ] deslop; docs (INTENT, pdp1/README, todo); decisions.tsv

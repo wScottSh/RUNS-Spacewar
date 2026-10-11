@@ -60,6 +60,10 @@ FIELDS = {
     ("outline_compiler", "codes_left"): "occ", ("outline_compiler", "codes_rest"): "oci",
     ("outline_compiler", "start_over"): "ocm", ("outline_compiler", "to_other_side"): "ocn",
     ("outline_code", "insn"): "nnn",
+    ("central_star", "slope_x"): "bx", ("central_star", "slope_y"): "by",
+    ("planetarium", "alternate_frames"): "bcc", ("planetarium", "window_steps"): "bkc",
+    ("planetarium", "right_margin"): "fpr",
+    ("star_catalog", "words"): "1j",
 }
 
 # A collection the binding lays out in pieces: (first slot, the symbol of its word).
@@ -67,6 +71,7 @@ PIECES = {("outlines", "codes"): [(0, "ot1"), (0o10, "ot2")]}
 
 # Fields that hold a place in a collection: the binding keeps its address.
 INTO = {("ships", "outline"): ("outline_code", "insn"), ("outline_call", "code"): ("outline_code", "insn"),
+        ("magnitudes", "cursor"): ("star_catalog", "words"),
         ("outline_call", "table"): ("outlines", "codes"), ("outline_compiler", "table"): ("outlines", "codes")}
 
 # The PDP-1's words for the instructions of `type insn`: memory reference
@@ -96,6 +101,18 @@ ENUM_WORDS = {"calc_routine": ROUTINE_WORDS,
 FLAGS = {("lights", "first_survived"): 1, ("lights", "second_survived"): 2, ("spaceship", "rocket"): 6,
          ("outline_compiler", "six"): 6}
 
+# The Expensive Planetarium lays out each magnitude's words in its code
+# (dislis: fpo, flo), with no symbol of their own: each instance of the
+# macro begins `clf 5 / lac flo / dap fpo / dap fin / dap fyn`. The words
+# per magnitude: its scan start, cursor, and the homes of star_x and star_y.
+DISLIS = 0o760005
+
+
+def magnitude_words(sym: dict, image: dict[int, int]) -> list[dict[str, int]]:
+    starts = [a for a in range(sym["bck"], sym["bcc"]) if image.get(a) == DISLIS]
+    return [{name: image[a + k] & 0o7777 for k, name in ((1, "cursor"), (2, "scan_start"), (3, "star_x"),
+                                                          (4, "star_y"))} for a in starts]
+
 DPY = 0o720007              # dpy, intensity in bits 6-8
 DPY_NOWAIT = 0o724007
 
@@ -111,8 +128,11 @@ class Binding:
         self.enum_of = {enum: {w: n for n, w in words.items()} for enum, words in self.enum_word.items()}
         self.routine_word = self.enum_word["calc_routine"]
         self.moved: dict[tuple[str, str], int] = {}     # a field a check lays out elsewhere: its address
+        self.slot_at: dict[tuple[str, str, int], int] = {}  # a slot laid out on its own: its address
 
     def address(self, record: str, fld: str, slot: int | None = None) -> int:
+        if (record, fld, slot) in self.slot_at:
+            return self.slot_at[(record, fld, slot)]
         if (record, fld) in self.moved:
             return self.moved[(record, fld)] + (slot or 0)
         if (record, fld) in PIECES:

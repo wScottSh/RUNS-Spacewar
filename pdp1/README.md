@@ -73,8 +73,17 @@ The keys that hold for a whole unit:
 - `[homes]` with `"pointer"`: an `[into]` field held in the address field of the first instruction that reads through it (`ocg, lio .`).
 - `[addresses]` with a collection's field: the collection lies at an address the layout fixes, not at a place of its own. `"after table"`: the first word after the object table (`outline_code`, nnn).
 - `[[place]]` with `slots`, `range` and `reserve`: the slots `range` of a collection's field laid out as data words with their RUNS initial values, then `reserve` words of room no rule reads (the five spare words after each outline, for an operator to make it longer).
+- `at` on a `[[place]]` with `slots`: the words lie from that address (`6077/`, the star catalog, right after the free core `outline_code` takes).
+- `[share]`: a field that lives in another field's word (`central_star.slope_x` in `spaceship.gravity_x`'s, `\bx`). Each Record's rules must set the word before they read it.
 - `data`: fields laid out as data words inside the routine's code, at its first point control cannot reach (`ocm`, `ocn` after `oc`'s return).
 - `args_done`: the Processor after which the routine steps its return address past the words after its call (`idx ocx`). Where it does so is a choice of code layout; pdp1cc needs AC dead there.
+- `pulse = true` on a routine: its points ask the display for a completion pulse (`dpy-4000`, at intensity 0). Each point waits for the one before it (`ioh`), and a routine that runs it waits for its last after the run. It is the display's handshake (`bpt`, the central star's line).
+- `flags`: locals held in a program flag (`{ half = 6 }`), an enum spelled 0 and 1. Setting one is `stf` or `clf`; a guard on it is `flag(n)`.
+- `homes`: locals held in the address field of the instruction that reads through them (`{ star_x = "pointer" }`, `fin, lac .`). The instruction is the one the first read takes it into: IO for a point's y (`lio`), AC otherwise. On the tape the address is 0, as the source writes such an instruction with no operand.
+- `into`: locals that hold a place in a collection (`{ star_x = "star_catalog.words" }`). A place by number set into one is that slot's address. Two places compared, one held by a homed local, are compared as its home instruction (`I_LIO(p)`; `I_LIO(++p)` when the step just before is the comparison's).
+- `data` may name locals and a collection's field. Each copy of the Processor that holds them (a Processor laid out at each run, `show_magnitude`) gets its own: its homed locals, its data locals, and the slots of the field it names by number, laid out at the copy's end. A data local is spelled as the home instruction it is compared with, at address 0 on the tape (`fpo, lio`).
+- `arms = "apart"`: in the routine's loops, the first arm of each if with an else lies apart, after the loop, and jumps back to the code after the if (to the loop's top when the if ends the loop's body); an arm that is only a break is the jump itself. The loop's breaks are one jump out, laid out at the first break in the text, which the others jump to. Data words of the copy follow (`dislis`: `fgr`, `fuu`, `flp` after `jmp fin`; `fx`).
+- `exit_after`: the routine's exit lies right after the named Processor, in the skip of the guard that follows it (`isp bcc / bcx, jmp .`). Each if with no else that ends the routine, or ends such an if's arm, is laid out as a guard: its test, negated, leaves the routine, and its arm follows in line. The returns after the exit jump to it.
 
 `runsc` lays code out by rules of its own, from the shape of the RUNS text, the same for every binding:
 
@@ -107,6 +116,11 @@ The keys that hold for a whole unit:
 - An if-chain with no else whose guards test one value for `== n`, or an `or` of such tests, over 0 to some n, is a jump table (`switch`, `add (T / dap J / J, jmp .`). The arm of n lies in the table and must end in a jump; the other arms lie apart. The first lies right after the table and falls into the code after the chain; the rest lie after the routine's code, each jumping back to that code. A Network that the arms run last is laid out in the first arm, and the others jump to it (`jmp oce`). A jump after an arm's last if/else goes into both of its branches. The arms share their locals, which are declared at the routine's top.
 - A loop whose body ends with `if c: X`, no else, is laid out with the test at the bottom: back to the top while c fails, then X. When X ends with the statements just before the loop, they are laid out once and X jumps back to them, the loop's second entry (`jmp ocj`, then `och`). A break of a loop that is the routine's last statement is its return.
 - An entry word of another unit's routine is, to the caller, AC: a value carried into the call and out of it (`jda oc`).
+- A counted loop from a local up to n, that does not read its index, is a jump into a run of n + 1 copies of its body past as many as the local says (Duff's device, `bjm, jmp .` into `bds`). The jump's address is set right after the local's last set before the loop.
+- A program flag set, then a new AC local and a new IO local set to 0, is one instruction (`cla cli clf 6`).
+- A plain loop that ends the routine leaves it through its breaks: each is a return.
+- An initial value may be an expression of numbers (`8192 - 1537`, `371 << 8`); the word is its value.
+- A place just past a collection's last slot has an address too (`lio Q+2`).
 
 A `[[place]]` may instead lay out words that the PDP-1 and its operator need and that no game rule reads. `runsc` knows each kind as the PDP-1 back end, the way it knows `jda`:
 

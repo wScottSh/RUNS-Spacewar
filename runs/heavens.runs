@@ -1,0 +1,39 @@
+# The heavens (source lines 510-653): the central star, and Peter Samson's
+# Expensive Planetarium, the background of real stars that drifts slowly
+# across the screen. The main loop runs both once a frame, after the
+# objects (mq3).
+#
+# Both are presentation, with one exception: the central star draws two
+# random numbers each frame from the generator that also decides hyperspace,
+# so its draws are a rule of the game. The planetarium draws none.
+
+# The central star (blp): a short line drawn from the center of the screen
+# in a random direction, then mirrored through the center. A new direction
+# and length every frame make it spin and flicker. Sense switch 6 turns it
+# off, and with it the draws.
+network central_star                                        # blp
+  if console.no_star == off:                                # szs 60
+    run next_random
+    run star_slope                                          # bx, by
+    run star_line                                           # jsp bpt
+
+network star_line                                           # bpt
+  run next_random
+  run draw_star
+
+# The Expensive Planetarium (bck), the `background` macro: the stars of the
+# catalog, in four magnitudes, through a window one screen wide that moves
+# slowly right to left across the sky. It draws every other frame, and moves
+# the window one step every 16 of those. Sense switch 4 turns it off.
+network expensive_planetarium                               # bck
+  if console.no_planetarium == off:                         # szs 40
+    run count_frames                                        # isp bcc
+    if planetarium.alternate_frames >= 0:
+      run skip_a_frame                                      # law i 2
+      run show_magnitude(0, 0, 022, 3)                      # dislis 1j, 1q, 3
+      run show_magnitude(1, 022, 044, 2)                    # dislis 2j, 2q, 2
+      run show_magnitude(2, 044, 0306, 1)                   # dislis 3j, 3q, 1
+      run show_magnitude(3, 0306, 01652, 0)                 # dislis 4j, 4q, 0
+      run count_steps                                       # isp bkc
+      if planetarium.window_steps >= 0:
+        run move_window

@@ -85,11 +85,11 @@ record console
   test_word: word           # the test word switches: the controls when started at 5, the
                             # match's setup, and whether to halt and show the scores
   control_boxes: word       # the control boxes' buttons
-  # The sense switches, each named for what it does when on. Switch 4 is the
-  # heavens', which are not ported.
+  # The sense switches, each named for what it does when on.
   angular_momentum: switch  # 1: the rotate buttons build up angular momentum
   light_star: switch        # 2: the central star pulls less
   single_shot: switch       # 3: a torpedo only for each new press of the fire button
+  no_planetarium: switch    # 4: no Expensive Planetarium
   star_kills: switch        # 5: a ship that falls into the star explodes
   no_star: switch           # 6: no central star, and no gravity
 
@@ -171,6 +171,38 @@ record outline_compiler
   six: six_code = store     # program flag 6
   start_over: insn = jmp(outline_compiler.start_over)        # ocm: where the second side starts
   to_other_side: insn = jmp(outline_compiler.to_other_side)  # ocn: past the end, on the first side
+
+# The central star's line: how far each dot moves along x and along y.
+# Each is the sign and the three bits just below a display coordinate, so a
+# dot moves less than one point.
+record central_star
+  slope_x: word = 0         # bx
+  slope_y: word = 0         # by
+
+# Which half of the central star's line is drawn (program flag 6).
+enum half
+  first
+  mirrored
+
+# The Expensive Planetarium's own words: it draws every other frame, and
+# moves its window one step left every 16 of those.
+record planetarium
+  alternate_frames: word = 0    # bcc: counting up
+  window_steps: word = 0        # bkc: counting up
+  right_margin: word = 010000   # fpr: the sky's x at the right edge of the screen
+
+# Where each magnitude's next scan starts: a place in star_catalog.words.
+record magnitudes[4]
+  cursor: word =            # flo
+    0                       # the first magnitude's first star (1j)
+    022                     # the second's (2j)
+    044                     # the third's (3j)
+    0306                    # the fourth's (4j)
+
+# Whether a scan of the stars has plotted one yet (program flag 5).
+enum scan
+  looking
+  plotted
 
 # The "interesting and often changed constants" at the head of the tape.
 # The ones the original keeps as instructions to execute are Processors in

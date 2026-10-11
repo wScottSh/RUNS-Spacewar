@@ -51,7 +51,8 @@ RECORDS = ["objects", "ships", "random", "spaceship", "pen"]
 # The arithmetic routines' own words that have a place in core.
 SCRATCH = [(rec, fld) for rec, fld in pdp1.FIELDS
            if rec in ("square_root_call", "multiply_call", "integer_multiply_call", "divide_call", "sine_call")]
-SWITCHES = {"angular_momentum": 1, "light_star": 2, "single_shot": 3, "star_kills": 5, "no_star": 6}
+SWITCHES = {"angular_momentum": 1, "light_star": 2, "single_shot": 3, "no_planetarium": 4, "star_kills": 5,
+            "no_star": 6}
 TWO_PI = 0o311040
 
 
