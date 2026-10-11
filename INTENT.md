@@ -22,9 +22,13 @@ Five requirements follow from that purpose:
 
 The topology is a Petri net. Records are the places and Processors are the transitions. No value flows from one transition straight into another. An earlier draft had a fourth kind, the function, which took words and returned words. A Processor called it, so a value went from one rule to another as a call and a return, with no place in between. That broke the topology, and functions are gone. The only calls left are the word's own operators, such as `rcl`, `scr` and `popcount`. Call syntax for writers, if it comes, belongs to tools that write RUNS, not to RUNS.
 
-A Network can state a contract the way a Processor does, with `reads:` and `writes:`. The Records it declares cross its boundary. Every other Record its Processors touch is its own. A top Network, one that nothing fires, is a whole game, and it must state its contract: that contract is the game's boundary with presentation.
+A Network can state a contract the way a Processor does, with `reads:` and `writes:`. The Records it declares cross its boundary. Every other Record its Processors touch is its own. A top Network, one that nothing fires, is a whole game, and it must state its contract: that contract is the game's boundary with presentation. A game may have several top Networks. Spacewar has three: the two start Networks, one of which the host fires once when the operator starts the machine, and the frame, which the host fires once each frame. Together they are the game, so a Record they share does not cross the boundary.
 
-The evaluator in `tools/runs.py` enforces these rules before anything runs. A call of anything but a word operator is an error. A Processor that fires a routine is an error. A Network with `let`, `set`, `emit` or `return` is an error, and so is a Network loop without a guarded exit. A top Network, or a Network that states a contract, must declare each stream its Processors write and each Record they share with Processors outside it. A Processor that nothing fires shares nothing at run time, so it does not count: the tunables the spaceship executes wait in the text for the spaceship. While the game runs, a Processor that reads or writes a Record it did not declare is an error.
+A field with no initial value is unknown until the game sets it or the world gives it. That is how the text says what comes in: the console's switches, and the words core held at power-on. Reading a field while it is unknown is an error. A top Network whose routines read a Record with such a field declares that Record under `reads:`.
+
+`wait`, in a Network, hands the world the firing. The host shows what has left the game and may change what comes in, and then the firing goes on. Spacewar waits when it halts to show the scores between games: the operator may flip the test word switches before continuing, and the game reads them after the halt.
+
+The evaluator in `tools/runs.py` enforces these rules before anything runs. A call of anything but a word operator is an error. A Processor that fires a routine is an error. A Network with `let`, `set`, `emit` or `return` is an error, and so is a Network loop without a guarded exit. A top Network, or a Network that states a contract, must declare each stream its Processors write and each Record they share with Processors outside it, and a top Network must declare each Record with an unknown field that it reads. A Processor that nothing fires shares nothing at run time, so it does not count: the tunables the spaceship executes wait in the text for the spaceship. While the game runs, a Processor that reads or writes a Record it did not declare is an error, and so is reading an unknown field.
 
 ## Gameplay and presentation
 
@@ -49,6 +53,16 @@ Spacewar shows the split in its own code (read in spacewar-c's lift):
 
 The port is still verbatim: presentation code stays where the original runs it, in the order it runs. The split says which of its effects the game must keep.
 
+### Spacewar's boundary so far
+
+The three top Networks of `runs/frame.runs` declare it.
+
+- **What comes in.** `console`: the test word switches and the control boxes. `score`: the two scores and the games left in the match, whose starting values are what core held at power-on. `outline_space.start`: where the outline compiler, which is presentation, may lay out the compiled outlines. Which start Network the host fires is the operator's start address, 4 or 5. Each of these is a field with no initial value.
+- **What goes out.** `display`, the points the scope plots. `scoreboard`, the scores the halt between games shows on the console lights. `lights`, program flags 1 and 2, which light for the ship that survived a game and which nothing in the game reads.
+- **Not yet declared.** The sense switches come in too, but only the spaceship and the heavens read them, and neither is ported.
+
+The control word is the spaceship's input. The main loop only picks its source: the start Network sets `controls.source`, and the `control_word` Network reads the test word or the control boxes from it. Nothing fires `control_word` until the spaceship is ported.
+
 ## Exactness, glitches, and the machine
 
 A glitch is one of three kinds, by what it reads.
@@ -71,8 +85,8 @@ Which Records need a layout stated, and where play runs into the machine, is a f
 
 | What it finds | Where | What it means for the port |
 |---|---|---|
-| One instruction reads several places | 31 sites. The outline compiler and the compiled outlines; the planetarium's star display; `clear mtb, nnn-1`; `mot`. | The first two are presentation. `clear` zeroes every table in one loop over contiguous core, and play sees only the zeros. `mot, lac .` (source line 865) reads `not+slot` for every colliding object, so for torpedoes it reads past the 2-word outline array into `nco`, `nh1` .. `nh4` and the compiled outline code. The value goes to `sp5`, which only the spaceship calc routine uses, and slots 0 and 1 set it right before (`lift/main_loop.c:307`). Inferred: play never observes it. The spaceship port's checks will confirm or refute it. |
-| Reads of core the tape never loaded | `1sc`, `2sc`, `gct`, `moc`, `mas` | The scores and the game count start from whatever core held at power-on. The scores are cleared only after a match's scores are shown (source lines 784-785), and the first match's tie test (`lac 1sc; sas 2sc`, lines 768-769) and game count (`lac gct`, line 764) read them. So their starting values come in at the boundary. `moc` (`frame.objects_seen`) and `mas` are counted and never read. |
+| One instruction reads several places | 31 sites. The outline compiler and the compiled outlines; the planetarium's star display; `clear mtb, nnn-1`; `mot`. | The first two are presentation. `clear` zeroes every table in one loop over contiguous core, and play sees only the zeros. `mot, lac .` (source line 865) reads `not+slot` for every colliding object, so for torpedoes it reads past the 2-word outline array into `nco`, `nh1` .. `nh4` and the compiled outline code. The value goes to `sp5`, the spaceship's jump into its compiled outline, which only the spaceship calc routine uses, and slots 0 and 1 set it right before. Inferred: play never observes it. The spaceship port's checks will confirm or refute it. The RUNS main loop does not read `ships.outline`: drawing the outline is the spaceship's. The binding carries the current slot's word to `sp5` as the comparison walk begins (`carry` in `pdp1/main_loop.toml`), so the image keeps the original's read past the array. |
+| Reads of core the tape never loaded | `1sc`, `2sc`, `gct`, `moc`, `mas` | The scores and the game count start from whatever core held at power-on. The scores are cleared only after a match's scores are shown (source lines 784-785), and the first match's tie test (`lac 1sc; sas 2sc`, lines 768-769) and game count (`lac gct`, line 764) read them. So their starting values come in at the boundary: `score` has no initial value, and the start Networks declare it. `moc` (`frame.objects_seen`) and `mas` are counted and never read. |
 | Code the program writes, then runs | the compiled outlines (684 words); `mi1` | Outlines are presentation. `mi1` is the explosion's `scl`, built from a random number; the port states it as a rule (`popcount`) and the checks match it. |
 | Code read as data | `mot`'s reads into the compiled outlines | The same `mot` read as above. |
 | Jumps to unnamed places | none, other than returns from a call | |
@@ -84,7 +98,7 @@ So far no layout read that play observes has turned up. The power-on words are t
 The head of the tape also holds words that belong to the machine and its operator, not to the game. Each was weighed by what play can observe:
 
 - **The sequence break words (0-3) and the flush (`sbf`).** Play never raises a sequence break, and spacewar-c's frame check runs none of these words. They are layout.
-- **The start vectors at 4 and 5, and the control word routine slot at 040.** Starting at 4 or 5 chooses whether the control word comes from the control boxes or the test word switches, and the slot is where an operator builds a private control word routine. Each decides only which device the control word comes from. The control word itself comes in at the boundary, so these are presentation, and layout.
+- **The start vectors at 4 and 5, and the control word routine slot at 040.** Starting at 4 or 5 chooses whether the control word comes from the control boxes or the test word switches, and the slot is where an operator builds a private control word routine. The two starts also differ in play: 5 goes to `a`, which reads the game count and the scores core held at power-on, and 4 goes to `a6`, which sets the game count from the test word first. (An earlier note here said they differ only in the control word's device; the listing says otherwise, lines 756-762.) So the start address is an input: the host fires `start_with_test_word` or `start_with_control_boxes`. The vectors that jump there, and the slot, are layout.
 - **The tunables' fixed low addresses.** They sit there so an operator can change them from the console between games. In RUNS that change is an edit to a Processor or a field, a house rule, so the addresses are layout. The values are rules: the instructions are Processors in `tunables.runs-prim`, the numbers are fields of the `tunables` Record.
 
 The PDP-1 binding lays all of them out (`pdp1/tunables.toml`), and `runsc` emits the machine's words as the PDP-1 back end, the way it emits `jda`.
@@ -106,6 +120,13 @@ The original passes values between routines in AC and IO, and that is what had m
 
 Splitting a routine at each macro or tunable leaves its skips in the Network. Each guard tests what the original's skip tests. `count i ma1, tc1` becomes `run count_down(slot)` followed by `if objects.counter[slot] >= 0:`.
 
+The main loop and the game control add four shapes:
+
+- **A label that several places jump to** (`a`, `a4`, `a5`, `a6`, `a2`, `ml1`) is a Network of its own, and each jump is a `run` of it as the last thing a branch does. The binding lays each one out as a block, and pdp1cc drops a jump to the block that follows.
+- **The main loop's own jump back to `ml0`** is the end of a firing: the host fires the frame again. The binding names the frame as the Network the PDP-1 repeats.
+- **A halt that waits for the operator** is an `emit` of what it shows, then `wait`.
+- **The cursors' walk** is `for slot in 0 .. 026`, and the comparison loop inside it is `for other in slot + 1 .. 027`. Which cursor points at which field, which instruction holds it, and how the walk steps them are the binding's.
+
 ## What the port showed
 
 **The 1962 program is already shaped like RUNS.** The object table is a Record collection. Each calc routine is a Processor. The routine word in each slot names the rule that runs the object, which makes it a state. The main loop's jump through that word is a guarded dispatch on that state. The tunables that the original keeps as instructions to execute (`the`, `hd2`, `hr1`, and others) are the authors' own swap points.
@@ -123,6 +144,8 @@ Splitting a routine at each macro or tunable leaves its skips in the Network. Ea
 | Values in AC and IO | Locals inside a Processor; between Processors, a field of `handoff` |
 | A routine's own scratch words (`sq1`, `mxc`) when they pass between Processors | Record fields |
 | The routine word's address plus its sign bit | An enum, and a guard that compares it with `explosion` and `in_hyperspace` |
+| The scores and game count core held at power-on | Fields with no initial value, declared by the top Networks |
+| `hlt`, showing the scores, then reading the switches again | `emit scoreboard`, then `wait` |
 | A shift instruction built at run time and executed | A shift by a counted number of places |
 | IO left over from the main loop in `in_hyperspace` | `handoff.jump_low`, which the draw shifts out (checked: SIMH runs each call with a random IO) |
 
@@ -134,12 +157,12 @@ The cursors are layout the program uses but play never observes; `tools/reach_or
 
 The syntax is a working draft. These are the forms this slice needed:
 
-- `record name[N]` with typed fields and initial values, and `stream` for ordered output (the display's points).
+- `record name[N]` with typed fields and initial values, and `stream` for ordered output (the display's points). A field with no initial value comes in from outside the game (the scores at power-on, the console).
 - `enum`, and `match` over an enum in a Network. The evaluator checks that every member has an arm.
 - In bodies: `let`, `set` (which updates a local or a declared Record field), `if`, `elif`, `else`, `loop at most N:` with `break`, `continue`, and `return`, `for i in a .. b` (a counted loop: `mpy`'s 17 multiply steps), and `emit`.
 - `let (high, low) = scl(h, l, 3)` names the two halves a pair operator returns.
 - The word's operators: `ral`, `rar`, `popcount`, and the AC:IO pair operators `rcl`, `rcr`, `scl`, `scr`, `mus` (multiply step) and `dis` (divide step), which return the pair: `set (high, low) = mus(high, low, m)`.
-- In Networks: `run`, `if`, `for i in a .. b` (bounded and ascending, and the bounds may depend on an outer index), `match`, `stop`, `unreachable`, `requires:`, and the contract, `reads:` and `writes:`. A guard is any expression that writes nothing; `breakout`'s `if (random.number | 0400000) + ships.uncertainty[slot] >= 0:` is one.
+- In Networks: `run`, `if`, `for i in a .. b` (bounded and ascending, and the bounds may depend on an outer index), `match`, `stop`, `unreachable`, `wait`, `requires:`, and the contract, `reads:` and `writes:`. A guard is any expression that writes nothing; `breakout`'s `if (random.number | 0400000) + ships.uncertainty[slot] >= 0:` is one.
 - The Network loop, `loop at most N:`. Its body fires and chooses like any Network body, and it must hold an `if <guard>: break` among its own statements. The guard reads Records that the Processors in the body write. The loop runs its body, in order, until a guard breaks. Running past N passes means the port is wrong, as it does in a Processor. The explosion's dot loop is the form:
 
   ```
@@ -186,11 +209,13 @@ Each check runs the RUNS source in the evaluator and SIMH running the oracle ima
 - The Networks `explosion`, `torpedo`, `in_hyperspace`, `breakout`: 3,000 calls each, all match, 6.1 million points (`tools/check_calc_routines.py`). It sees the shapes the compile needs: a warp of `>> 4` for `>> 9` in `warp_from_y` changes 110 of 200 torpedo calls, plotting y for x 119 of 200, and no swap in `jump` 99 of 200 hyperspace calls. A warp of `>> 8` changes none: the torpedo space warpage of any coordinate is its sign alone, so both are the same rule.
 - The frame Network from `ml0` to `mq3`, covering the restart countdown, the object loop, collisions, and every ported calc routine: 1,500 frames, all match, with 4,343 collisions that hit (`tools/check_frame.py`).
 - The checks fail when the source is wrong. Each mutation through `tools/mutate.sh` was caught: skipping adjacent collision tests, testing objects that do not collide, skipping slot 0, an off-by-one in the time charge, a wrong torpedo explosion counter, and dropping the second `random` from the explosion's dot loop.
-- The frame's contract is checked: without `writes: display` the source does not load.
+- The game control (`tools/check_game.py`): the start Networks from power-on, the restart checks, scoring, the match count, the halt between games and the new game. 3,000 seeded cases against SIMH, all match, with 1,226 starts from power-on (random scores and game count in core), 1,009 halts whose second test word is given at the `wait`, and 2,199 new games. Also spacewar-c's seventeen scripted matches, 51,000 stops: at each frame the evaluator fires the frame from SIMH's Records; the 71 games that end match through the halt (38 shown) and the new game, and every other frame's restart delay matches. The `control_word` Network matches mg2 and cwr on 2,000 calls with random IO and test word. The outline compiler is not ported, so the check leaves `outline_call.code` where SIMH's compiler leaves it.
+- Fourteen mutations of the game control were each caught (600 seeded cases and 1,500 stops a match): a tie adding two games, scoring the wrong ship, the game count's shift, the scores switch bit, the restart delay's doubling, the tie test reversed, the needle's heading, the first frame's time estimate, a score not cleared, the outline test reversed, no `wait`, no game count step, flag 2 left on, and testing the first ship's torpedoes twice. The seeded cases caught all fourteen; the scripted matches nine of them.
+- The contracts are checked: without `writes: display` the frame does not load, and without `reads: score` neither does `start_with_test_word`.
 - `tools/reach_oracle.py` checks its own copy of core and its model of the word's arithmetic against SIMH, as above.
 
 ## Not yet ported
 
-The spaceship calc routine, which covers gravity, thrust, the controls, torpedo launch, the jump into the compiled outline, hyperspace entry, and the halt on a full object table. Also the outline compiler and the Expensive Planetarium (presentation), the central star (presentation, with two game-rule random draws), the game control between games (scores, the game count, halts, and the test word), and the sense switches. With them come the boundary's inputs: the control word, the sense switches, and the words the game reads from core at power-on.
+The spaceship calc routine, which covers gravity, thrust, the controls, torpedo launch, the jump into the compiled outline, hyperspace entry, and the halt on a full object table. Also the outline compiler and the Expensive Planetarium (presentation), the central star (presentation, with two game-rule random draws), and the sense switches, which come in with the spaceship and the heavens.
 
-`tools/runsc.py` compiles the arithmetic subroutines (`sqt`, `mpy`, `imp`, `dvd`, `idv`, `sin`, `cos`), the head of the tape (the tunables, with the machine's words around them) and the calc routines for explosions, torpedoes and hyperspace (`mex`, `tcr`, `hp1`, `hp3`, with the `random` and `diff` macros laid out at each use) from RUNS and their bindings (`pdp1/`) to the exact tape image. The objects port needed no addition to the language. The rest of the image still comes from spacewar-c's lifted C.
+`tools/runsc.py` compiles the arithmetic subroutines (`sqt`, `mpy`, `imp`, `dvd`, `idv`, `sin`, `cos`), the head of the tape (the tunables, with the machine's words around them), the calc routines for explosions, torpedoes and hyperspace (`mex`, `tcr`, `hp1`, `hp3`, with the `random` and `diff` macros laid out at each use) and the main loop with its game control (`ml0` to `jmp ml0`, `a1` to `mg4`) from RUNS and their bindings (`pdp1/`) to the exact tape image. The main loop needed two additions to the language: fields with no initial value, which come in, and `wait`. The rest of the image still comes from spacewar-c's lifted C: the outline compiler, the heavens, the spaceship, the outlines and the core layout.
