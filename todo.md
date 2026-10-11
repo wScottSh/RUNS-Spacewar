@@ -17,9 +17,9 @@
 - skip: architect/arena for the tool: its shape follows SIMH's history format and the existing frame driver; nothing to choose between
 - skip: a planted-defect test of the tool: every kind it reports except far jumps has a true positive in real play, and both self-checks compare against SIMH
 - [ ] Open: a field-level classifier for gameplay vs presentation (by consequence) once more of the game is ported
-- [ ] Open: port the spaceship (confirms or refutes that play never observes mot's reads past the outline array)
+- [x] Port the spaceship; play never observes mot's reads past the outline array (round 6)
 - [x] The boundary's inputs: console (test word, control boxes), power-on score and game count, start address (round 5)
-- [ ] Open: the sense switches, with the spaceship and the heavens
+- [x] The sense switches the spaceship reads (round 6); switch 4 waits for the heavens
 - [ ] Open: runs-spec is untouched; it still says what the user called directionally right, wrong in details
 
 ## Round 3 (autonomous): compile multiply, divide, sincos from RUNS
@@ -37,4 +37,12 @@
 - [x] Language: fields with no initial value come in (top Networks declare them); `wait`; several top Networks are one game
 - [x] check_game.py vs SIMH: 3000 seeded cases, 17 scripted matches (51000 stops), control word; 14 mutations caught
 - [x] pdp1/main_loop.toml + runsc rules (table, walk, cursors' homes, carry, stray, blocks, repeat, jumping guards, enum sign/zero tests, xor sharing, devices, flags, hlt+wait, clearing loop, dispatch); MATCH; gate 263/263
-- [ ] Open: confirm with the spaceship port that play never observes the carried outline word (mot) for torpedoes
+- [x] Confirmed with the spaceship port: play never observes the carried outline word (mot) for torpedoes (check_frame poison)
+
+## Round 6 (autonomous): compile the spaceship from RUNS
+- [x] RUNS: spaceship.runs (first/second_spaceship, spaceship, accelerate, after_outline, launch_torpedo), spaceship.runs-prim; records spaceship, pen, launch; console sense switches; handoff fields
+- [x] Language: enums may share a member name (resolved by type); evaluator fix: a field's name is not a Record mention
+- [x] check_spaceship vs SIMH: 3000 calls through the compiled outline (tools/outline.py stand-in); 17 mutations (14 caught, 1 after one-free-slot tables, 2 equivalent)
+- [x] check_frame with flying ships: 1500 frames; poison mode for the mot verdict, with its control
+- [x] pdp1/spaceship.toml + runsc rules (exit, back/pulse externs, carried homed jump, slot-field cursors and search, sense/flag guards, shared Network tail, pool-word dispatch); MATCH; gate 357/357
+- [ ] Open: the outline compiler and outlines (presentation); tools/outline.py stands in for them in the checks
