@@ -404,6 +404,7 @@ class Bindings:
         self.into: dict[str, str] = {}          # field -> the collection's field it holds a place in
         self.pieces: dict[str, list] = {}       # collection field -> (first slot, last slot, C name) laid out
         self.shared: dict[str, str] = {}        # field -> the field whose word it lives in
+        self.compiled: list[tuple] = []         # (Function, its statements as run) of every routine compiled
         self.insns = {f"{r}.{f}" for r, rec in prog.records.items() for f, (typ, _) in rec.fields.items()
                       if typ == "insn"}
         for path, spec in self.specs.items():
@@ -500,6 +501,14 @@ class Bindings:
                     + list(walk.get("other", {})) + ([walk["stray"]["after"]] if "stray" in walk else []):
                 if f:
                     self.check_field(path, f)
+            if "stray" in walk:
+                cursor = walk["stray"]["cursor"]
+                taken = set(self.cursors.values()) | set(walk.get("other", {}).values()) \
+                    | {c for m in self.slot_cursors.values() for c in m.values()} \
+                    | {self.table.get("clear")} | {self.c_name(f) for f in self.field_names()}
+                if cursor in taken:
+                    raise BindError(f"{path.name}: [walk] stray {cursor!r} is a name a field or a cursor has: "
+                                    f"a stray cursor is one no field has")
             for r in spec.get("table", {}).get("records", []):
                 if r not in self.prog.records:
                     raise BindError(f"{path.name}: table.records {r!r} is no Record")
@@ -534,6 +543,9 @@ class Bindings:
                 for key in ("args_done", "exit_after"):
                     if key in p and p[key] not in runs_here:
                         raise BindError(f"{path.name}: {b.name} {key}: {p[key]!r} is no routine it runs")
+
+    def field_names(self):
+        return (f"{r}.{f}" for r, rec in self.prog.records.items() for f in rec.fields)
 
     def locals_of(self, name: str, bound: set[str]) -> set[str]:
         """The locals of a bound routine's RUNS: its parameters, and every
@@ -856,6 +868,18 @@ class Unit:
                 if s[2][1] not in (table := self.tables.setdefault(f, [])):
                     table.append(s[2][1])
 
+    def shift_kind(self, f: str) -> str:
+        if f not in self.kinds:
+            raise BindError(f"{self.path.name}: {f} is held in a shift instruction, but no pair shift of this "
+                            f"unit takes it as its count")
+        return self.kinds[f]
+
+    def shift_table(self, f: str) -> list[int]:
+        if f not in self.tables:
+            raise BindError(f"{self.path.name}: {f} is a table of shifts, but no routine of this unit sets it "
+                            f"to a count")
+        return self.tables[f]
+
     def routine(self, b: Bound) -> list[str]:
         out = []
         r = self.prog.routines[b.name]
@@ -873,7 +897,65 @@ class Unit:
         else:
             fn = Function(self, b, {f: leaf(f) for f, _ in b.params()}, self.arguments(self.flat_routine(r)))
             out += [b.declaration(), "{", *fn.compile(), "}"]
+        self.binds.compiled.append((fn, self.arguments(self.as_run)))
+        if b.skips:
+            self.check_skips(b, self.as_run)
         return out
+
+    def check_skips(self, b: Bound, stmts: list):
+        """A skip return is a count the routine's sets of the field add to
+        (skip_return): the RUNS field's last value is the outcome only when
+        every path sets the field, and sets the skip member at most once,
+        last. A jump into another routine with the same skip return leaves
+        the rest to it."""
+        field, skip = b.skips
+        loops: list[list] = []
+
+        def go(stmts: list, states: frozenset | None) -> frozenset | None:
+            for s in stmts:
+                if states is None:
+                    return None
+                op, where = s[0], s[-1] if isinstance(s[-1], str) else ""
+                if op in ("let", "set") and s[1][0] != "tuple" and dotted_of(s[1]) == field:
+                    if "skip" in states:
+                        raise BindError(f"{where}: {field} is {b.name}'s skip return, set after it took {skip}")
+                    states = frozenset({"skip" if s[2][0] == "member" and s[2][2] == skip else "other"})
+                elif op == "if":
+                    outs = [go(body, states) for _, body in s[1]] + [go(s[2], states)]
+                    live = [x for x in outs if x is not None]
+                    states = frozenset().union(*live) if live else None
+                elif op in ("loop", "for", "slots"):
+                    top = states
+                    for _ in range(8):
+                        loops.append([])
+                        end = go(s[-2], top)
+                        exits = loops.pop()
+                        new = top | (end or frozenset()) | frozenset().union(frozenset(), *exits)
+                        if new == top:
+                            break
+                        top = new
+                    states = top
+                elif op in ("break", "continue"):
+                    if loops:
+                        loops[-1].append(states)
+                    return None
+                elif op == "shared":
+                    states = go(s[2], states)
+                elif op == "call" and self.binds.bound[s[1]].skips == b.skips:
+                    if "skip" in states:
+                        raise BindError(f"{where}: {field} took {skip}, then {s[1]} sets it again")
+                    return None
+                elif op == "return":
+                    exit_(states, where)
+                    return None
+            return states
+
+        def exit_(states: frozenset, where: str):
+            if "unset" in states:
+                raise BindError(f"{where}: {field} is {b.name}'s skip return: set it on every path")
+        end = go(stmts, frozenset({"unset"}))
+        if end is not None:
+            exit_(end, b.name)
 
     def flat(self, r: runs.Routine, names: dict | None = None) -> list:
         """A routine's statements in the order the PDP-1 runs them: a
@@ -922,6 +1004,7 @@ class Unit:
                 elif s[0] in ("loop", "slots"):
                     collect(s[-2])
         collect(stmts)
+        self.as_run = stmts                     # each branch with its own copy of a shared tail
         seen: dict[str, int] = {}
 
         def rebuild(items):
@@ -1091,6 +1174,9 @@ class Unit:
             if s[0] == "loop":
                 out.append(("loop", s[1], self.arguments(s[2]), s[3]))
                 continue
+            if s[0] == "shared":
+                out.append(("shared", s[1], self.arguments(s[2]), s[3]))
+                continue
             if s[0] != "call":
                 out.append(s)
                 continue
@@ -1176,7 +1262,7 @@ class Unit:
                 body.append(self.table_words())
             elif "shifts" in p:
                 f = p["shifts"]
-                entries = ", ".join(f"I_{self.kinds[f].upper()}({octal(n)})" for n in self.tables[f])
+                entries = ", ".join(f"I_{self.shift_kind(f).upper()}({octal(n)})" for n in self.shift_table(f))
                 body.append(f"shift {self.binds.c_name(f)}_shifts[{len(self.tables[f])}] = {{ {entries} }};")
             else:
                 body += self.machine(p, head)
@@ -1230,6 +1316,26 @@ class Unit:
         return "\n".join(head + inline + body) + "\n"
 
 
+STORAGE = re.compile(r"[A-Za-z_]\w*(\.(hi|lo))?")
+
+
+class Aliases(dict):
+    """Function.alias: a name's C storage, told to record as it is set."""
+
+    def __init__(self, record):
+        super().__init__()
+        self.record = record
+
+    def __setitem__(self, key, value):
+        self.record(key, value)
+        super().__setitem__(key, value)
+
+    def setdefault(self, key, value):
+        if key not in self:
+            self[key] = value
+        return self[key]
+
+
 class Function:
     """One C function's body from the RUNS statements it runs."""
 
@@ -1242,7 +1348,8 @@ class Function:
         self.out: list[str] = []
         self.tail: list[str] = []               # laid out after the body: see loop
         self.scopes: list[set[str]] = [set(own.values())]
-        self.alias: dict[str, str] = {}         # field or local -> C expression
+        self.storage: dict[str, set[str]] = {}  # a C name -> the RUNS names compiled to it (Occupancy)
+        self.alias: dict[str, str] = Aliases(self.stored_as)   # field or local -> C expression
         self.io_names = {leaf(f) if "." in f else f for f in bound.io | self.binds.io_fields}
         self.rest: list[list] = []              # what runs after the statement being compiled
         self.loops: list[tuple[str, str] | None] = []   # (break, continue) labels; None: a C loop
@@ -1276,6 +1383,11 @@ class Function:
 
     # ---- names
 
+    def stored_as(self, name: str, text: str):
+        """name, a field or a local of the RUNS, is compiled to the C text."""
+        if STORAGE.fullmatch(text):
+            self.storage.setdefault(text, set()).add(name)
+
     def label(self, what: str) -> str:
         self.labels += 1
         return f"{what}{self.labels}"
@@ -1297,6 +1409,11 @@ class Function:
         return dotted in self.b.result and not self.binds.stored(dotted) and dotted not in self.binds.io_fields
 
     def place(self, dotted: str) -> str:
+        text = self.where_is(dotted)
+        self.stored_as(dotted, text)
+        return text
+
+    def where_is(self, dotted: str) -> str:
         if dotted in self.binds.devices:
             return f"{self.binds.devices[dotted]['read']}()"
         if dotted in self.binds.addresses:
@@ -1466,7 +1583,9 @@ class Function:
         if op == "name":
             if e[1] in self.unit.prog.instructions and not self.declared(e[1]) and e[1] not in self.alias:
                 return INSTRUCTIONS[e[1]], 99
-            return self.alias.get(e[1], e[1]), 99
+            text = self.alias.get(e[1], e[1])
+            self.stored_as(e[1], text)
+            return text, 99
         if op == "field":
             if (d := dotted_of(e)) is None:
                 raise BindError(f"cannot compile {e!r}")
@@ -1607,6 +1726,8 @@ class Function:
         self.out.append("    " * depth + text)
 
     def compile(self) -> list[str]:
+        for f, text in self.own.items():
+            self.stored_as(f, text)
         if self.b.exit_after:
             self.stmts = self.guards(self.stmts)
         if any(b.pulse and b.back == self.b.name for b in self.binds.bound.values()):
@@ -1649,6 +1770,10 @@ class Function:
                 if self.pending is before:
                     self.pending = None
             self.spill(stmts[k:k + done], stmts[k + done:], depth)
+            for x in stmts[k:k + done]:
+                if x[0] in ("let", "set"):
+                    for name in (t[1] for t in (x[1][1] if x[1][0] == "tuple" else [x[1]]) if t[0] == "name"):
+                        self.stored_as(name, self.alias.get(name, name))
             for x in stmts[k:k + done]:
                 if id(x) in self.duff:
                     home, local = self.duff[id(x)]
@@ -2656,9 +2781,9 @@ class Function:
         if self.binds.homes[dotted] == "built":
             if e[0] != "call" or e[1] != "popcount":
                 raise BindError(f"{self.b.name}: {dotted} is built from a mask: set it to popcount(w & m)")
-            self.emit(depth, f"{name} = I_{self.unit.kinds[dotted].upper()}_BITS({self.expr(e[2][0])});")
+            self.emit(depth, f"{name} = I_{self.unit.shift_kind(dotted).upper()}_BITS({self.expr(e[2][0])});")
             return 1
-        table, v, known = self.unit.tables[dotted], e[1], self.known.get(dotted)
+        table, v, known = self.unit.shift_table(dotted), e[1], self.known.get(dotted)
         if known is not None and table.index(known) + 1 < len(table) and table[table.index(known) + 1] == v:
             self.emit(depth, f"++{name};")
         elif v == table[0]:
@@ -2961,6 +3086,418 @@ class Function:
         self.emit(depth, f"{after}:")
 
 
+class Taint(Exception):
+    """A choice, or something the routine cannot follow bit by bit, depends
+    on the value."""
+
+
+def ignores(routine: runs.Routine, name: str, where: str) -> bool:
+    """Whether a Processor's effects depend on no bit of the value its
+    statement at `where` reads as `name`. Each word is followed bit by bit:
+    a shift, a rotate or a mask moves or drops bits, the pair shifts as the
+    machine does them; add, subtract and the rest mix every bit. True when
+    no bit of that value reaches a field the Processor writes, a point it
+    plots, a value it returns or a guard it tests."""
+    clean, dirty = [False] * 18, [True] * 18
+
+    def any_of(*vs) -> list[bool]:
+        return [any(b for v in vs for b in v)] * 18
+
+    def shifted(v: list, op: str, n: int) -> list:
+        for _ in range(n):
+            if op == ">>":
+                v = v[1:] + [v[17]]
+            elif op == "<<":
+                v = [v[17]] + v[:16] + [v[17]]
+            elif op == "ral":
+                v = [v[17]] + v[:17]
+            elif op == "rar":
+                v = v[1:] + [v[0]]
+        return v
+
+    def paired(op: str, h: list, lo: list, n: int) -> tuple[list, list]:
+        for _ in range(n):
+            if op == "rcl":
+                h, lo = [lo[17]] + h[:17], [h[17]] + lo[:17]
+            elif op == "rcr":
+                h, lo = h[1:] + [lo[0]], lo[1:] + [h[0]]
+            elif op == "scl":
+                h, lo = [lo[17]] + h[:16] + [h[17]], [h[17]] + lo[:17]
+            elif op == "scr":
+                h, lo = h[1:] + [h[17]], lo[1:] + [h[0]]
+        return h, lo
+
+    def number(e) -> int | None:
+        return e[1] if e[0] == "num" else None
+
+    def value(e, env: dict):
+        op = e[0]
+        if op in ("num", "member", "bool"):
+            return clean
+        if op == "name":
+            return dirty if e[1] == name and env["@"] == where else env.get(e[1], clean)
+        if op == "field":
+            d = dotted_of(e)
+            return dirty if d == name and env["@"] == where else env.get(d, clean)
+        if op == "index":
+            if any(value(e[2], env)):
+                raise Taint()
+            return value(e[1], env)
+        if op == "neg":
+            return value(e[1], env)
+        if op == "call" and e[1] in ("ral", "rar") and number(e[2][1]) is not None:
+            return shifted(value(e[2][0], env), e[1], number(e[2][1]))
+        if op == "call" and e[1] in PAIR_OPS and len(e[2]) == 3 and e[1] not in ("mus", "dis") \
+                and number(e[2][2]) is not None:
+            return paired(e[1], value(e[2][0], env), value(e[2][1], env), number(e[2][2]))
+        if op == "call":
+            v = any_of(*(value(a, env) for a in e[2]))
+            return (v, v) if e[1] in PAIR_OPS else v
+        if op == "tuple":
+            return tuple(value(x, env) for x in e[1])
+        if op == "bin":
+            _, o, a, b = e
+            if o in ("<<", ">>") and number(b) is not None:
+                return shifted(value(a, env), o, number(b))
+            if o in ("&", "|") and (number(b) is not None or number(a) is not None):
+                mask, v = (number(b), value(a, env)) if number(b) is not None else (number(a), value(b, env))
+                bits = runs.word_of(mask).v
+                keep = (lambda i: bits >> i & 1) if o == "&" else (lambda i: not bits >> i & 1)
+                return [v[i] and bool(keep(i)) for i in range(18)]
+            if o == "^":
+                return [x or y for x, y in zip(value(a, env), value(b, env))]
+            return any_of(value(a, env), value(b, env))
+        raise Taint()
+
+    def assign(target, v, env: dict):
+        if target[0] == "tuple":
+            for t, x in zip(target[1], v):
+                assign(t, x, env)
+        elif target[0] == "name":
+            env[target[1]] = v
+        elif target[0] == "index":
+            if any(value(target[2], env)) or any(v):
+                raise Taint()
+        else:
+            env[dotted_of(target)] = v          # its last value is the Processor's effect
+
+    def joined(*envs: dict) -> dict:
+        """Either path's words: a bit is dirty when it is on either."""
+        out = {"@": None}
+        for k in set().union(*envs) - {"@"}:
+            vs = [e.get(k, clean) for e in envs]
+            out[k] = [any(bits) for bits in zip(*vs)]
+        return out
+
+    def block(stmts: list, env: dict) -> dict:
+        for s in stmts:
+            op = s[0]
+            env = {**env, "@": s[-1]}
+            if op in ("let", "set"):
+                assign(s[1], value(s[2], env), env)
+            elif op == "if":
+                outs = []
+                for c, body in s[1]:
+                    if any(value(c, env)):
+                        raise Taint()
+                    outs.append(block(body, dict(env)))
+                outs.append(block(s[2], dict(env)))
+                env = joined(*outs)
+            elif op in ("loop", "for"):
+                for _ in range(64):             # the words after any number of passes: until it settles
+                    exits.append([])
+                    end = block(s[-2], dict(env))
+                    after = joined(env, end, *exits.pop())
+                    if after == {**env, "@": None}:
+                        break
+                    env = after
+                else:
+                    raise Taint()
+            elif op == "emit":
+                if any(any(value(a, env)) for a in s[2]):
+                    raise Taint()
+            elif op == "return":
+                if s[1] is not None and any(value(s[1], env)) or effects(env):
+                    raise Taint()
+            elif op in ("break", "continue"):
+                exits[-1].append(dict(env))
+            else:
+                raise Taint()
+        return env
+
+    def effects(env: dict) -> bool:
+        return any(any(v) for k, v in env.items() if "." in k)
+    exits: list[list] = []
+    try:
+        env = block(routine.body, {"@": None})
+    except Taint:
+        return False
+    return not effects(env)
+
+
+class UnionFind:
+    def __init__(self):
+        self.parent: dict[str, str] = {}
+
+    def find(self, x: str) -> str:
+        while self.parent.setdefault(x, x) != x:
+            x = self.parent[x]
+        return x
+
+    def union(self, names):
+        names = list(names)
+        for x in names[1:]:
+            self.parent[self.find(x)] = self.find(names[0])
+
+    def groups(self) -> dict[str, set[str]]:
+        """root -> its names, for groups of two or more."""
+        out: dict[str, set[str]] = {}
+        for x in self.parent:
+            out.setdefault(self.find(x), set()).add(x)
+        return {root: names for root, names in out.items() if len(names) > 1}
+
+
+class SharedWords:
+    """Which RUNS names a shared word holds, through every bound routine.
+    Names share a word when the binding puts them there (an entry word and
+    its cells, a [share]) or when runsc compiles them to one C name (a local
+    kept in the register a field arrived in, the halves of a pair, a call's
+    result). A word holds the value of the last name written to it, and of
+    the names copied from that one since. A read of any other name is a
+    BindError: the RUNS text would read a value the machine no longer has.
+
+    The binding's words carry from a routine into the routines it runs: a
+    routine starts with what every run of it leaves there. A top Network,
+    which the host fires, starts with nothing known, so a [share] field is
+    set before it is read in every firing."""
+
+    def __init__(self, binds: "Bindings", compiled: list[tuple["Function", list]]):
+        self.binds = binds
+        self.prog = binds.prog
+        self.compiled = compiled
+        self.words = UnionFind()
+        for b in binds.bound.values():
+            if b.entry and b.cells:
+                self.words.union([b.entry, *b.cells])
+        for f, other in binds.shared.items():
+            self.words.union([f, other])
+        self.shared = self.words.groups()       # root -> the fields that share its word
+        self.processor_at = {s[-1]: r for r in self.prog.routines.values() if r.kind == "processor"
+                             for s in walk(r.body)}
+
+    def check(self):
+        fired = set().union(set(), *(runs.runs_of(r.body) for r in self.prog.routines.values()))
+        entry: dict[str, dict] = {}
+        todo = []
+        for fn, _ in self.compiled:
+            if fn.b.name not in fired and fn.b.name not in entry:
+                entry[fn.b.name] = {}
+                todo.append(fn.b.name)
+        for _ in range(10000):
+            if not todo:
+                break
+            name = todo.pop()
+            for fn, stmts in self.compiled:
+                if fn.b.name != name:
+                    continue
+                for callee, state in Occupancy(self, fn, entry[name]).run(stmts):
+                    old = entry.get(callee)
+                    new = state if old is None else {g: old.get(g, frozenset()) & state.get(g, frozenset())
+                                                      for g in self.shared}
+                    if new != old:
+                        entry[callee] = new
+                        todo.append(callee)
+        for fn, stmts in self.compiled:
+            if fn.b.name not in entry:          # entered only from outside the RUNS (none today)
+                Occupancy(self, fn, {}).run(stmts)
+
+
+class Occupancy:
+    """SharedWords through one bound routine's statements, as the RUNS runs
+    them (each branch with its own copy of a shared tail)."""
+
+    def __init__(self, words: SharedWords, fn: Function, entry: dict):
+        self.words = words
+        self.fn = fn
+        self.prog = fn.unit.prog
+        self.names = UnionFind()
+        for names in words.shared.values():
+            self.names.union(sorted(names))
+        for names in fn.storage.values():
+            self.names.union(sorted(names))
+        self.members = self.names.groups()
+        self.group = {x: root for root, names in self.members.items() for x in names}
+        self.entry = entry
+        self.calls: list[tuple[str, dict]] = []    # (routine run, the binding's words as it starts)
+        self.loops: list[tuple[list, list]] = []   # (states at its breaks, states at its continues)
+        self.labels: dict[str, list] = {}
+        self.seen_labels: set[str] = set()
+
+    def run(self, stmts: list) -> list[tuple[str, dict]]:
+        b = self.fn.b
+        state: dict[str, frozenset] = {}
+        for root, holders in self.entry.items():
+            g = self.group[next(iter(self.words.shared[root]))]
+            state[g] = state.get(g, frozenset()) | holders
+        for f in [b.entry, b.ac_param, b.io_param, b.byname, b.inline, *self.fn.own]:
+            if f in self.group:
+                state[self.group[f]] = state.get(self.group[f], frozenset()) | {f}
+        self.block(stmts, state)
+        return self.calls
+
+    def export(self, state: dict) -> dict:
+        """The binding's shared words, as a routine run here starts."""
+        return {root: state.get(self.group[next(iter(names))], frozenset()) & names
+                for root, names in self.words.shared.items()}
+
+    def kill(self, state: dict, routines) -> dict:
+        """What the routines may write no longer holds what it held."""
+        written = set().union(set(), *(self.prog.routines[p].writes for r in routines if r in self.prog.routines
+                                       for p in runs.fires(self.prog, r, set())
+                                       if self.prog.routines[p].kind == "processor"))
+        return {g: names for g, names in state.items()
+                if not any(x.split(".")[0] in written for x in self.members[g] if "." in x)}
+
+    def read(self, name: str, state: dict, where: str):
+        g = self.group.get(name)
+        processor = self.words.processor_at.get(where)
+        if g is not None and name not in state.get(g, frozenset()) \
+                and not (processor and ignores(processor, name, where)):
+            holds = sorted(state.get(g, frozenset())) or "no name set before it on every path"
+            raise BindError(f"{where}: {name} is read where its word, which the binding shares with "
+                            f"{sorted(self.members[g] - {name})}, holds {holds}")
+
+    def reads(self, e, state: dict, where: str):
+        if not isinstance(e, tuple) or not e:
+            return
+        op = e[0]
+        if op == "name":
+            self.read(e[1], state, where)
+        elif op == "field":
+            if (d := dotted_of(e)) is not None:
+                self.read(d, state, where)
+        elif op == "index":
+            self.reads(e[2], state, where)
+        elif op == "call" and runs.instruction_call(e[1], e[2]):
+            if e[2] and e[2][0][0] == "index":
+                self.reads(e[2][0][2], state, where)
+        elif op in ("call", "tuple"):
+            for x in (e[2] if op == "call" else e[1]):
+                self.reads(x, state, where)
+        elif op in ("bin", "neg", "not"):
+            for x in e[1:]:
+                self.reads(x, state, where)
+
+    def write(self, target, state: dict, copied=None):
+        name = target[1] if target[0] == "name" else dotted_of(target)
+        g = self.group.get(name)
+        if g is None:
+            return
+        if copied is not None and self.group.get(copied) == g and copied in state.get(g, frozenset()):
+            state[g] = state[g] | {name}            # the same value, kept where it was
+        else:
+            state[g] = frozenset({name})
+
+    @staticmethod
+    def join(states: list) -> dict | None:
+        live = [s for s in states if s is not None]
+        if not live:
+            return None
+        keys = set().union(*live)
+        return {g: frozenset.intersection(*(s.get(g, frozenset()) for s in live)) for g in keys}
+
+    def block(self, stmts: list, state: dict | None) -> dict | None:
+        for s in stmts:
+            if state is None and s[0] != "label":
+                continue                            # reached only by a label
+            state = self.stmt(s, state)
+        return state
+
+    def loop_body(self, body: list, state: dict) -> list:
+        """The states at a loop's exits, its top joined over every pass."""
+        top = dict(state)
+        for _ in range(20):
+            self.loops.append(([], []))
+            end = self.block(body, dict(top))
+            breaks, continues = self.loops.pop()
+            new = self.join([state, end, *continues])
+            if new == top:
+                return breaks + [end]
+            top = new
+        raise BindError(f"{self.fn.b.name}: the shared words' contents do not settle in a loop")
+
+    def stmt(self, s, state: dict | None) -> dict | None:
+        op, where = s[0], (s[-1] if isinstance(s[-1], str) else "")
+        if op == "label":
+            self.seen_labels.add(s[1])
+            return self.join([state, *self.labels.pop(s[1], [])])
+        if op == "goto":
+            if s[1] in self.seen_labels:
+                raise BindError(f"{where}: a jump back to {s[1]}: runsc follows shared words forward only")
+            self.labels.setdefault(s[1], []).append(dict(state))
+            return None
+        state = dict(state)
+        if op in ("let", "set"):
+            self.reads(s[2], state, where)
+            targets = s[1][1] if s[1][0] == "tuple" else [s[1]]
+            for t in targets:
+                if t[0] == "index":
+                    self.reads(t[2], state, where)
+            if s[1][0] == "tuple":
+                for t in targets:
+                    if t[0] != "index":
+                        self.write(t, state)
+            elif s[1][0] != "index":
+                source = s[2][1] if s[2][0] == "name" else dotted_of(s[2]) if s[2][0] == "field" else None
+                self.write(s[1], state, copied=source)
+            return state
+        if op == "if":
+            outs = []
+            for c, body in s[1]:
+                self.reads(c, state, where)
+                outs.append(self.block(body, dict(state)))
+            outs.append(self.block(s[2], dict(state)))
+            return self.join(outs)
+        if op == "loop":
+            return self.join(self.loop_body(s[2], state)[:-1])     # a loop leaves by its breaks
+        if op in ("for", "slots"):
+            self.reads(s[2], state, where)
+            self.reads(s[3], state, where)
+            return self.join(self.loop_body(s[4], state) + [state])
+        if op in ("break", "continue"):
+            if self.loops:
+                self.loops[-1][0 if op == "break" else 1].append(state)
+            return None
+        if op in ("return", "stop", "unreachable"):
+            if op == "return" and s[1] is not None:
+                self.reads(s[1], state, where)
+            return None
+        if op == "emit":
+            for a in s[2]:
+                self.reads(a, state, where)
+            return state
+        if op == "call":
+            callee = self.fn.binds.bound[s[1]]
+            for e in s[2].values():
+                self.reads(e, state, where)
+            self.calls.append((s[1], self.export(state)))
+            state = self.kill(state, [s[1]])
+            if callee.code and callee.back:
+                self.calls.append((callee.back, self.export(state)))
+            for f in callee.result:
+                self.write(as_field(f), state)
+            return state
+        if op == "dispatch":
+            self.reads(s[1], state, where)
+            self.calls += [(t, self.export(state)) for t in s[3]]
+            return self.kill(state, s[3])
+        if op == "shared":
+            return self.block(s[2], state)
+        if op in ("cursors", "clear", "args_done", "exit_next", "data_here", "wait"):
+            return state
+        raise BindError(f"{where}: runsc cannot follow shared words through {op}")
+
+
 def write_tree(prog: runs.Program, out: Path) -> Path:
     """spacewar-c's lift.toml under out, each unit compiled from RUNS: out's
     lift/ holds the generated C and nothing else. Returns the toml."""
@@ -2981,6 +3518,7 @@ def write_tree(prog: runs.Program, out: Path) -> Path:
         units.append(f'[[unit]]\nc = "{u["c"]}"\nprefix = "{u["prefix"]}"\n')
     if bound:
         raise BindError(f"bindings replace no lift unit: {sorted(bound)}")
+    SharedWords(binds, binds.compiled).check()
     toml = out / "lift.toml"
     head = "".join(f'{k} = "{SPACEWAR_C / v if k in ("macro1", "macro1_src", "oracle_listing") else v}"\n'
                    for k, v in lift.items() if k != "unit")
