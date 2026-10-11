@@ -18,6 +18,7 @@ A `[[place]]` with `fields` lays out those Record fields as data words, with the
 
 - `convention`: `JDA`, `JSP`, `XCT`, as spacewar-c's dialect spells it (`tools/pdp1cc/include/pdp1.h`).
 - `entry`: the field that is the JDA entry word, where the call leaves AC.
+- `ac_param`: the field that arrives in AC, for a routine with no entry word (`XCT`).
 - `byname`: the field that is the word after the call, executed each time it is read.
 - `result`: the fields that hold the result when the routine returns: AC, then IO.
 - `io_param`: the field that arrives in IO.
@@ -30,11 +31,17 @@ A `[[place]]` with `fields` lays out those Record fields as data words, with the
 
 A Network bound as one routine runs its Processors inline. A `run` of another bound routine is a call: the sets of that routine's parameter fields just before the run are its arguments, and its result fields are read from the returned AC:IO pair.
 
+A `[[place]]` may instead lay out words that the PDP-1 and its operator need and that no game rule reads. `runsc` knows each kind as the PDP-1 back end, the way it knows `jda`:
+
+- `machine = "sequence break"`: words 0-2, where a sequence break saves AC, PC and IO (not punched), and word 3, a jump to the flush. `machine = "sequence break flush"`: the flush, which resumes the interrupted program. Play never raises a sequence break (spacewar-c's README: the frame check never runs these words).
+- `jump`: a start address, a jump to the named routine. `start = true` makes it the tape's own start.
+- `jsp_slot`: a JSP routine the operator may rewrite in place, laid out `at` an address. By default it jumps to `jump` and returns what that returns (`returns`: `ac` or `io`); `reserve` words of room follow it.
+
 A field with no data word of its own (an entry word, a register) has no value on the tape, so its RUNS initial value must be 0; `runsc` refuses any other.
 
 ## Names the lifted C still uses
 
-Lifted units call the ported routines by their C names. `runsc` names each C function after its RUNS routine, and the lifted names are the same: `square_root`, `multiply`, `integer_multiply`, `integer_divide`, `sine` and `cosine` (`lift/spaceship.c`). No binding renames one. These names stop mattering when the last lifted unit that calls them is ported.
+Lifted units call the ported routines by their C names. `runsc` names each C function after its RUNS routine, and the lifted names are the same: `square_root`, `multiply`, `integer_multiply`, `integer_divide`, `sine`, `cosine` and the twelve XCT tunables (`lift/spaceship.c`, `lift/main_loop.c`). A field's C name is `record_field`, unless the binding's `[names]` table gives the one the lifted units use (`tunables.collision_radius` is `collision_radius`). The routines a `jump` or `jsp_slot` names are the lifted main loop's. These names stop mattering when the last lifted unit that uses them is ported.
 
 ## What a binding may not say
 

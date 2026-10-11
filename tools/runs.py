@@ -819,8 +819,9 @@ def check_contracts(prog: Program) -> None:
     fires, is a whole game: it always has a contract, its boundary with
     presentation. Every Record a Network's Processors touch is its own,
     unless a Processor it does not fire touches it too, or it is a stream:
-    those cross its boundary and must be declared. Each declared Record must
-    be touched inside."""
+    those cross its boundary and must be declared. A Processor that nothing
+    fires (a tunable whose caller is not ported yet) shares nothing at run
+    time. Each declared Record must be touched inside."""
     records = set(prog.records)
     fired = set().union(*(runs_of(r.body) - {r.name} for r in prog.routines.values()))
     for n in prog.routines.values():
@@ -832,7 +833,8 @@ def check_contracts(prog: Program) -> None:
         written = set().union(*(p.writes for p in procs))
         guarded = set().union(*(mentions(prog.routines[r].body, records) for r in inside
                                 if prog.routines[r].kind == "network"))
-        outside = [r for name, r in prog.routines.items() if name not in inside and r.kind == "processor"]
+        outside = [r for name, r in prog.routines.items()
+                   if name not in inside and name in fired and r.kind == "processor"]
         shared = set().union(*(p.reads | p.writes for p in outside))
         for rec in sorted(written & (shared | {r for r in records if prog.records[r].stream})):
             if rec not in n.writes:

@@ -61,7 +61,7 @@ def sites(prog: runs.Program):
             for proc in dict.fromkeys(compiled(prog, name, bound)):
                 for path, n in numbers(prog.routines[proc].body):
                     yield f"{proc} {path} {n:o}", ("routine", proc, path, n)
-            fields += [place.get(k) for k in ("entry", "io_param", "byname")]
+            fields += [place.get(k) for k in ("entry", "ac_param", "io_param", "byname")]
             fields += place.get("result", []) + place.get("cells", [])
         fields += place.get("fields", [])
     for dotted in dict.fromkeys(f for f in fields if f):

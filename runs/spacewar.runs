@@ -54,11 +54,16 @@ record frame
   objects_seen: word = 0    # moc: counted, never read. The tape does not load it, so on the
                             # PDP-1 it counts up from core's power-on contents (reach_oracle).
 
-# The tunables at the head of the tape (words 3-116). The ones the original
-# keeps as instructions to execute are Processors in tunables.runs-prim.
+# The "interesting and often changed constants" at the head of the tape.
+# The ones the original keeps as instructions to execute are Processors in
+# tunables.runs-prim; these are the ones it keeps as numbers.
 record tunables
+  fuel_supply: word = -020000               # foo
+  angular_acceleration: word = 010          # maa: spaceship angular acceleration
+  star_capture_radius: word = 1             # str
   collision_radius: word = 06000            # me1
   collision_radius_half: word = 03000       # me2
+  separate_outlines: word = -0              # ddd: -0 compiles an outline for each ship; 0 shares one
   hyperspatial_uncertainty: word = 040000   # hur
 
 # What the scope shows: each point in the order it is plotted. It leaves the
@@ -135,6 +140,14 @@ record handoff
   acceleration: word = 0    # AC into diff: from `the`, or 0 (cla)
   jump_high: word = 0       # AC: hyperspace's random draw into and out of hr1, hr2;
   jump_low: word = 0        # IO:   one 36-bit value, scaled as one
+  torpedo_direction: word = 0   # AC into tvl: the sine or cosine of the ship's heading
+  torpedo_velocity: word = 0    # AC out of tvl
+  thrust_direction: word = 0    # AC into sac: the sine or cosine of the heading, sar 9s
+  thrust: word = 0              # AC out of sac
+  torpedo_supply: word = 0  # AC out of tno
+  reload_time: word = 0     # AC out of rlt
   torpedo_life: word = 0    # AC out of tlf
+  hyperspace_shots: word = 0    # AC out of mhs
+  hyperspace_time: word = 0     # AC out of hd1
   breakout_time: word = 0   # AC out of hd2
   recharge_time: word = 0   # AC out of hd3

@@ -24,7 +24,7 @@ The topology is a Petri net. Records are the places and Processors are the trans
 
 A Network can state a contract the way a Processor does, with `reads:` and `writes:`. The Records it declares cross its boundary. Every other Record its Processors touch is its own. A top Network, one that nothing fires, is a whole game, and it must state its contract: that contract is the game's boundary with presentation.
 
-The evaluator in `tools/runs.py` enforces these rules before anything runs. A call of anything but a word operator is an error. A Processor that fires a routine is an error. A Network with `let`, `set`, `emit` or `return` is an error, and so is a Network loop without a guarded exit. A top Network, or a Network that states a contract, must declare each stream its Processors write and each Record they share with Processors outside it. While the game runs, a Processor that reads or writes a Record it did not declare is an error.
+The evaluator in `tools/runs.py` enforces these rules before anything runs. A call of anything but a word operator is an error. A Processor that fires a routine is an error. A Network with `let`, `set`, `emit` or `return` is an error, and so is a Network loop without a guarded exit. A top Network, or a Network that states a contract, must declare each stream its Processors write and each Record they share with Processors outside it. A Processor that nothing fires shares nothing at run time, so it does not count: the tunables the spaceship executes wait in the text for the spaceship. While the game runs, a Processor that reads or writes a Record it did not declare is an error.
 
 ## Gameplay and presentation
 
@@ -80,6 +80,14 @@ Which Records need a layout stated, and where play runs into the machine, is a f
 | The word's machine behavior | 730 sites | All of it is the `word` type's semantics, which RUNS already states. Positions wrap around the screen in the inertia (`diff`, lines 1000-1003, 1178-1186), hyperspace jumps (1022-1025) and the explosion's dots (973-975), and the collision test's distance wraps (`mx2, sub .`, line 871, 23,520 times): the screen is a torus because the word wraps. The random generator wraps by design. Shifts of negative numbers round toward zero, and some tests see minus zero. A compiler for another machine must give the `word` these semantics. |
 
 So far no layout read that play observes has turned up. The power-on words are the one place Spacewar's play reaches the machine outside the `word` type.
+
+The head of the tape also holds words that belong to the machine and its operator, not to the game. Each was weighed by what play can observe:
+
+- **The sequence break words (0-3) and the flush (`sbf`).** Play never raises a sequence break, and spacewar-c's frame check runs none of these words. They are layout.
+- **The start vectors at 4 and 5, and the control word routine slot at 040.** Starting at 4 or 5 chooses whether the control word comes from the control boxes or the test word switches, and the slot is where an operator builds a private control word routine. Each decides only which device the control word comes from. The control word itself comes in at the boundary, so these are presentation, and layout.
+- **The tunables' fixed low addresses.** They sit there so an operator can change them from the console between games. In RUNS that change is an edit to a Processor or a field, a house rule, so the addresses are layout. The values are rules: the instructions are Processors in `tunables.runs-prim`, the numbers are fields of the `tunables` Record.
+
+The PDP-1 binding lays all of them out (`pdp1/tunables.toml`), and `runsc` emits the machine's words as the PDP-1 back end, the way it emits `jda`.
 
 ## How the original's routines map
 
@@ -173,6 +181,7 @@ Each check runs the RUNS source in the evaluator and SIMH running the oracle ima
 - `multiply` and the Network `integer_multiply`: 101,453 calls each, all match on AC, IO, `mpy`, `mp2` and `imp` (`tools/check_multiply.py`, against SIMH: every pair of 38 edge values, RUNS-Spacewar's nine observed pairs, and 100,000 seeded pairs).
 - `divide` and the Network `integer_divide`: 107,224 and 107,227 calls, all match on AC, IO, `dvd`, `idv` and the skip (`tools/check_divide.py`, against SIMH: every pair of 38 edge values with five low halves, RUNS-Spacewar's observed inputs, and 100,000 seeded triples; 53,875 and 382 of them overflow).
 - The Networks `sine` and `cosine`: every one of the 2^18 input words each, all match on AC, `sin`, `cos`, `mpy` and `mp2` (`tools/check_sincos.py`, against SIMH and against RUNS-Spacewar's observed vectors). Two passes of the reduction loop reduce every word, so its bound is 2. No input word reaches the series' saturation at +-1 (`lac (377777`): the overshoot test never passes. The port keeps the branch; only the compiled-image gate checks it.
+- The twelve tunables the original executes with `xct`, as Processors over `handoff`: each against SIMH executing its word, the scalers of AC over every word, the constants over 1,000 AC:IO pairs, `hr1` and `hr2` over 101,444 pairs (`tools/check_tunables.py`). The eight tunables kept as numbers, and `random.number`'s initial 0, are the oracle image's words.
 - The Networks `explosion`, `torpedo`, `in_hyperspace`, `breakout`: 3,000 calls each, all match, 6.1 million points (`tools/check_calc_routines.py`).
 - The frame Network from `ml0` to `mq3`, covering the restart countdown, the object loop, collisions, and every ported calc routine: 1,500 frames, all match, with 4,343 collisions that hit (`tools/check_frame.py`).
 - The checks fail when the source is wrong. Each mutation through `tools/mutate.sh` was caught: skipping adjacent collision tests, testing objects that do not collide, skipping slot 0, an off-by-one in the time charge, a wrong torpedo explosion counter, and dropping the second `random` from the explosion's dot loop.
@@ -183,4 +192,4 @@ Each check runs the RUNS source in the evaluator and SIMH running the oracle ima
 
 The spaceship calc routine, which covers gravity, thrust, the controls, torpedo launch, the jump into the compiled outline, hyperspace entry, and the halt on a full object table. Also the outline compiler and the Expensive Planetarium (presentation), the central star (presentation, with two game-rule random draws), the game control between games (scores, the game count, halts, and the test word), and the sense switches. With them come the boundary's inputs: the control word, the sense switches, and the words the game reads from core at power-on.
 
-`tools/runsc.py` compiles the arithmetic subroutines (`sqt`, `mpy`, `imp`, `dvd`, `idv`, `sin`, `cos`) from RUNS and their bindings (`pdp1/`) to the exact tape image. The rest of the image still comes from spacewar-c's lifted C.
+`tools/runsc.py` compiles the arithmetic subroutines (`sqt`, `mpy`, `imp`, `dvd`, `idv`, `sin`, `cos`) and the head of the tape (the tunables, with the machine's words around them) from RUNS and their bindings (`pdp1/`) to the exact tape image. The rest of the image still comes from spacewar-c's lifted C.

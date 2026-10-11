@@ -1,0 +1,116 @@
+# The start of the tape: the sequence break words and the start vectors,
+# the "interesting and often changed constants", the control word routine
+# slot and the sequence break flush. The constants sit low in core so an
+# operator could change them from the console between games; that the
+# addresses are fixed is the PDP-1's operator interface, not a game rule.
+# The ones the original executes with xct are XCT routines.
+replaces = "lift/tunables.c"
+
+[names]
+"tunables.fuel_supply" = "fuel_supply"
+"tunables.angular_acceleration" = "angular_acceleration"
+"tunables.star_capture_radius" = "star_capture_radius"
+"tunables.collision_radius" = "collision_radius"
+"tunables.collision_radius_half" = "collision_radius_half"
+"tunables.separate_outlines" = "separate_outlines"
+"tunables.hyperspatial_uncertainty" = "hyperspatial_uncertainty"
+
+[[place]]
+machine = "sequence break"
+
+[[place]]
+jump = "start_with_control_boxes"
+start = true
+
+[[place]]
+jump = "start_with_test_word"
+
+[[place]]
+routine = "torpedo_supply"
+convention = "XCT"
+result = ["handoff.torpedo_supply"]
+
+[[place]]
+routine = "torpedo_velocity"
+convention = "XCT"
+ac_param = "handoff.torpedo_direction"
+result = ["handoff.torpedo_velocity"]
+
+[[place]]
+routine = "torpedo_reload_time"
+convention = "XCT"
+result = ["handoff.reload_time"]
+
+[[place]]
+routine = "torpedo_life"
+convention = "XCT"
+result = ["handoff.torpedo_life"]
+
+[[place]]
+fields = ["tunables.fuel_supply", "tunables.angular_acceleration"]
+
+[[place]]
+routine = "spaceship_acceleration"
+convention = "XCT"
+ac_param = "handoff.thrust_direction"
+result = ["handoff.thrust"]
+
+[[place]]
+fields = ["tunables.star_capture_radius", "tunables.collision_radius", "tunables.collision_radius_half",
+          "tunables.separate_outlines"]
+
+[[place]]
+routine = "torpedo_space_warpage"
+convention = "XCT"
+ac_param = "handoff.coordinate"
+result = ["handoff.acceleration"]
+
+[[place]]
+routine = "hyperspace_shots"
+convention = "XCT"
+result = ["handoff.hyperspace_shots"]
+
+[[place]]
+routine = "time_before_breakout"
+convention = "XCT"
+result = ["handoff.hyperspace_time"]
+
+[[place]]
+routine = "breakout_time"
+convention = "XCT"
+result = ["handoff.breakout_time"]
+
+[[place]]
+routine = "hyperfield_recharge_time"
+convention = "XCT"
+result = ["handoff.recharge_time"]
+
+[[place]]
+routine = "hyperspatial_displacement"
+convention = "XCT"
+ac_param = "handoff.jump_high"
+io_param = "handoff.jump_low"
+result = ["handoff.jump_high", "handoff.jump_low"]
+
+[[place]]
+routine = "hyperspatial_velocity"
+convention = "XCT"
+ac_param = "handoff.jump_high"
+io_param = "handoff.jump_low"
+result = ["handoff.jump_high", "handoff.jump_low"]
+
+[[place]]
+fields = ["tunables.hyperspatial_uncertainty", "random.number"]
+
+# The control word routine slot: a JSP routine that leaves the control
+# word in IO, normally a jump to the main loop's reading of the control
+# boxes, with room to build a private one.
+[[place]]
+jsp_slot = "control_word_routine"
+at = 0o40
+returns = "io"
+jump = "read_control_boxes"
+reserve = 0o20
+
+[[place]]
+machine = "sequence break flush"

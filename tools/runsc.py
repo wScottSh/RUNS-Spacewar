@@ -55,10 +55,6 @@ def leaf(dotted: str) -> str:
     return dotted.split(".")[1]
 
 
-def c_name(dotted: str) -> str:
-    return dotted.replace(".", "_")
-
-
 def dotted_of(e) -> str | None:
     """`record.field` for a field expression, else None."""
     if e[0] == "field" and e[1][0] == "name":
@@ -96,6 +92,7 @@ class Bound:
     unit: Path
     convention: str
     entry: str | None = None            # JDA: the entry word, which holds AC on entry
+    ac_param: str | None = None         # arrives in AC, with no entry word (XCT)
     io_param: str | None = None         # arrives in IO
     byname: str | None = None           # the word after the call, executed each time it is read
     result: list[str] = field(default_factory=list)     # AC, then IO
@@ -111,6 +108,8 @@ class Bound:
         out = []
         if self.entry and (not block or self.block_takes_entry):
             out.append((self.entry, f"word {leaf(self.entry)}"))
+        if self.ac_param:
+            out.append((self.ac_param, f"word {leaf(self.ac_param)}"))
         if self.io_param:
             out.append((self.io_param, f"register word {leaf(self.io_param)}"))
         if self.byname:
@@ -134,7 +133,11 @@ class Bindings:
         self.placed: dict[str, Path] = {}       # field -> the unit that lays out its data word
         self.cell_of: dict[str, str] = {}       # field -> the JDA routine whose entry word holds it
         self.io_fields: set[str] = set()
+        self.names: dict[str, str] = {}         # field -> the C name the lifted units use
         for path, spec in self.specs.items():
+            for f, name in spec.get("names", {}).items():
+                self.check_field(path, f)
+                self.names[f] = name
             for p in spec["place"]:
                 if "routine" in p:
                     self.bind(path, p)
@@ -151,11 +154,12 @@ class Bindings:
         name = p["routine"]
         if name not in self.prog.routines:
             raise BindError(f"{path.name}: no routine {name}")
-        b = Bound(name, path, p["convention"], p.get("entry"), p.get("io_param"), p.get("byname"),
-                  p.get("result", []), p.get("block"), p.get("block_takes_entry", False),
+        b = Bound(name, path, p["convention"], p.get("entry"), p.get("ac_param"), p.get("io_param"),
+                  p.get("byname"), p.get("result", []), p.get("block"), p.get("block_takes_entry", False),
                   tuple(p["skips"]) if "skips" in p else None, set(p.get("io", [])), p.get("cells", []),
                   p.get("loops"))
-        for f in [b.entry, b.io_param, b.byname, *b.result, *b.cells] + ([b.skips[0]] if b.skips else []):
+        for f in [b.entry, b.ac_param, b.io_param, b.byname, *b.result, *b.cells] + \
+                ([b.skips[0]] if b.skips else []):
             if f:
                 self.check_field(path, f)
         for f in [b.entry, *b.cells]:
@@ -165,6 +169,9 @@ class Bindings:
         if b.io_param:
             self.io_fields.add(b.io_param)
         self.bound[name] = b
+
+    def c_name(self, dotted: str) -> str:
+        return self.names.get(dotted, dotted.replace(".", "_"))
 
     def stored(self, dotted: str) -> bool:
         """The field has a word of its own: data, or an entry word."""
@@ -196,7 +203,8 @@ class Unit:
             if "routine" not in p:
                 continue
             b = self.binds.bound[p["routine"]]
-            for f in {b.entry, b.io_param, b.byname, *b.result, *b.cells} - {None} - set(self.binds.placed):
+            for f in {b.entry, b.ac_param, b.io_param, b.byname, *b.result, *b.cells} - {None} \
+                    - set(self.binds.placed):
                 rec, fld = f.split(".")
                 e = self.prog.records[rec].fields[fld][1]
                 if e is not None and e != ("num", 0):
@@ -270,24 +278,55 @@ class Unit:
         thing a routine does, is a jump into the block."""
         return bool(callee.block) and callee.unit == self.path and stmts[-1] is call
 
+    def machine(self, p: dict, head: list[str]) -> list[str]:
+        """Words the PDP-1 and its operator need, which no game rule reads.
+        The sequence break: the machine saves AC, PC and IO in words 0-2
+        and runs word 3, a jump to the flush, which resumes the interrupted
+        program. A jump: a start address, the tape's own when `start`. A JSP
+        slot: a routine the operator may rewrite in place, by default a
+        jump to another, with room after it."""
+        if p.get("machine") == "sequence break":
+            head += ["typedef void resume_point(word ac, register word io) BLOCK;",
+                     "BLOCK void flush_sequence_break(void);"]
+            return ["AT(0) RESERVE word break_ac;", "RESERVE resume_point *break_pc;", "RESERVE word break_io;",
+                    "BLOCK void sequence_break(void)", "{", "    return flush_sequence_break();", "}"]
+        if p.get("machine") == "sequence break flush":
+            return ["BLOCK void flush_sequence_break(void)", "{", "    tyi();", "    register word io = break_io;",
+                    "    word ac = break_ac;", "    lsm();", "    return break_pc(ac, io);", "}"]
+        if "jsp_slot" in p:
+            ret = {"io": "io_word", "ac": "word"}[p["returns"]]
+            head.append(f"JSP {ret} {p['jump']}(void);")
+            out = [f"AT({octal(p['at'])}) JSP {ret} {p['jsp_slot']}(void)", "{", f"    return {p['jump']}();", "}"]
+            if p.get("reserve"):
+                out.append(f"RESERVE word {p['jsp_slot']}_space[{octal(p['reserve'])}];")
+            return out
+        if "jump" in p:
+            head.append(f"BLOCK void {p['jump']}(void);")
+            start = "START " if p.get("start") else ""
+            return [f"{start}BLOCK void vector_{p['jump']}(void)", "{", f"    return {p['jump']}();", "}"]
+        raise BindError(f"{self.path.name}: a place is a routine, fields, or a machine word: {p}")
+
     def compile(self) -> str:
         self.check_unstored()
         body: list[str] = []
+        head: list[str] = []
         for p in self.spec["place"]:
             if "routine" in p:
                 body += self.routine(self.binds.bound[p["routine"]])
-            else:
+            elif "fields" in p:
                 for f in p["fields"]:
-                    body.append(f"word {c_name(f)} = {self.initial(f)};")
-        head = []
+                    body.append(f"word {self.binds.c_name(f)} = {self.initial(f)};")
+            else:
+                body += self.machine(p, head)
         for name in [p["routine"] for p in self.spec["place"] if "routine" in p] + sorted(self.callees):
             b = self.binds.bound[name]
             head.append(b.declaration() + ";")
             if b.block and b.unit == self.path:
                 head.append(b.declaration(block=True) + ";")
         head = list(dict.fromkeys(head))
-        head += [f"extern word {c_name(f)};" for f in sorted(self.externs)]
-        head += [f"ENTRY_CELL({self.binds.cell_of[f]}) word {c_name(f)};" for f in sorted(self.cells_used)]
+        head += [f"extern word {self.binds.c_name(f)};" for f in sorted(self.externs)]
+        head += [f"ENTRY_CELL({self.binds.cell_of[f]}) word {self.binds.c_name(f)};"
+                 for f in sorted(self.cells_used)]
         return "\n".join(head + body) + "\n"
 
 
@@ -319,7 +358,7 @@ class Function:
 
     def cell(self, dotted: str) -> str:
         self.unit.cells_used.add(dotted)
-        return c_name(dotted)
+        return self.binds.c_name(dotted)
 
     def own_result_local(self, dotted: str) -> bool:
         """A result held only in AC: a C local of this function."""
@@ -336,7 +375,7 @@ class Function:
             return self.cell(dotted)
         if dotted in self.binds.placed:
             self.unit.externs.add(dotted)
-            return c_name(dotted)
+            return self.binds.c_name(dotted)
         raise BindError(f"{self.b.name}: {dotted} has no place in the binding")
 
     def declared(self, name: str) -> bool:
@@ -349,7 +388,7 @@ class Function:
         if e[0] == "num":
             return octal(e[1])
         if e[0] == "neg" and e[1][0] == "num":
-            return f"-{octal(e[1][1])}"
+            return f"-{octal(e[1][1])}" if e[1][1] else "MINUS_ZERO"
         raise BindError(f"an initial value is a number: {e!r}")
 
     def expr(self, e) -> str:

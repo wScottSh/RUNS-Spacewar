@@ -26,3 +26,7 @@
 - [x] divide: RUNS dvd + idv Network, division enum for the skip, check_divide vs SIMH, block/skips/io_param/cells in the binding, MATCH, gate
 - [x] sincos: RUNS sin/cos Networks over mpy, check_sincos vs SIMH on all 2^18 words, exit-first loop layout + block_takes_entry, MATCH, gate
 - [ ] Open: sincos saturation branch is unreachable for every input word; only the image gate covers it
+
+## Round 4 (autonomous): compile tunables and objects from RUNS
+- [x] tunables: all twelve xct tunables as Processors, the numbers as tunables fields; check_tunables vs SIMH; pdp1/tunables.toml with the machine's words (sequence break, start vectors, control word slot); XCT + ac_param, [names], MINUS_ZERO in runsc; MATCH, gate
+- [ ] objects: explosion, torpedo, in_hyperspace, breakout compiled from RUNS
