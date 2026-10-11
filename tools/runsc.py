@@ -483,7 +483,7 @@ class Unit:
         self.args_done_after: str | None = None
         self.homed_pointers: set[str] = set()  # fields held in the address of an instruction
         self.duff_homes: set[str] = set()      # jumps into a run of a counted loop's bodies
-        self.current: Bound | None = None       # the bound routine being flattened
+        self.current: Bound | None = None       # the bound routine being flattened (flat_routine)
         self.copies = 0
         self.local_base: dict[str, str] = {}   # a copy's own local -> the Processor's local
         self.slot_data: dict[str, dict[int, str]] = {}   # field -> slot -> its data word, laid out in code
@@ -550,13 +550,18 @@ class Unit:
                     raise BindError(f"{self.path.name}: {d} has no slot {octal(k)}")
                 e = init[1][k] if init is not None and init[0] == "slots" else init
                 if d in self.binds.into and e is not None and e[0] == "num":
-                    text, array = self.binds.address(self.binds.into[d], e[1])
-                    if array:
-                        self.named_data.add(array)
-                    out.append(f"word *{name} = {text};")
+                    out.append(f"word *{name} = {self.address(self.binds.into[d], e[1])};")
                 else:
                     out.append(f"word {name} = {Function.constant(e) if e is not None else '0'};")
         return out
+
+    def address(self, dotted: str, slot: int) -> str:
+        """The address of a slot of a collection's field, the array it lies
+        in declared when another unit lays it out."""
+        text, array = self.binds.address(dotted, slot)
+        if array:
+            self.named_data.add(array)
+        return text
 
     def current_homes(self) -> set[str]:
         return {h for p in self.spec.get("place", []) if "routine" in p for h in p.get("homes", {})}
@@ -687,7 +692,7 @@ class Unit:
         jump table, it is laid out in the first arm, which the code after
         the table follows (Function.jump_table)."""
         self.args_done_after = self.binds.bound[r.name].args_done if r.name in self.binds.bound else None
-        self.current = self.binds.bound.get(r.name)
+        self.current = self.binds.bound[r.name]
         self.copies = 0
         stmts = self.flat(r)
         runs_at: list[str] = []
@@ -775,7 +780,7 @@ class Unit:
                 body = self.flat(inner, dict(zip(inner.params, args)))
                 if inner.kind == "processor":
                     body = self.own_copy(body, s[-1])
-                if name == (self.current.exit_after if self.current else None):
+                if name == self.current.exit_after:
                     out.append(("exit_next", s[-1]))
                 if inner.kind == "processor" and has_return(inner.body) and (in_slots or n < len(items) - 1):
                     end = self.label("done")
@@ -802,8 +807,6 @@ class Unit:
         collection's field it names that the binding lays out in its code,
         are laid out at the copy's end (data_here)."""
         b = self.current
-        if b is None:
-            return body
         own = set(b.homes) | set(b.into) | {d for d in b.data if "." not in d}
         mine = own & {x[1][1] for x in walk(body) if x[0] == "let" and x[1][0] == "name"}
         fields = [d for d in b.data if "." in d and self.prog.records[d.split(".")[0]].count]
@@ -1311,16 +1314,15 @@ class Function:
         for x, k in zip(sides, kinds):
             if k == "homed":
                 step = "++" if self.preinc == x[1] else ""
-                self.preinc = None if step else self.preinc
+                if step:
+                    self.preinc = None
                 texts.append(f"{spelled}({step}{x[1]})")
             elif k == "data":
                 texts.append(x[1])
             elif k == "number":
                 coll = next(self.b.into[self.base(y[1])] if y[0] == "name" else self.binds.into[dotted_of(y[1])]
                             for y, j in zip(sides, kinds) if j not in (None, "number"))
-                text, array = self.binds.address(coll, self.fold(x))
-                if array:
-                    self.unit.named_data.add(array)
+                text = self.unit.address(coll, self.fold(x))
                 texts.append(f"{spelled}({text})" if spelled else text)
             else:
                 texts.append(self.expr(x))
@@ -1349,10 +1351,7 @@ class Function:
         """e as the value of a local that holds a place: a place by number
         is its address."""
         if self.place_kind(e) == "number":
-            text, array = self.binds.address(self.b.into[local], self.fold(e))
-            if array:
-                self.unit.named_data.add(array)
-            return text
+            return self.unit.address(self.b.into[local], self.fold(e))
         return self.expr(e)
 
     def _paren(self, e, at_least: int) -> str:
@@ -2369,10 +2368,7 @@ class Function:
         """e as the value of a field: a place by number in the collection a
         field holds a place in is that place's address."""
         if dotted in self.binds.into and e[0] == "num":
-            text, array = self.binds.address(self.binds.into[dotted], e[1])
-            if array:
-                self.unit.named_data.add(array)
-            return text
+            return self.unit.address(self.binds.into[dotted], e[1])
         return self.expr(e)
 
     def word_of(self, e, into_pointer: bool = False) -> str:
