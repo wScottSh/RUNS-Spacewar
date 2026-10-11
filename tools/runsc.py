@@ -261,6 +261,13 @@ def table_cases(s):
     return value, arms
 
 
+# The names C and the dialect's header (pdp1.h) already give meaning to.
+C_WORDS = set(re.findall(r"[A-Za-z_]\w*", (SPACEWAR_C / "tools/pdp1cc/include/pdp1.h").read_text())) | {
+    "auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern",
+    "float", "for", "goto", "if", "inline", "int", "long", "register", "return", "short", "signed", "sizeof",
+    "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while"}
+
+
 @dataclass
 class Bound:
     """One bound routine: how the PDP-1 enters and leaves it."""
@@ -586,7 +593,8 @@ class Bindings:
                 raise BindError(f"[share] {f} lives in {other}'s word, which is a word of its own: "
                                 f"not {f} itself, and not shared with a third")
         made = self.made_names()
-        taken = set(self.prog.routines) | set(self.prog.records) | {self.c_name(f) for f in self.field_names()}
+        taken = set(self.prog.routines) | set(self.prog.records) | {self.c_name(f) for f in self.field_names()} \
+            | C_WORDS
         if clash := sorted({n for n in made if made.count(n) > 1 or n in taken}):
             raise BindError(f"{clash}: a name a binding gives a cursor, the table, a block, an exit or a slot "
                             f"names nothing else")

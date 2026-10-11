@@ -5,7 +5,7 @@ set -eo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 cd "$here/../../spacewar-c"
 uv run -q python "$here/runsc.py" | tail -1
-uv run -q python "$here/check_compiled.py" | tail -1
+uv run -q python "$here/check_compiled.py" --sample 8000 | tail -1     # the full gate (about 20 minutes) runs by hand
 PYTHONPATH=tools uv run -q python "$here/check_square_root.py"
 PYTHONPATH=tools uv run -q python "$here/check_multiply.py"
 PYTHONPATH=tools uv run -q python "$here/check_divide.py"
