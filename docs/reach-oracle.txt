@@ -24,59 +24,59 @@ one instruction, several places: 31 sites
   01623 a6+10          line 792: a2,	clear mtb, nnn-1
       objects.routine x720, objects.x x720, objects.y x720, objects.counter x720, objects.cycles x720, objects.dx x720, objects.dy x720, ships.angular_momentum x60 (+9 more)
   01732 mot            line 865: mot,	lac .
-      ships.outline x16228, ships.previous_control x8105, ships.saved_routine x5794, ships.jumps_left x4405, ships.recharge x2974, ships.uncertainty x1333, free core x786
-  04015 nnn+23         not on the tape
-      ssn x12932, ssc x1436
-  04020 nnn+26         not on the tape
-      scn x12932, csm x1436
-  04035 nnn+43         not on the tape
-      ssc x12932, ssn x1436
-  04040 nnn+46         not on the tape
-      csm x12932, scn x1436
-  04045 nnn+53         not on the tape
-      ssn x12932, ssc x1436
-  04050 nnn+56         not on the tape
-      scn x12932, csm x1436
-  04075 nnn+103        not on the tape
-      ssn x12932, ssc x1436
-  04100 nnn+106        not on the tape
-      scn x12932, csm x1436
-  04155 nnn+163        not on the tape
-      ssn x12932, ssa x1436
-  04257 nnn+265        not on the tape
-      ssc x12932, ssn x1436
-  04262 nnn+270        not on the tape
-      csm x12932, scn x1436
-  04267 nnn+275        not on the tape
-      ssc x12932, ssn x1436
-  04272 nnn+300        not on the tape
-      csm x12932, scn x1436
-  04277 nnn+305        not on the tape
-      ssn x12932, ssa x1436
-  04371 nnn+377        not on the tape
-      ssn x12932, ssa x1436
-  04424 nnn+432        not on the tape
-      scn x12932, ssi x1436
-  04503 nnn+511        not on the tape
-      sx1 x6466, ssd x718
-  04504 nnn+512        not on the tape
-      sy1 x6466, csm x718
-  04507 nnn+515        not on the tape
-      scm x6466, csn x718
+      ships.outline x16228, ships.previous_control x8105, ships.saved_routine x5794, ships.jumps_left x4405, ships.recharge x2974, ships.uncertainty x1333, outline_code.insn x786
+  04015 outline_code.insn[23] not on the tape
+      pen.down_x x12932, pen.out_down_x x1436
+  04020 outline_code.insn[26] not on the tape
+      pen.down_y x12932, pen.out_down_y x1436
+  04035 outline_code.insn[43] not on the tape
+      pen.out_down_x x12932, pen.down_x x1436
+  04040 outline_code.insn[46] not on the tape
+      pen.out_down_y x12932, pen.down_y x1436
+  04045 outline_code.insn[53] not on the tape
+      pen.down_x x12932, pen.out_down_x x1436
+  04050 outline_code.insn[56] not on the tape
+      pen.down_y x12932, pen.out_down_y x1436
+  04075 outline_code.insn[103] not on the tape
+      pen.down_x x12932, pen.out_down_x x1436
+  04100 outline_code.insn[106] not on the tape
+      pen.down_y x12932, pen.out_down_y x1436
+  04155 outline_code.insn[163] not on the tape
+      pen.down_x x12932, pen.saved_x x1436
+  04257 outline_code.insn[265] not on the tape
+      pen.out_down_x x12932, pen.down_x x1436
+  04262 outline_code.insn[270] not on the tape
+      pen.out_down_y x12932, pen.down_y x1436
+  04267 outline_code.insn[275] not on the tape
+      pen.out_down_x x12932, pen.down_x x1436
+  04272 outline_code.insn[300] not on the tape
+      pen.out_down_y x12932, pen.down_y x1436
+  04277 outline_code.insn[305] not on the tape
+      pen.down_x x12932, pen.saved_x x1436
+  04371 outline_code.insn[377] not on the tape
+      pen.down_x x12932, pen.saved_x x1436
+  04424 outline_code.insn[432] not on the tape
+      pen.down_y x12932, pen.saved_y x1436
+  04503 outline_code.insn[511] not on the tape
+      pen.x x6466, pen.in_down_y x718
+  04504 outline_code.insn[512] not on the tape
+      pen.y x6466, pen.out_down_y x718
+  04507 outline_code.insn[515] not on the tape
+      pen.out_x x6466, pen.in_down_x x718
 
 reads of core the tape never loaded, before any write: 5 words
-  1sc            03255 read at 01545
-  2sc            03256 read at 01553
-  gct            03260 read at 01564
+  score.first    03255 read at 01545
+  score.second   03256 read at 01553
+  score.games_left 03260 read at 01564
   frame.objects_seen 03261 read at 01710
   mas            03263 read at 02021
 
 words written whole, then executed (generated code): 685 words
   02120        mi1           1 words, written by ms1
-  03772-05245  nnn+0       684 words, written by oc, oc6, oc9, ocd, oce, ocn, ocr, ocs
+  03772-05245  outline_code.insn[0]  684 words, written by oc, oc6, oc9, ocd, oce, ocn, ocr, ocs
 
 instruction words read whole as values, other than cursors: 11 words
-  03772-04004  nnn+0        11 words, read at 01732 mot
+  03772-04004  outline_code.insn[0]   11 words, read at 01732 mot
 
 indirect jumps and xcts to an address no label names, other than returns from a call: 0 sites
 
@@ -139,96 +139,96 @@ the word's machine behavior: 730 sites
       01110 bjm+173        line 553: bds,	repeat 20, starp  x15638
       01112 bjm+175        line 553: bds,	repeat 20, starp  x15638
       01113 bjm+176        line 553: bds,	repeat 20, starp  x15638
-      03776 nnn+4          not on the tape  x14368
-      03777 nnn+5          not on the tape  x14368
-      04001 nnn+7          not on the tape  x14368
-      04002 nnn+10         not on the tape  x14368
-      04006 nnn+14         not on the tape  x14368
-      04007 nnn+15         not on the tape  x14368
-      04011 nnn+17         not on the tape  x14368
-      04012 nnn+20         not on the tape  x14368
-      04016 nnn+24         not on the tape  x14368
-      04017 nnn+25         not on the tape  x14368
-      04021 nnn+27         not on the tape  x14368
-      04022 nnn+30         not on the tape  x14368
-      04026 nnn+34         not on the tape  x14368
-      04027 nnn+35         not on the tape  x14368
-      04031 nnn+37         not on the tape  x14368
-      04032 nnn+40         not on the tape  x14368
-      04036 nnn+44         not on the tape  x14368
-      04037 nnn+45         not on the tape  x14368
-      04041 nnn+47         not on the tape  x14368
-      04042 nnn+50         not on the tape  x14368
-      04046 nnn+54         not on the tape  x14368
-      04047 nnn+55         not on the tape  x14368
-      04051 nnn+57         not on the tape  x14368
-      04052 nnn+60         not on the tape  x14368
-      04056 nnn+64         not on the tape  x14368
-      04057 nnn+65         not on the tape  x14368
-      04061 nnn+67         not on the tape  x14368
-      04062 nnn+70         not on the tape  x14368
-      04066 nnn+74         not on the tape  x14368
-      04067 nnn+75         not on the tape  x14368
-      04071 nnn+77         not on the tape  x14368
-      04072 nnn+100        not on the tape  x14368
-      04076 nnn+104        not on the tape  x14368
-      04077 nnn+105        not on the tape  x14368
-      04101 nnn+107        not on the tape  x14368
-      04102 nnn+110        not on the tape  x14368
-      04106 nnn+114        not on the tape  x14368
-      04107 nnn+115        not on the tape  x14368
-      04111 nnn+117        not on the tape  x14368
-      04112 nnn+120        not on the tape  x14368
-      04116 nnn+124        not on the tape  x14368
-      04117 nnn+125        not on the tape  x14368
-      04121 nnn+127        not on the tape  x14368
-      04122 nnn+130        not on the tape  x14368
-      04126 nnn+134        not on the tape  x14368
-      04127 nnn+135        not on the tape  x14368
-      04131 nnn+137        not on the tape  x14368
-      04132 nnn+140        not on the tape  x14368
-      04136 nnn+144        not on the tape  x14368
-      04137 nnn+145        not on the tape  x14368
-      04141 nnn+147        not on the tape  x14368
-      04142 nnn+150        not on the tape  x14368
-      04146 nnn+154        not on the tape  x14368
-      04147 nnn+155        not on the tape  x14368
-      04151 nnn+157        not on the tape  x14368
-      04152 nnn+160        not on the tape  x14368
-      04161 nnn+167        not on the tape  x14368
-      04171 nnn+177        not on the tape  x14368
-      04201 nnn+207        not on the tape  x14368
-      04211 nnn+217        not on the tape  x14368
-      04221 nnn+227        not on the tape  x14368
-      04231 nnn+237        not on the tape  x14368
-      04241 nnn+247        not on the tape  x14368
-      04251 nnn+257        not on the tape  x14368
-      04260 nnn+266        not on the tape  x14368
-      04261 nnn+267        not on the tape  x14368
-      04263 nnn+271        not on the tape  x14368
-      04264 nnn+272        not on the tape  x14368
-      04270 nnn+276        not on the tape  x14368
-      04271 nnn+277        not on the tape  x14368
-      04273 nnn+301        not on the tape  x14368
-      04274 nnn+302        not on the tape  x14368
-      04303 nnn+311        not on the tape  x14368
-      04313 nnn+321        not on the tape  x14368
-      04323 nnn+331        not on the tape  x14368
-      04333 nnn+341        not on the tape  x14368
-      04343 nnn+351        not on the tape  x14368
-      04353 nnn+361        not on the tape  x14368
-      04363 nnn+371        not on the tape  x14368
-      04375 nnn+403        not on the tape  x14368
-      04405 nnn+413        not on the tape  x14368
-      04415 nnn+423        not on the tape  x14368
-      04426 nnn+434        not on the tape  x14368
-      04432 nnn+440        not on the tape  x14368
-      04436 nnn+444        not on the tape  x14368
-      04442 nnn+450        not on the tape  x14368
-      04446 nnn+454        not on the tape  x14368
-      04452 nnn+460        not on the tape  x14368
-      04456 nnn+464        not on the tape  x14368
-      04462 nnn+470        not on the tape  x14368
+      03776 outline_code.insn[4] not on the tape  x14368
+      03777 outline_code.insn[5] not on the tape  x14368
+      04001 outline_code.insn[7] not on the tape  x14368
+      04002 outline_code.insn[10] not on the tape  x14368
+      04006 outline_code.insn[14] not on the tape  x14368
+      04007 outline_code.insn[15] not on the tape  x14368
+      04011 outline_code.insn[17] not on the tape  x14368
+      04012 outline_code.insn[20] not on the tape  x14368
+      04016 outline_code.insn[24] not on the tape  x14368
+      04017 outline_code.insn[25] not on the tape  x14368
+      04021 outline_code.insn[27] not on the tape  x14368
+      04022 outline_code.insn[30] not on the tape  x14368
+      04026 outline_code.insn[34] not on the tape  x14368
+      04027 outline_code.insn[35] not on the tape  x14368
+      04031 outline_code.insn[37] not on the tape  x14368
+      04032 outline_code.insn[40] not on the tape  x14368
+      04036 outline_code.insn[44] not on the tape  x14368
+      04037 outline_code.insn[45] not on the tape  x14368
+      04041 outline_code.insn[47] not on the tape  x14368
+      04042 outline_code.insn[50] not on the tape  x14368
+      04046 outline_code.insn[54] not on the tape  x14368
+      04047 outline_code.insn[55] not on the tape  x14368
+      04051 outline_code.insn[57] not on the tape  x14368
+      04052 outline_code.insn[60] not on the tape  x14368
+      04056 outline_code.insn[64] not on the tape  x14368
+      04057 outline_code.insn[65] not on the tape  x14368
+      04061 outline_code.insn[67] not on the tape  x14368
+      04062 outline_code.insn[70] not on the tape  x14368
+      04066 outline_code.insn[74] not on the tape  x14368
+      04067 outline_code.insn[75] not on the tape  x14368
+      04071 outline_code.insn[77] not on the tape  x14368
+      04072 outline_code.insn[100] not on the tape  x14368
+      04076 outline_code.insn[104] not on the tape  x14368
+      04077 outline_code.insn[105] not on the tape  x14368
+      04101 outline_code.insn[107] not on the tape  x14368
+      04102 outline_code.insn[110] not on the tape  x14368
+      04106 outline_code.insn[114] not on the tape  x14368
+      04107 outline_code.insn[115] not on the tape  x14368
+      04111 outline_code.insn[117] not on the tape  x14368
+      04112 outline_code.insn[120] not on the tape  x14368
+      04116 outline_code.insn[124] not on the tape  x14368
+      04117 outline_code.insn[125] not on the tape  x14368
+      04121 outline_code.insn[127] not on the tape  x14368
+      04122 outline_code.insn[130] not on the tape  x14368
+      04126 outline_code.insn[134] not on the tape  x14368
+      04127 outline_code.insn[135] not on the tape  x14368
+      04131 outline_code.insn[137] not on the tape  x14368
+      04132 outline_code.insn[140] not on the tape  x14368
+      04136 outline_code.insn[144] not on the tape  x14368
+      04137 outline_code.insn[145] not on the tape  x14368
+      04141 outline_code.insn[147] not on the tape  x14368
+      04142 outline_code.insn[150] not on the tape  x14368
+      04146 outline_code.insn[154] not on the tape  x14368
+      04147 outline_code.insn[155] not on the tape  x14368
+      04151 outline_code.insn[157] not on the tape  x14368
+      04152 outline_code.insn[160] not on the tape  x14368
+      04161 outline_code.insn[167] not on the tape  x14368
+      04171 outline_code.insn[177] not on the tape  x14368
+      04201 outline_code.insn[207] not on the tape  x14368
+      04211 outline_code.insn[217] not on the tape  x14368
+      04221 outline_code.insn[227] not on the tape  x14368
+      04231 outline_code.insn[237] not on the tape  x14368
+      04241 outline_code.insn[247] not on the tape  x14368
+      04251 outline_code.insn[257] not on the tape  x14368
+      04260 outline_code.insn[266] not on the tape  x14368
+      04261 outline_code.insn[267] not on the tape  x14368
+      04263 outline_code.insn[271] not on the tape  x14368
+      04264 outline_code.insn[272] not on the tape  x14368
+      04270 outline_code.insn[276] not on the tape  x14368
+      04271 outline_code.insn[277] not on the tape  x14368
+      04273 outline_code.insn[301] not on the tape  x14368
+      04274 outline_code.insn[302] not on the tape  x14368
+      04303 outline_code.insn[311] not on the tape  x14368
+      04313 outline_code.insn[321] not on the tape  x14368
+      04323 outline_code.insn[331] not on the tape  x14368
+      04333 outline_code.insn[341] not on the tape  x14368
+      04343 outline_code.insn[351] not on the tape  x14368
+      04353 outline_code.insn[361] not on the tape  x14368
+      04363 outline_code.insn[371] not on the tape  x14368
+      04375 outline_code.insn[403] not on the tape  x14368
+      04405 outline_code.insn[413] not on the tape  x14368
+      04415 outline_code.insn[423] not on the tape  x14368
+      04426 outline_code.insn[434] not on the tape  x14368
+      04432 outline_code.insn[440] not on the tape  x14368
+      04436 outline_code.insn[444] not on the tape  x14368
+      04442 outline_code.insn[450] not on the tape  x14368
+      04446 outline_code.insn[454] not on the tape  x14368
+      04452 outline_code.insn[460] not on the tape  x14368
+      04456 outline_code.insn[464] not on the tape  x14368
+      04462 outline_code.insn[470] not on the tape  x14368
       00777 bjm+62         line 553: bds,	repeat 20, starp  x13620
       01000 bjm+63         line 553: bds,	repeat 20, starp  x13620
       01002 bjm+65         line 553: bds,	repeat 20, starp  x13620
@@ -237,228 +237,228 @@ the word's machine behavior: 730 sites
       02335 sr8            line 1105: sr8,	ril 1s  x13558
       02533 sq6+2          line 1218: ranct sar 9s, sar 4s, \src  x13553
       02545 sq6+14         line 1220: ril 2s  x13553
-      04156 nnn+164        not on the tape  x12932
-      04157 nnn+165        not on the tape  x12932
-      04162 nnn+170        not on the tape  x12932
-      04166 nnn+174        not on the tape  x12932
-      04167 nnn+175        not on the tape  x12932
-      04172 nnn+200        not on the tape  x12932
-      04176 nnn+204        not on the tape  x12932
-      04177 nnn+205        not on the tape  x12932
-      04202 nnn+210        not on the tape  x12932
-      04206 nnn+214        not on the tape  x12932
-      04207 nnn+215        not on the tape  x12932
-      04212 nnn+220        not on the tape  x12932
-      04216 nnn+224        not on the tape  x12932
-      04217 nnn+225        not on the tape  x12932
-      04222 nnn+230        not on the tape  x12932
-      04226 nnn+234        not on the tape  x12932
-      04227 nnn+235        not on the tape  x12932
-      04232 nnn+240        not on the tape  x12932
-      04236 nnn+244        not on the tape  x12932
-      04237 nnn+245        not on the tape  x12932
-      04242 nnn+250        not on the tape  x12932
-      04246 nnn+254        not on the tape  x12932
-      04247 nnn+255        not on the tape  x12932
-      04252 nnn+260        not on the tape  x12932
-      04300 nnn+306        not on the tape  x12932
-      04301 nnn+307        not on the tape  x12932
-      04304 nnn+312        not on the tape  x12932
-      04310 nnn+316        not on the tape  x12932
-      04311 nnn+317        not on the tape  x12932
-      04314 nnn+322        not on the tape  x12932
-      04320 nnn+326        not on the tape  x12932
-      04321 nnn+327        not on the tape  x12932
-      04324 nnn+332        not on the tape  x12932
-      04330 nnn+336        not on the tape  x12932
-      04331 nnn+337        not on the tape  x12932
-      04334 nnn+342        not on the tape  x12932
-      04340 nnn+346        not on the tape  x12932
-      04341 nnn+347        not on the tape  x12932
-      04344 nnn+352        not on the tape  x12932
-      04350 nnn+356        not on the tape  x12932
-      04351 nnn+357        not on the tape  x12932
-      04354 nnn+362        not on the tape  x12932
-      04360 nnn+366        not on the tape  x12932
-      04361 nnn+367        not on the tape  x12932
-      04364 nnn+372        not on the tape  x12932
-      04372 nnn+400        not on the tape  x12932
-      04373 nnn+401        not on the tape  x12932
-      04376 nnn+404        not on the tape  x12932
-      04402 nnn+410        not on the tape  x12932
-      04403 nnn+411        not on the tape  x12932
-      04406 nnn+414        not on the tape  x12932
-      04412 nnn+420        not on the tape  x12932
-      04413 nnn+421        not on the tape  x12932
-      04416 nnn+424        not on the tape  x12932
-      04422 nnn+430        not on the tape  x12932
-      04423 nnn+431        not on the tape  x12932
-      04425 nnn+433        not on the tape  x12932
-      04433 nnn+441        not on the tape  x12932
-      04435 nnn+443        not on the tape  x12932
-      04443 nnn+451        not on the tape  x12932
-      04445 nnn+453        not on the tape  x12932
-      04453 nnn+461        not on the tape  x12932
-      04455 nnn+463        not on the tape  x12932
-      04463 nnn+471        not on the tape  x12932
-      04465 nnn+473        not on the tape  x12932
-      04466 nnn+474        not on the tape  x12932
-      04472 nnn+500        not on the tape  x12932
-      04473 nnn+501        not on the tape  x12932
-      04475 nnn+503        not on the tape  x12932
-      04476 nnn+504        not on the tape  x12932
-      04532 nnn+540        not on the tape  x12738
-      04533 nnn+541        not on the tape  x12738
-      04535 nnn+543        not on the tape  x12738
-      04536 nnn+544        not on the tape  x12738
-      04542 nnn+550        not on the tape  x12738
-      04543 nnn+551        not on the tape  x12738
-      04545 nnn+553        not on the tape  x12738
-      04546 nnn+554        not on the tape  x12738
-      04552 nnn+560        not on the tape  x12738
-      04553 nnn+561        not on the tape  x12738
-      04555 nnn+563        not on the tape  x12738
-      04556 nnn+564        not on the tape  x12738
-      04562 nnn+570        not on the tape  x12738
-      04563 nnn+571        not on the tape  x12738
-      04565 nnn+573        not on the tape  x12738
-      04566 nnn+574        not on the tape  x12738
-      04572 nnn+600        not on the tape  x12738
-      04573 nnn+601        not on the tape  x12738
-      04575 nnn+603        not on the tape  x12738
-      04576 nnn+604        not on the tape  x12738
-      04602 nnn+610        not on the tape  x12738
-      04603 nnn+611        not on the tape  x12738
-      04605 nnn+613        not on the tape  x12738
-      04606 nnn+614        not on the tape  x12738
-      04612 nnn+620        not on the tape  x12738
-      04613 nnn+621        not on the tape  x12738
-      04615 nnn+623        not on the tape  x12738
-      04616 nnn+624        not on the tape  x12738
-      04622 nnn+630        not on the tape  x12738
-      04623 nnn+631        not on the tape  x12738
-      04625 nnn+633        not on the tape  x12738
-      04626 nnn+634        not on the tape  x12738
-      04632 nnn+640        not on the tape  x12738
-      04633 nnn+641        not on the tape  x12738
-      04635 nnn+643        not on the tape  x12738
-      04636 nnn+644        not on the tape  x12738
-      04642 nnn+650        not on the tape  x12738
-      04643 nnn+651        not on the tape  x12738
-      04645 nnn+653        not on the tape  x12738
-      04646 nnn+654        not on the tape  x12738
-      04652 nnn+660        not on the tape  x12738
-      04653 nnn+661        not on the tape  x12738
-      04655 nnn+663        not on the tape  x12738
-      04656 nnn+664        not on the tape  x12738
-      04662 nnn+670        not on the tape  x12738
-      04663 nnn+671        not on the tape  x12738
-      04665 nnn+673        not on the tape  x12738
-      04666 nnn+674        not on the tape  x12738
-      04672 nnn+700        not on the tape  x12738
-      04673 nnn+701        not on the tape  x12738
-      04675 nnn+703        not on the tape  x12738
-      04676 nnn+704        not on the tape  x12738
-      04702 nnn+710        not on the tape  x12738
-      04703 nnn+711        not on the tape  x12738
-      04705 nnn+713        not on the tape  x12738
-      04706 nnn+714        not on the tape  x12738
-      04714 nnn+722        not on the tape  x12738
-      04715 nnn+723        not on the tape  x12738
-      04717 nnn+725        not on the tape  x12738
-      04720 nnn+726        not on the tape  x12738
-      04724 nnn+732        not on the tape  x12738
-      04725 nnn+733        not on the tape  x12738
-      04727 nnn+735        not on the tape  x12738
-      04730 nnn+736        not on the tape  x12738
-      04734 nnn+742        not on the tape  x12738
-      04735 nnn+743        not on the tape  x12738
-      04737 nnn+745        not on the tape  x12738
-      04740 nnn+746        not on the tape  x12738
-      04744 nnn+752        not on the tape  x12738
-      04745 nnn+753        not on the tape  x12738
-      04747 nnn+755        not on the tape  x12738
-      04750 nnn+756        not on the tape  x12738
-      04754 nnn+762        not on the tape  x12738
-      04755 nnn+763        not on the tape  x12738
-      04757 nnn+765        not on the tape  x12738
-      04760 nnn+766        not on the tape  x12738
-      04764 nnn+772        not on the tape  x12738
-      04765 nnn+773        not on the tape  x12738
-      04767 nnn+775        not on the tape  x12738
-      04770 nnn+776        not on the tape  x12738
-      04774 nnn+1002       not on the tape  x12738
-      04775 nnn+1003       not on the tape  x12738
-      04777 nnn+1005       not on the tape  x12738
-      05000 nnn+1006       not on the tape  x12738
-      05004 nnn+1012       not on the tape  x12738
-      05005 nnn+1013       not on the tape  x12738
-      05007 nnn+1015       not on the tape  x12738
-      05010 nnn+1016       not on the tape  x12738
-      05014 nnn+1022       not on the tape  x12738
-      05015 nnn+1023       not on the tape  x12738
-      05017 nnn+1025       not on the tape  x12738
-      05020 nnn+1026       not on the tape  x12738
-      05024 nnn+1032       not on the tape  x12738
-      05025 nnn+1033       not on the tape  x12738
-      05027 nnn+1035       not on the tape  x12738
-      05030 nnn+1036       not on the tape  x12738
-      05036 nnn+1044       not on the tape  x12738
-      05037 nnn+1045       not on the tape  x12738
-      05041 nnn+1047       not on the tape  x12738
-      05042 nnn+1050       not on the tape  x12738
-      05046 nnn+1054       not on the tape  x12738
-      05047 nnn+1055       not on the tape  x12738
-      05051 nnn+1057       not on the tape  x12738
-      05052 nnn+1060       not on the tape  x12738
-      05056 nnn+1064       not on the tape  x12738
-      05057 nnn+1065       not on the tape  x12738
-      05061 nnn+1067       not on the tape  x12738
-      05062 nnn+1070       not on the tape  x12738
-      05066 nnn+1074       not on the tape  x12738
-      05067 nnn+1075       not on the tape  x12738
-      05071 nnn+1077       not on the tape  x12738
-      05072 nnn+1100       not on the tape  x12738
-      05076 nnn+1104       not on the tape  x12738
-      05077 nnn+1105       not on the tape  x12738
-      05101 nnn+1107       not on the tape  x12738
-      05102 nnn+1110       not on the tape  x12738
-      05106 nnn+1114       not on the tape  x12738
-      05107 nnn+1115       not on the tape  x12738
-      05111 nnn+1117       not on the tape  x12738
-      05112 nnn+1120       not on the tape  x12738
-      05116 nnn+1124       not on the tape  x12738
-      05117 nnn+1125       not on the tape  x12738
-      05121 nnn+1127       not on the tape  x12738
-      05122 nnn+1130       not on the tape  x12738
-      05130 nnn+1136       not on the tape  x12738
-      05131 nnn+1137       not on the tape  x12738
-      05133 nnn+1141       not on the tape  x12738
-      05134 nnn+1142       not on the tape  x12738
-      05140 nnn+1146       not on the tape  x12738
-      05141 nnn+1147       not on the tape  x12738
-      05143 nnn+1151       not on the tape  x12738
-      05144 nnn+1152       not on the tape  x12738
-      05150 nnn+1156       not on the tape  x12738
-      05151 nnn+1157       not on the tape  x12738
-      05153 nnn+1161       not on the tape  x12738
-      05154 nnn+1162       not on the tape  x12738
-      05162 nnn+1170       not on the tape  x12738
-      05163 nnn+1171       not on the tape  x12738
-      05165 nnn+1173       not on the tape  x12738
-      05166 nnn+1174       not on the tape  x12738
-      05172 nnn+1200       not on the tape  x12738
-      05173 nnn+1201       not on the tape  x12738
-      05175 nnn+1203       not on the tape  x12738
-      05176 nnn+1204       not on the tape  x12738
-      05202 nnn+1210       not on the tape  x12738
-      05203 nnn+1211       not on the tape  x12738
-      05205 nnn+1213       not on the tape  x12738
-      05206 nnn+1214       not on the tape  x12738
-      05212 nnn+1220       not on the tape  x12738
-      05213 nnn+1221       not on the tape  x12738
-      05215 nnn+1223       not on the tape  x12738
-      05216 nnn+1224       not on the tape  x12738
+      04156 outline_code.insn[164] not on the tape  x12932
+      04157 outline_code.insn[165] not on the tape  x12932
+      04162 outline_code.insn[170] not on the tape  x12932
+      04166 outline_code.insn[174] not on the tape  x12932
+      04167 outline_code.insn[175] not on the tape  x12932
+      04172 outline_code.insn[200] not on the tape  x12932
+      04176 outline_code.insn[204] not on the tape  x12932
+      04177 outline_code.insn[205] not on the tape  x12932
+      04202 outline_code.insn[210] not on the tape  x12932
+      04206 outline_code.insn[214] not on the tape  x12932
+      04207 outline_code.insn[215] not on the tape  x12932
+      04212 outline_code.insn[220] not on the tape  x12932
+      04216 outline_code.insn[224] not on the tape  x12932
+      04217 outline_code.insn[225] not on the tape  x12932
+      04222 outline_code.insn[230] not on the tape  x12932
+      04226 outline_code.insn[234] not on the tape  x12932
+      04227 outline_code.insn[235] not on the tape  x12932
+      04232 outline_code.insn[240] not on the tape  x12932
+      04236 outline_code.insn[244] not on the tape  x12932
+      04237 outline_code.insn[245] not on the tape  x12932
+      04242 outline_code.insn[250] not on the tape  x12932
+      04246 outline_code.insn[254] not on the tape  x12932
+      04247 outline_code.insn[255] not on the tape  x12932
+      04252 outline_code.insn[260] not on the tape  x12932
+      04300 outline_code.insn[306] not on the tape  x12932
+      04301 outline_code.insn[307] not on the tape  x12932
+      04304 outline_code.insn[312] not on the tape  x12932
+      04310 outline_code.insn[316] not on the tape  x12932
+      04311 outline_code.insn[317] not on the tape  x12932
+      04314 outline_code.insn[322] not on the tape  x12932
+      04320 outline_code.insn[326] not on the tape  x12932
+      04321 outline_code.insn[327] not on the tape  x12932
+      04324 outline_code.insn[332] not on the tape  x12932
+      04330 outline_code.insn[336] not on the tape  x12932
+      04331 outline_code.insn[337] not on the tape  x12932
+      04334 outline_code.insn[342] not on the tape  x12932
+      04340 outline_code.insn[346] not on the tape  x12932
+      04341 outline_code.insn[347] not on the tape  x12932
+      04344 outline_code.insn[352] not on the tape  x12932
+      04350 outline_code.insn[356] not on the tape  x12932
+      04351 outline_code.insn[357] not on the tape  x12932
+      04354 outline_code.insn[362] not on the tape  x12932
+      04360 outline_code.insn[366] not on the tape  x12932
+      04361 outline_code.insn[367] not on the tape  x12932
+      04364 outline_code.insn[372] not on the tape  x12932
+      04372 outline_code.insn[400] not on the tape  x12932
+      04373 outline_code.insn[401] not on the tape  x12932
+      04376 outline_code.insn[404] not on the tape  x12932
+      04402 outline_code.insn[410] not on the tape  x12932
+      04403 outline_code.insn[411] not on the tape  x12932
+      04406 outline_code.insn[414] not on the tape  x12932
+      04412 outline_code.insn[420] not on the tape  x12932
+      04413 outline_code.insn[421] not on the tape  x12932
+      04416 outline_code.insn[424] not on the tape  x12932
+      04422 outline_code.insn[430] not on the tape  x12932
+      04423 outline_code.insn[431] not on the tape  x12932
+      04425 outline_code.insn[433] not on the tape  x12932
+      04433 outline_code.insn[441] not on the tape  x12932
+      04435 outline_code.insn[443] not on the tape  x12932
+      04443 outline_code.insn[451] not on the tape  x12932
+      04445 outline_code.insn[453] not on the tape  x12932
+      04453 outline_code.insn[461] not on the tape  x12932
+      04455 outline_code.insn[463] not on the tape  x12932
+      04463 outline_code.insn[471] not on the tape  x12932
+      04465 outline_code.insn[473] not on the tape  x12932
+      04466 outline_code.insn[474] not on the tape  x12932
+      04472 outline_code.insn[500] not on the tape  x12932
+      04473 outline_code.insn[501] not on the tape  x12932
+      04475 outline_code.insn[503] not on the tape  x12932
+      04476 outline_code.insn[504] not on the tape  x12932
+      04532 outline_code.insn[540] not on the tape  x12738
+      04533 outline_code.insn[541] not on the tape  x12738
+      04535 outline_code.insn[543] not on the tape  x12738
+      04536 outline_code.insn[544] not on the tape  x12738
+      04542 outline_code.insn[550] not on the tape  x12738
+      04543 outline_code.insn[551] not on the tape  x12738
+      04545 outline_code.insn[553] not on the tape  x12738
+      04546 outline_code.insn[554] not on the tape  x12738
+      04552 outline_code.insn[560] not on the tape  x12738
+      04553 outline_code.insn[561] not on the tape  x12738
+      04555 outline_code.insn[563] not on the tape  x12738
+      04556 outline_code.insn[564] not on the tape  x12738
+      04562 outline_code.insn[570] not on the tape  x12738
+      04563 outline_code.insn[571] not on the tape  x12738
+      04565 outline_code.insn[573] not on the tape  x12738
+      04566 outline_code.insn[574] not on the tape  x12738
+      04572 outline_code.insn[600] not on the tape  x12738
+      04573 outline_code.insn[601] not on the tape  x12738
+      04575 outline_code.insn[603] not on the tape  x12738
+      04576 outline_code.insn[604] not on the tape  x12738
+      04602 outline_code.insn[610] not on the tape  x12738
+      04603 outline_code.insn[611] not on the tape  x12738
+      04605 outline_code.insn[613] not on the tape  x12738
+      04606 outline_code.insn[614] not on the tape  x12738
+      04612 outline_code.insn[620] not on the tape  x12738
+      04613 outline_code.insn[621] not on the tape  x12738
+      04615 outline_code.insn[623] not on the tape  x12738
+      04616 outline_code.insn[624] not on the tape  x12738
+      04622 outline_code.insn[630] not on the tape  x12738
+      04623 outline_code.insn[631] not on the tape  x12738
+      04625 outline_code.insn[633] not on the tape  x12738
+      04626 outline_code.insn[634] not on the tape  x12738
+      04632 outline_code.insn[640] not on the tape  x12738
+      04633 outline_code.insn[641] not on the tape  x12738
+      04635 outline_code.insn[643] not on the tape  x12738
+      04636 outline_code.insn[644] not on the tape  x12738
+      04642 outline_code.insn[650] not on the tape  x12738
+      04643 outline_code.insn[651] not on the tape  x12738
+      04645 outline_code.insn[653] not on the tape  x12738
+      04646 outline_code.insn[654] not on the tape  x12738
+      04652 outline_code.insn[660] not on the tape  x12738
+      04653 outline_code.insn[661] not on the tape  x12738
+      04655 outline_code.insn[663] not on the tape  x12738
+      04656 outline_code.insn[664] not on the tape  x12738
+      04662 outline_code.insn[670] not on the tape  x12738
+      04663 outline_code.insn[671] not on the tape  x12738
+      04665 outline_code.insn[673] not on the tape  x12738
+      04666 outline_code.insn[674] not on the tape  x12738
+      04672 outline_code.insn[700] not on the tape  x12738
+      04673 outline_code.insn[701] not on the tape  x12738
+      04675 outline_code.insn[703] not on the tape  x12738
+      04676 outline_code.insn[704] not on the tape  x12738
+      04702 outline_code.insn[710] not on the tape  x12738
+      04703 outline_code.insn[711] not on the tape  x12738
+      04705 outline_code.insn[713] not on the tape  x12738
+      04706 outline_code.insn[714] not on the tape  x12738
+      04714 outline_code.insn[722] not on the tape  x12738
+      04715 outline_code.insn[723] not on the tape  x12738
+      04717 outline_code.insn[725] not on the tape  x12738
+      04720 outline_code.insn[726] not on the tape  x12738
+      04724 outline_code.insn[732] not on the tape  x12738
+      04725 outline_code.insn[733] not on the tape  x12738
+      04727 outline_code.insn[735] not on the tape  x12738
+      04730 outline_code.insn[736] not on the tape  x12738
+      04734 outline_code.insn[742] not on the tape  x12738
+      04735 outline_code.insn[743] not on the tape  x12738
+      04737 outline_code.insn[745] not on the tape  x12738
+      04740 outline_code.insn[746] not on the tape  x12738
+      04744 outline_code.insn[752] not on the tape  x12738
+      04745 outline_code.insn[753] not on the tape  x12738
+      04747 outline_code.insn[755] not on the tape  x12738
+      04750 outline_code.insn[756] not on the tape  x12738
+      04754 outline_code.insn[762] not on the tape  x12738
+      04755 outline_code.insn[763] not on the tape  x12738
+      04757 outline_code.insn[765] not on the tape  x12738
+      04760 outline_code.insn[766] not on the tape  x12738
+      04764 outline_code.insn[772] not on the tape  x12738
+      04765 outline_code.insn[773] not on the tape  x12738
+      04767 outline_code.insn[775] not on the tape  x12738
+      04770 outline_code.insn[776] not on the tape  x12738
+      04774 outline_code.insn[1002] not on the tape  x12738
+      04775 outline_code.insn[1003] not on the tape  x12738
+      04777 outline_code.insn[1005] not on the tape  x12738
+      05000 outline_code.insn[1006] not on the tape  x12738
+      05004 outline_code.insn[1012] not on the tape  x12738
+      05005 outline_code.insn[1013] not on the tape  x12738
+      05007 outline_code.insn[1015] not on the tape  x12738
+      05010 outline_code.insn[1016] not on the tape  x12738
+      05014 outline_code.insn[1022] not on the tape  x12738
+      05015 outline_code.insn[1023] not on the tape  x12738
+      05017 outline_code.insn[1025] not on the tape  x12738
+      05020 outline_code.insn[1026] not on the tape  x12738
+      05024 outline_code.insn[1032] not on the tape  x12738
+      05025 outline_code.insn[1033] not on the tape  x12738
+      05027 outline_code.insn[1035] not on the tape  x12738
+      05030 outline_code.insn[1036] not on the tape  x12738
+      05036 outline_code.insn[1044] not on the tape  x12738
+      05037 outline_code.insn[1045] not on the tape  x12738
+      05041 outline_code.insn[1047] not on the tape  x12738
+      05042 outline_code.insn[1050] not on the tape  x12738
+      05046 outline_code.insn[1054] not on the tape  x12738
+      05047 outline_code.insn[1055] not on the tape  x12738
+      05051 outline_code.insn[1057] not on the tape  x12738
+      05052 outline_code.insn[1060] not on the tape  x12738
+      05056 outline_code.insn[1064] not on the tape  x12738
+      05057 outline_code.insn[1065] not on the tape  x12738
+      05061 outline_code.insn[1067] not on the tape  x12738
+      05062 outline_code.insn[1070] not on the tape  x12738
+      05066 outline_code.insn[1074] not on the tape  x12738
+      05067 outline_code.insn[1075] not on the tape  x12738
+      05071 outline_code.insn[1077] not on the tape  x12738
+      05072 outline_code.insn[1100] not on the tape  x12738
+      05076 outline_code.insn[1104] not on the tape  x12738
+      05077 outline_code.insn[1105] not on the tape  x12738
+      05101 outline_code.insn[1107] not on the tape  x12738
+      05102 outline_code.insn[1110] not on the tape  x12738
+      05106 outline_code.insn[1114] not on the tape  x12738
+      05107 outline_code.insn[1115] not on the tape  x12738
+      05111 outline_code.insn[1117] not on the tape  x12738
+      05112 outline_code.insn[1120] not on the tape  x12738
+      05116 outline_code.insn[1124] not on the tape  x12738
+      05117 outline_code.insn[1125] not on the tape  x12738
+      05121 outline_code.insn[1127] not on the tape  x12738
+      05122 outline_code.insn[1130] not on the tape  x12738
+      05130 outline_code.insn[1136] not on the tape  x12738
+      05131 outline_code.insn[1137] not on the tape  x12738
+      05133 outline_code.insn[1141] not on the tape  x12738
+      05134 outline_code.insn[1142] not on the tape  x12738
+      05140 outline_code.insn[1146] not on the tape  x12738
+      05141 outline_code.insn[1147] not on the tape  x12738
+      05143 outline_code.insn[1151] not on the tape  x12738
+      05144 outline_code.insn[1152] not on the tape  x12738
+      05150 outline_code.insn[1156] not on the tape  x12738
+      05151 outline_code.insn[1157] not on the tape  x12738
+      05153 outline_code.insn[1161] not on the tape  x12738
+      05154 outline_code.insn[1162] not on the tape  x12738
+      05162 outline_code.insn[1170] not on the tape  x12738
+      05163 outline_code.insn[1171] not on the tape  x12738
+      05165 outline_code.insn[1173] not on the tape  x12738
+      05166 outline_code.insn[1174] not on the tape  x12738
+      05172 outline_code.insn[1200] not on the tape  x12738
+      05173 outline_code.insn[1201] not on the tape  x12738
+      05175 outline_code.insn[1203] not on the tape  x12738
+      05176 outline_code.insn[1204] not on the tape  x12738
+      05202 outline_code.insn[1210] not on the tape  x12738
+      05203 outline_code.insn[1211] not on the tape  x12738
+      05205 outline_code.insn[1213] not on the tape  x12738
+      05206 outline_code.insn[1214] not on the tape  x12738
+      05212 outline_code.insn[1220] not on the tape  x12738
+      05213 outline_code.insn[1221] not on the tape  x12738
+      05215 outline_code.insn[1223] not on the tape  x12738
+      05216 outline_code.insn[1224] not on the tape  x12738
       01700 mg2+2          line 839: swap  x11934
       01701 mg2+3          line 839: swap  x11934
       00767 bjm+52         line 553: bds,	repeat 20, starp  x11680
@@ -501,68 +501,68 @@ the word's machine behavior: 730 sites
       00720 bjm+3          line 553: bds,	repeat 20, starp  x1848
       00722 bjm+5          line 553: bds,	repeat 20, starp  x1848
       00723 bjm+6          line 553: bds,	repeat 20, starp  x1848
-      04160 nnn+166        not on the tape  x1436
-      04163 nnn+171        not on the tape  x1436
-      04164 nnn+172        not on the tape  x1436
-      04170 nnn+176        not on the tape  x1436
-      04173 nnn+201        not on the tape  x1436
-      04174 nnn+202        not on the tape  x1436
-      04200 nnn+206        not on the tape  x1436
-      04203 nnn+211        not on the tape  x1436
-      04204 nnn+212        not on the tape  x1436
-      04210 nnn+216        not on the tape  x1436
-      04213 nnn+221        not on the tape  x1436
-      04214 nnn+222        not on the tape  x1436
-      04220 nnn+226        not on the tape  x1436
-      04223 nnn+231        not on the tape  x1436
-      04224 nnn+232        not on the tape  x1436
-      04230 nnn+236        not on the tape  x1436
-      04233 nnn+241        not on the tape  x1436
-      04234 nnn+242        not on the tape  x1436
-      04240 nnn+246        not on the tape  x1436
-      04243 nnn+251        not on the tape  x1436
-      04244 nnn+252        not on the tape  x1436
-      04250 nnn+256        not on the tape  x1436
-      04253 nnn+261        not on the tape  x1436
-      04254 nnn+262        not on the tape  x1436
-      04302 nnn+310        not on the tape  x1436
-      04305 nnn+313        not on the tape  x1436
-      04306 nnn+314        not on the tape  x1436
-      04312 nnn+320        not on the tape  x1436
-      04315 nnn+323        not on the tape  x1436
-      04316 nnn+324        not on the tape  x1436
-      04322 nnn+330        not on the tape  x1436
-      04325 nnn+333        not on the tape  x1436
-      04326 nnn+334        not on the tape  x1436
-      04332 nnn+340        not on the tape  x1436
-      04335 nnn+343        not on the tape  x1436
-      04336 nnn+344        not on the tape  x1436
-      04342 nnn+350        not on the tape  x1436
-      04345 nnn+353        not on the tape  x1436
-      04346 nnn+354        not on the tape  x1436
-      04352 nnn+360        not on the tape  x1436
-      04355 nnn+363        not on the tape  x1436
-      04356 nnn+364        not on the tape  x1436
-      04362 nnn+370        not on the tape  x1436
-      04365 nnn+373        not on the tape  x1436
-      04366 nnn+374        not on the tape  x1436
-      04374 nnn+402        not on the tape  x1436
-      04377 nnn+405        not on the tape  x1436
-      04400 nnn+406        not on the tape  x1436
-      04404 nnn+412        not on the tape  x1436
-      04407 nnn+415        not on the tape  x1436
-      04410 nnn+416        not on the tape  x1436
-      04414 nnn+422        not on the tape  x1436
-      04417 nnn+425        not on the tape  x1436
-      04420 nnn+426        not on the tape  x1436
-      04427 nnn+435        not on the tape  x1436
-      04431 nnn+437        not on the tape  x1436
-      04437 nnn+445        not on the tape  x1436
-      04441 nnn+447        not on the tape  x1436
-      04447 nnn+455        not on the tape  x1436
-      04451 nnn+457        not on the tape  x1436
-      04457 nnn+465        not on the tape  x1436
-      04461 nnn+467        not on the tape  x1436
+      04160 outline_code.insn[166] not on the tape  x1436
+      04163 outline_code.insn[171] not on the tape  x1436
+      04164 outline_code.insn[172] not on the tape  x1436
+      04170 outline_code.insn[176] not on the tape  x1436
+      04173 outline_code.insn[201] not on the tape  x1436
+      04174 outline_code.insn[202] not on the tape  x1436
+      04200 outline_code.insn[206] not on the tape  x1436
+      04203 outline_code.insn[211] not on the tape  x1436
+      04204 outline_code.insn[212] not on the tape  x1436
+      04210 outline_code.insn[216] not on the tape  x1436
+      04213 outline_code.insn[221] not on the tape  x1436
+      04214 outline_code.insn[222] not on the tape  x1436
+      04220 outline_code.insn[226] not on the tape  x1436
+      04223 outline_code.insn[231] not on the tape  x1436
+      04224 outline_code.insn[232] not on the tape  x1436
+      04230 outline_code.insn[236] not on the tape  x1436
+      04233 outline_code.insn[241] not on the tape  x1436
+      04234 outline_code.insn[242] not on the tape  x1436
+      04240 outline_code.insn[246] not on the tape  x1436
+      04243 outline_code.insn[251] not on the tape  x1436
+      04244 outline_code.insn[252] not on the tape  x1436
+      04250 outline_code.insn[256] not on the tape  x1436
+      04253 outline_code.insn[261] not on the tape  x1436
+      04254 outline_code.insn[262] not on the tape  x1436
+      04302 outline_code.insn[310] not on the tape  x1436
+      04305 outline_code.insn[313] not on the tape  x1436
+      04306 outline_code.insn[314] not on the tape  x1436
+      04312 outline_code.insn[320] not on the tape  x1436
+      04315 outline_code.insn[323] not on the tape  x1436
+      04316 outline_code.insn[324] not on the tape  x1436
+      04322 outline_code.insn[330] not on the tape  x1436
+      04325 outline_code.insn[333] not on the tape  x1436
+      04326 outline_code.insn[334] not on the tape  x1436
+      04332 outline_code.insn[340] not on the tape  x1436
+      04335 outline_code.insn[343] not on the tape  x1436
+      04336 outline_code.insn[344] not on the tape  x1436
+      04342 outline_code.insn[350] not on the tape  x1436
+      04345 outline_code.insn[353] not on the tape  x1436
+      04346 outline_code.insn[354] not on the tape  x1436
+      04352 outline_code.insn[360] not on the tape  x1436
+      04355 outline_code.insn[363] not on the tape  x1436
+      04356 outline_code.insn[364] not on the tape  x1436
+      04362 outline_code.insn[370] not on the tape  x1436
+      04365 outline_code.insn[373] not on the tape  x1436
+      04366 outline_code.insn[374] not on the tape  x1436
+      04374 outline_code.insn[402] not on the tape  x1436
+      04377 outline_code.insn[405] not on the tape  x1436
+      04400 outline_code.insn[406] not on the tape  x1436
+      04404 outline_code.insn[412] not on the tape  x1436
+      04407 outline_code.insn[415] not on the tape  x1436
+      04410 outline_code.insn[416] not on the tape  x1436
+      04414 outline_code.insn[422] not on the tape  x1436
+      04417 outline_code.insn[425] not on the tape  x1436
+      04420 outline_code.insn[426] not on the tape  x1436
+      04427 outline_code.insn[435] not on the tape  x1436
+      04431 outline_code.insn[437] not on the tape  x1436
+      04437 outline_code.insn[445] not on the tape  x1436
+      04441 outline_code.insn[447] not on the tape  x1436
+      04447 outline_code.insn[455] not on the tape  x1436
+      04451 outline_code.insn[457] not on the tape  x1436
+      04457 outline_code.insn[465] not on the tape  x1436
+      04461 outline_code.insn[467] not on the tape  x1436
       02200 hp1+10         line 1018: random  x36
       02211 hp1+21         line 1024: swap  x36
       02212 hp1+22         line 1024: swap  x36
@@ -579,187 +579,187 @@ the word's machine behavior: 730 sites
       01750 my2            line 879: my2,	sub .  x602
       00361 dv2+25         line 378: add idv  x254
       02473 bsg+43         line 1191: sub \ssn  x158
-      04175 nnn+203        not on the tape  x95
+      04175 outline_code.insn[203] not on the tape  x95
       02475 bsg+45         line 1193: sub \ssn  x87
       00274 sqx+14         line 333: sub sqt  x85
-      04165 nnn+173        not on the tape  x77
-      04205 nnn+213        not on the tape  x76
+      04165 outline_code.insn[173] not on the tape  x77
+      04205 outline_code.insn[213] not on the tape  x76
       02566 sq6+35         line 1229: st2,	yincr \sx1, \sy1, sub  x65
-      04230 nnn+236        not on the tape  x63
-      04220 nnn+226        not on the tape  x61
-      04210 nnn+216        not on the tape  x55
-      04215 nnn+223        not on the tape  x53
-      04713 nnn+721        not on the tape  x52
+      04230 outline_code.insn[236] not on the tape  x63
+      04220 outline_code.insn[226] not on the tape  x61
+      04210 outline_code.insn[216] not on the tape  x55
+      04215 outline_code.insn[223] not on the tape  x53
+      04713 outline_code.insn[721] not on the tape  x52
       02163 tc1+15         line 1003: diff \mdx, mx1, (sar 3s  x51
       02500 bsg+50         line 1196: add \scn  x50
       02502 bsg+52         line 1198: add \scn  x48
-      04272 nnn+300        not on the tape  x46
-      04601 nnn+607        not on the tape  x43
-      04631 nnn+637        not on the tape  x43
-      04150 nnn+156        not on the tape  x39
-      04571 nnn+577        not on the tape  x39
-      04733 nnn+741        not on the tape  x38
-      04170 nnn+176        not on the tape  x37
-      05055 nnn+1063       not on the tape  x37
+      04272 outline_code.insn[300] not on the tape  x46
+      04601 outline_code.insn[607] not on the tape  x43
+      04631 outline_code.insn[637] not on the tape  x43
+      04150 outline_code.insn[156] not on the tape  x39
+      04571 outline_code.insn[577] not on the tape  x39
+      04733 outline_code.insn[741] not on the tape  x38
+      04170 outline_code.insn[176] not on the tape  x37
+      05055 outline_code.insn[1063] not on the tape  x37
       02121 mi1+1          line 973: add i my1  x37
-      04250 nnn+256        not on the tape  x36
-      05065 nnn+1073       not on the tape  x36
-      04235 nnn+243        not on the tape  x35
-      04262 nnn+270        not on the tape  x35
-      04277 nnn+305        not on the tape  x34
-      04641 nnn+647        not on the tape  x34
-      04240 nnn+246        not on the tape  x32
-      04621 nnn+627        not on the tape  x32
-      05100 nnn+1106       not on the tape  x30
-      04245 nnn+253        not on the tape  x29
-      04312 nnn+320        not on the tape  x28
-      04225 nnn+233        not on the tape  x27
-      04371 nnn+377        not on the tape  x27
-      04651 nnn+657        not on the tape  x27
+      04250 outline_code.insn[256] not on the tape  x36
+      05065 outline_code.insn[1073] not on the tape  x36
+      04235 outline_code.insn[243] not on the tape  x35
+      04262 outline_code.insn[270] not on the tape  x35
+      04277 outline_code.insn[305] not on the tape  x34
+      04641 outline_code.insn[647] not on the tape  x34
+      04240 outline_code.insn[246] not on the tape  x32
+      04621 outline_code.insn[627] not on the tape  x32
+      05100 outline_code.insn[1106] not on the tape  x30
+      04245 outline_code.insn[253] not on the tape  x29
+      04312 outline_code.insn[320] not on the tape  x28
+      04225 outline_code.insn[233] not on the tape  x27
+      04371 outline_code.insn[377] not on the tape  x27
+      04651 outline_code.insn[657] not on the tape  x27
       02154 tc1+6          line 1000: diff \mdy, my1, (sar 3s  x27
-      05161 nnn+1167       not on the tape  x26
-      04160 nnn+166        not on the tape  x25
-      04551 nnn+557        not on the tape  x25
-      05035 nnn+1043       not on the tape  x25
-      04200 nnn+206        not on the tape  x23
-      04302 nnn+310        not on the tape  x23
-      04322 nnn+330        not on the tape  x23
-      04723 nnn+731        not on the tape  x23
-      04766 nnn+774        not on the tape  x23
-      05075 nnn+1103       not on the tape  x23
-      04561 nnn+567        not on the tape  x22
-      04267 nnn+275        not on the tape  x19
-      04753 nnn+761        not on the tape  x19
-      04763 nnn+771        not on the tape  x19
-      05211 nnn+1217       not on the tape  x19
+      05161 outline_code.insn[1167] not on the tape  x26
+      04160 outline_code.insn[166] not on the tape  x25
+      04551 outline_code.insn[557] not on the tape  x25
+      05035 outline_code.insn[1043] not on the tape  x25
+      04200 outline_code.insn[206] not on the tape  x23
+      04302 outline_code.insn[310] not on the tape  x23
+      04322 outline_code.insn[330] not on the tape  x23
+      04723 outline_code.insn[731] not on the tape  x23
+      04766 outline_code.insn[774] not on the tape  x23
+      05075 outline_code.insn[1103] not on the tape  x23
+      04561 outline_code.insn[567] not on the tape  x22
+      04267 outline_code.insn[275] not on the tape  x19
+      04753 outline_code.insn[761] not on the tape  x19
+      04763 outline_code.insn[771] not on the tape  x19
+      05211 outline_code.insn[1217] not on the tape  x19
       02124 mi1+4          line 975: add i mx1  x19
       02202 hp1+12         line 1018: random  x18
-      04307 nnn+315        not on the tape  x17
-      04671 nnn+677        not on the tape  x17
-      04701 nnn+707        not on the tape  x17
-      04743 nnn+751        not on the tape  x17
-      05045 nnn+1053       not on the tape  x17
-      05105 nnn+1113       not on the tape  x17
-      05110 nnn+1116       not on the tape  x17
-      05127 nnn+1135       not on the tape  x17
+      04307 outline_code.insn[315] not on the tape  x17
+      04671 outline_code.insn[677] not on the tape  x17
+      04701 outline_code.insn[707] not on the tape  x17
+      04743 outline_code.insn[751] not on the tape  x17
+      05045 outline_code.insn[1053] not on the tape  x17
+      05105 outline_code.insn[1113] not on the tape  x17
+      05110 outline_code.insn[1116] not on the tape  x17
+      05127 outline_code.insn[1135] not on the tape  x17
       02220 hp1+30         line 1027: random  x17
-      05115 nnn+1123       not on the tape  x16
-      04401 nnn+407        not on the tape  x15
-      04611 nnn+617        not on the tape  x15
-      04776 nnn+1004       not on the tape  x15
-      05137 nnn+1145       not on the tape  x15
-      04541 nnn+547        not on the tape  x14
-      04130 nnn+136        not on the tape  x13
-      04773 nnn+1001       not on the tape  x13
-      05147 nnn+1155       not on the tape  x13
-      05152 nnn+1160       not on the tape  x13
+      05115 outline_code.insn[1123] not on the tape  x16
+      04401 outline_code.insn[407] not on the tape  x15
+      04611 outline_code.insn[617] not on the tape  x15
+      04776 outline_code.insn[1004] not on the tape  x15
+      05137 outline_code.insn[1145] not on the tape  x15
+      04541 outline_code.insn[547] not on the tape  x14
+      04130 outline_code.insn[136] not on the tape  x13
+      04773 outline_code.insn[1001] not on the tape  x13
+      05147 outline_code.insn[1155] not on the tape  x13
+      05152 outline_code.insn[1160] not on the tape  x13
       02270 hp7+10         line 1064: random  x13
-      04257 nnn+265        not on the tape  x12
-      04531 nnn+537        not on the tape  x12
-      04716 nnn+724        not on the tape  x12
-      05003 nnn+1011       not on the tape  x12
-      05006 nnn+1014       not on the tape  x12
-      05132 nnn+1140       not on the tape  x12
-      05171 nnn+1177       not on the tape  x12
-      04020 nnn+26         not on the tape  x11
-      05013 nnn+1021       not on the tape  x11
-      05023 nnn+1031       not on the tape  x11
-      05142 nnn+1150       not on the tape  x11
-      05164 nnn+1172       not on the tape  x11
+      04257 outline_code.insn[265] not on the tape  x12
+      04531 outline_code.insn[537] not on the tape  x12
+      04716 outline_code.insn[724] not on the tape  x12
+      05003 outline_code.insn[1011] not on the tape  x12
+      05006 outline_code.insn[1014] not on the tape  x12
+      05132 outline_code.insn[1140] not on the tape  x12
+      05171 outline_code.insn[1177] not on the tape  x12
+      04020 outline_code.insn[26] not on the tape  x11
+      05013 outline_code.insn[1021] not on the tape  x11
+      05023 outline_code.insn[1031] not on the tape  x11
+      05142 outline_code.insn[1150] not on the tape  x11
+      05164 outline_code.insn[1172] not on the tape  x11
       02213 hp1+23         line 1025: add i my1  x11
-      04414 nnn+422        not on the tape  x10
-      04736 nnn+744        not on the tape  x10
-      05026 nnn+1034       not on the tape  x10
+      04414 outline_code.insn[422] not on the tape  x10
+      04736 outline_code.insn[744] not on the tape  x10
+      05026 outline_code.insn[1034] not on the tape  x10
       02462 bsg+32         line 1186: diff \mdx, mx1, (sar 3s  x9
-      04362 nnn+370        not on the tape  x9
-      04661 nnn+667        not on the tape  x9
-      05016 nnn+1024       not on the tape  x9
-      05060 nnn+1066       not on the tape  x9
-      05120 nnn+1126       not on the tape  x9
-      05201 nnn+1207       not on the tape  x9
-      04374 nnn+402        not on the tape  x8
-      04756 nnn+764        not on the tape  x8
-      05050 nnn+1056       not on the tape  x8
+      04362 outline_code.insn[370] not on the tape  x9
+      04661 outline_code.insn[667] not on the tape  x9
+      05016 outline_code.insn[1024] not on the tape  x9
+      05060 outline_code.insn[1066] not on the tape  x9
+      05120 outline_code.insn[1126] not on the tape  x9
+      05201 outline_code.insn[1207] not on the tape  x9
+      04374 outline_code.insn[402] not on the tape  x8
+      04756 outline_code.insn[764] not on the tape  x8
+      05050 outline_code.insn[1056] not on the tape  x8
       02207 hp1+17         line 1022: add i mx1  x8
-      04030 nnn+36         not on the tape  x7
-      04040 nnn+46         not on the tape  x7
-      04317 nnn+325        not on the tape  x7
-      04704 nnn+712        not on the tape  x7
-      04746 nnn+754        not on the tape  x7
-      05174 nnn+1202       not on the tape  x7
-      05214 nnn+1222       not on the tape  x7
+      04030 outline_code.insn[36] not on the tape  x7
+      04040 outline_code.insn[46] not on the tape  x7
+      04317 outline_code.insn[325] not on the tape  x7
+      04704 outline_code.insn[712] not on the tape  x7
+      04746 outline_code.insn[754] not on the tape  x7
+      05174 outline_code.insn[1202] not on the tape  x7
+      05214 outline_code.insn[1222] not on the tape  x7
       02563 sq6+32         line 1229: st2,	yincr \sx1, \sy1, sub  x7
       02446 bsg+16         line 1178: diff \mdy, my1, (sar 3s  x6
-      03775 nnn+3          not on the tape  x6
-      04000 nnn+6          not on the tape  x6
-      04010 nnn+16         not on the tape  x6
-      04035 nnn+43         not on the tape  x6
-      04332 nnn+340        not on the tape  x6
-      04337 nnn+345        not on the tape  x6
-      04404 nnn+412        not on the tape  x6
-      04441 nnn+447        not on the tape  x6
-      05070 nnn+1076       not on the tape  x6
-      05204 nnn+1212       not on the tape  x6
-      04070 nnn+76         not on the tape  x5
-      04110 nnn+116        not on the tape  x5
-      04140 nnn+146        not on the tape  x5
-      04554 nnn+562        not on the tape  x5
-      04634 nnn+642        not on the tape  x5
-      04726 nnn+734        not on the tape  x5
-      05040 nnn+1046       not on the tape  x5
-      04050 nnn+56         not on the tape  x4
-      04055 nnn+63         not on the tape  x4
-      04075 nnn+103        not on the tape  x4
-      04105 nnn+113        not on the tape  x4
-      04162 nnn+170        not on the tape  x4
-      04202 nnn+210        not on the tape  x4
-      04411 nnn+417        not on the tape  x4
-      04421 nnn+427        not on the tape  x4
-      04544 nnn+552        not on the tape  x4
-      04654 nnn+662        not on the tape  x4
-      04664 nnn+672        not on the tape  x4
-      04674 nnn+702        not on the tape  x4
-      04060 nnn+66         not on the tape  x3
-      04115 nnn+123        not on the tape  x3
-      04120 nnn+126        not on the tape  x3
-      04125 nnn+133        not on the tape  x3
-      04135 nnn+143        not on the tape  x3
-      04145 nnn+153        not on the tape  x3
-      04155 nnn+163        not on the tape  x3
-      04212 nnn+220        not on the tape  x3
-      04347 nnn+355        not on the tape  x3
-      04357 nnn+365        not on the tape  x3
-      04431 nnn+437        not on the tape  x3
-      04461 nnn+467        not on the tape  x3
-      04471 nnn+477        not on the tape  x3
-      04604 nnn+612        not on the tape  x3
-      04015 nnn+23         not on the tape  x2
-      04025 nnn+33         not on the tape  x2
-      04100 nnn+106        not on the tape  x2
-      04172 nnn+200        not on the tape  x2
-      04222 nnn+230        not on the tape  x2
-      04232 nnn+240        not on the tape  x2
-      04242 nnn+250        not on the tape  x2
-      04252 nnn+260        not on the tape  x2
-      04304 nnn+312        not on the tape  x2
-      04314 nnn+322        not on the tape  x2
-      04324 nnn+332        not on the tape  x2
-      04334 nnn+342        not on the tape  x2
-      04344 nnn+352        not on the tape  x2
-      04364 nnn+372        not on the tape  x2
-      04376 nnn+404        not on the tape  x2
-      04406 nnn+414        not on the tape  x2
-      04416 nnn+424        not on the tape  x2
-      04430 nnn+436        not on the tape  x2
-      04440 nnn+446        not on the tape  x2
-      04451 nnn+457        not on the tape  x2
-      04574 nnn+602        not on the tape  x2
-      04624 nnn+632        not on the tape  x2
-      04644 nnn+652        not on the tape  x2
-      04045 nnn+53         not on the tape  x1
-      04065 nnn+73         not on the tape  x1
-      04327 nnn+335        not on the tape  x1
-      04614 nnn+622        not on the tape  x1
+      03775 outline_code.insn[3] not on the tape  x6
+      04000 outline_code.insn[6] not on the tape  x6
+      04010 outline_code.insn[16] not on the tape  x6
+      04035 outline_code.insn[43] not on the tape  x6
+      04332 outline_code.insn[340] not on the tape  x6
+      04337 outline_code.insn[345] not on the tape  x6
+      04404 outline_code.insn[412] not on the tape  x6
+      04441 outline_code.insn[447] not on the tape  x6
+      05070 outline_code.insn[1076] not on the tape  x6
+      05204 outline_code.insn[1212] not on the tape  x6
+      04070 outline_code.insn[76] not on the tape  x5
+      04110 outline_code.insn[116] not on the tape  x5
+      04140 outline_code.insn[146] not on the tape  x5
+      04554 outline_code.insn[562] not on the tape  x5
+      04634 outline_code.insn[642] not on the tape  x5
+      04726 outline_code.insn[734] not on the tape  x5
+      05040 outline_code.insn[1046] not on the tape  x5
+      04050 outline_code.insn[56] not on the tape  x4
+      04055 outline_code.insn[63] not on the tape  x4
+      04075 outline_code.insn[103] not on the tape  x4
+      04105 outline_code.insn[113] not on the tape  x4
+      04162 outline_code.insn[170] not on the tape  x4
+      04202 outline_code.insn[210] not on the tape  x4
+      04411 outline_code.insn[417] not on the tape  x4
+      04421 outline_code.insn[427] not on the tape  x4
+      04544 outline_code.insn[552] not on the tape  x4
+      04654 outline_code.insn[662] not on the tape  x4
+      04664 outline_code.insn[672] not on the tape  x4
+      04674 outline_code.insn[702] not on the tape  x4
+      04060 outline_code.insn[66] not on the tape  x3
+      04115 outline_code.insn[123] not on the tape  x3
+      04120 outline_code.insn[126] not on the tape  x3
+      04125 outline_code.insn[133] not on the tape  x3
+      04135 outline_code.insn[143] not on the tape  x3
+      04145 outline_code.insn[153] not on the tape  x3
+      04155 outline_code.insn[163] not on the tape  x3
+      04212 outline_code.insn[220] not on the tape  x3
+      04347 outline_code.insn[355] not on the tape  x3
+      04357 outline_code.insn[365] not on the tape  x3
+      04431 outline_code.insn[437] not on the tape  x3
+      04461 outline_code.insn[467] not on the tape  x3
+      04471 outline_code.insn[477] not on the tape  x3
+      04604 outline_code.insn[612] not on the tape  x3
+      04015 outline_code.insn[23] not on the tape  x2
+      04025 outline_code.insn[33] not on the tape  x2
+      04100 outline_code.insn[106] not on the tape  x2
+      04172 outline_code.insn[200] not on the tape  x2
+      04222 outline_code.insn[230] not on the tape  x2
+      04232 outline_code.insn[240] not on the tape  x2
+      04242 outline_code.insn[250] not on the tape  x2
+      04252 outline_code.insn[260] not on the tape  x2
+      04304 outline_code.insn[312] not on the tape  x2
+      04314 outline_code.insn[322] not on the tape  x2
+      04324 outline_code.insn[332] not on the tape  x2
+      04334 outline_code.insn[342] not on the tape  x2
+      04344 outline_code.insn[352] not on the tape  x2
+      04364 outline_code.insn[372] not on the tape  x2
+      04376 outline_code.insn[404] not on the tape  x2
+      04406 outline_code.insn[414] not on the tape  x2
+      04416 outline_code.insn[424] not on the tape  x2
+      04430 outline_code.insn[436] not on the tape  x2
+      04440 outline_code.insn[446] not on the tape  x2
+      04451 outline_code.insn[457] not on the tape  x2
+      04574 outline_code.insn[602] not on the tape  x2
+      04624 outline_code.insn[632] not on the tape  x2
+      04644 outline_code.insn[652] not on the tape  x2
+      04045 outline_code.insn[53] not on the tape  x1
+      04065 outline_code.insn[73] not on the tape  x1
+      04327 outline_code.insn[335] not on the tape  x1
+      04614 outline_code.insn[622] not on the tape  x1
   multiply or divide step: 35 sites
       00205 mp1+5          line 285: repeat 21, mus mp2  x195436
       00206 mp1+6          line 285: repeat 21, mus mp2  x195436

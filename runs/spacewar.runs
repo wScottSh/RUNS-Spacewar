@@ -10,6 +10,17 @@ type word
   complement: ones          # -0 exists; add and subtract are the PDP-1's (end-around carry, never yield -0)
   compare: sign             # word < 0 tests the sign bit; == compares all 18 bits
 
+# A word of code: a PDP-1 instruction, as the outline compiler writes it and
+# a spaceship runs it (`jump`). Each is built by its instruction's name and
+# its operand: lac(pen.x) is `lac \sx1`, jmp(after_outline) is `jmp sq6`,
+# stf(5) is `stf 5`, rcl(9) is `rcl 9s`, cma is `cma`. An operand names a
+# word of a Record or code, a routine, or a number; the word is read only
+# when the instruction runs. The machine runs code by its own rules. These
+# are the instructions the game reaches:
+type insn
+  instructions: lac lio dac dio add sub jmp stf clf szf cma ioh dpy rcl
+  display: display          # dpy-4000 plots AC, IO at intensity 0, and asks for the pulse ioh waits for
+
 # The routine word (the ml1 property): which calc routine runs the object.
 # Each value also fixes whether the object collides; core keeps that in the
 # word's sign bit.
@@ -106,22 +117,60 @@ stream scoreboard
   first: word               # AC
   second: word              # IO
 
-# The ship outlines are presentation: the outline compiler (oc) lays each
-# one out as code, which the spaceship jumps into to draw the ship. The
-# game hands it where to start and keeps where each outline went in
-# ships.outline.
-enum outline
-  needle                    # ot1: the first ship's
-  wedge                     # ot2: the second ship's, and the first's too when it shares
+# The ship outlines are presentation, ported as the original runs them: at
+# each new game the outline compiler (oc) lays each one out as code, and
+# each frame a spaceship runs its own (draw_outline). ships.outline keeps
+# where each ship's code starts.
+
+# The ships' outlines (ot1, ot2), what the compiler reads. Each word holds
+# six 3-bit direction codes, read from the left, that trace one side of a
+# ship from its nose down to its tail, as it stands on its tail:
+#   0, 1 down   2 out   3 out and down   4 in   5 in and down
+#   6 store the pen's position, and at the next 6 restore it
+#   7 the end: draw the other side, then go back to the spaceship
+record outlines[020]
+  codes: word =
+    0111131                 # ot1: the needle, the first ship's
+    0111111
+    0111111
+    0111163
+    0311111
+    0146111
+    0111114
+    0700000
+    0013113                 # ot2: the wedge, the second ship's, and the first's when they share
+    0113111
+    0116313
+    0131111
+    0161151
+    0111633
+    0365114
+    0700000
+
+# The compiled outlines (nnn): the free core after the object table, up to
+# the star catalog. The tape does not load these words, and a new game
+# compiles the outlines into them before anything runs them.
+record outline_code[02105]
+  insn: insn
 
 record outline_call
-  code: word = 0            # AC into and out of oc: where the outline goes, then where it ended
-  shape: outline = needle   # the word after the call
+  code: word = 0            # oc's entry word: where in outline_code the next word goes; at
+                            #   the end, the word after the outline
+  table: word = 0           # the word after the call: where in outlines the outline starts
 
-# Where the compiled outlines may go: the free core after the object table.
-# Presentation hands the game this address; it comes in.
-record outline_space
-  start: word               # nnn
+# What the next 6 code of an outline compiles.
+enum six_code
+  store
+  restore
+
+# The outline compiler's own words.
+record outline_compiler
+  table: word = 0           # ocg: the outline word it reads, a place in outlines
+  codes_left: word = 0      # occ: codes still to read in that word, counting up
+  codes_rest: word = 0      # oci: the word, rotated past the codes read
+  six: six_code = store     # program flag 6
+  start_over: insn = jmp(outline_compiler.start_over)        # ocm: where the second side starts
+  to_other_side: insn = jmp(outline_compiler.to_other_side)  # ocn: past the end, on the first side
 
 # The "interesting and often changed constants" at the head of the tape.
 # The ones the original keeps as instructions to execute are Processors in
@@ -238,6 +287,8 @@ record pen
   out_down_y: word = 0      # csm: subtracted from y
   in_down_x: word = 0       # csn: added to x
   in_down_y: word = 0       # ssd: subtracted from y
+  saved_x: word = 0         # ssa: where a 6 code stores the pen, and the next restores it
+  saved_y: word = 0         # ssi
 
 # A new torpedo's slot: the first free one of the object table.
 record launch
@@ -270,3 +321,7 @@ record handoff
   distance_high: word = 0   # AC:IO: the distance from the star cubed, scaled down; a ship
   distance_low: word = 0    #   feels gravity only when the high half is 0
   torpedo_button: word = 0  # AC: the fire button, if it counts as pressed, in the sign bit
+  codes: word = 0           # IO through the outline compiler: the outline word, rotated
+  direction: word = 0       # AC: the next direction code, which the compiler dispatches on
+  swap: insn = 0            # IO into ocs: rcl 9s, half of the swap the compiler lays out twice
+  pending: insn = 0         # AC: the next word the compiler lays out

@@ -179,6 +179,15 @@ processor mark_center                                       # cla cli; dpy-4000
   writes: display
   emit display: 0, 0, 0
 
+# The ship's compiled outline, ships.outline[slot], which the main loop
+# loads into the jump as it reaches the ship's slot. It plots the ship from
+# the pen and the steps, the second side mirrored, leaves the pen at the
+# tail and jumps back to sq6. Each of its words runs at most once a side.
+processor draw_outline(slot)                                # sp5, jmp .
+  reads: ships, outline_code
+  writes: pen, display
+  jump outline_code.insn[ships.outline[slot]] at most 04212
+
 # The exhaust flame: while the rocket fires, a random number of dots behind
 # the tail, each burning a unit of fuel. The count and the fuel are the
 # game; the dots are presentation.

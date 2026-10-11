@@ -8,6 +8,7 @@ Run under spacewar-c's environment:
   uv run --project ../spacewar-c python tools/check_compiled.py"""
 from __future__ import annotations
 
+import dataclasses
 import multiprocessing
 import sys
 import tempfile
@@ -63,8 +64,8 @@ def sites(prog: runs.Program):
                 for path, n in numbers(prog.routines[proc].body):
                     yield f"{proc} {path} {n:o}", ("routine", proc, path, n)
             fields += [place.get(k) for k in ("entry", "ac_param", "io_param", "byname")]
-            fields += place.get("result", []) + place.get("cells", [])
-        fields += place.get("fields", [])
+            fields += place.get("result", []) + place.get("cells", []) + place.get("data", [])
+        fields += place.get("fields", []) + ([place["slots"]] if "slots" in place else [])
     fields += [f for spec in specs for f in spec.get("pool", []) + list(spec.get("homes", {}))]
     for dotted in dict.fromkeys(f for f in fields if f):
         rec, fld = dotted.split(".")
@@ -80,7 +81,7 @@ def is_bound(prog, site) -> bool:
     node = prog.routines[name].body
     for k in path[:-1]:
         node = node[k]
-    return node[0] == "loop" and path[-1] == 1
+    return node[0] == "loop" and path[-1] == 1 or node[0] == "jump" and path[-1] == 2
 
 
 def mutate(prog: runs.Program, site) -> runs.Program:
@@ -89,13 +90,12 @@ def mutate(prog: runs.Program, site) -> runs.Program:
         r = prog.routines[name]
         new = runs.Routine(r.kind, r.name, r.params, replaced(r.body, path, ("num", n + 1)),
                            r.reads, r.writes, r.requires)
-        return runs.Program(prog.enums, prog.records, {**prog.routines, name: new})
+        return dataclasses.replace(prog, routines={**prog.routines, name: new})
     _, rec, fld, path, n = site
     r = prog.records[rec]
     typ, init = r.fields[fld]
     fields = {**r.fields, fld: (typ, replaced(init, path, ("num", n + 1)))}
-    return runs.Program(prog.enums, {**prog.records, rec: runs.Record(rec, r.count, fields, r.stream)},
-                        prog.routines)
+    return dataclasses.replace(prog, records={**prog.records, rec: runs.Record(rec, r.count, fields, r.stream)})
 
 
 def changes_image(site) -> tuple[bool, str]:

@@ -10,8 +10,9 @@ laid out after the table (tools/check_spaceship.py), the image's word at
 mq3 is replaced by a jump to the stub's halt, and the run enters at ml0.
 The main loop itself loads each ship's outline into the jump at sp5, read
 past the outline array for every other colliding object. The evaluator runs
-the frame Network until it would fire the heavens, drawing the outlines
-with tools/outline.py. A full object table halts both, at the launch.
+the frame Network until it would fire the heavens, the outlines its own
+outline compiler laid out included. A full object table halts both, at the
+launch.
 
 The main loop loads ships.outline[slot] into sp5 for every colliding
 object, so for a torpedo it reads past the 2-word array. With `poison`,
@@ -30,7 +31,6 @@ import random
 import sys
 
 import check_spaceship as ship
-import outline
 import pdp1
 import runs
 from pdp1cc.gate import corpus, simh
@@ -123,11 +123,11 @@ def main() -> int:
     b = pdp1.Binding(prog)
     sym = b.sym
     image = ship.image_words()
-    outlines = ship.Outlines(sym, image)
+    m = runs.Machine(prog)
+    outlines = ship.Outlines(m, b)
     full = sym["sr1"] + 6                                   # hlt: no space for new objects
     display = {a: w for a, w in (corpus.display_words(built_listing()) | outlines.display).items() if a != full}
     rng = random.Random(0o1444)
-    m = runs.Machine(prog)
     cases = [a_frame(m, rng, outlines) for _ in range(frames)]
     places = list(b.places(RECORDS))
     halt, halt_full = STUB + 3, STUB + 4
@@ -143,10 +143,6 @@ def main() -> int:
     plain_run = m.run
 
     def counted_run(name, args=()):
-        if name == "draw_outline":                          # presentation: the compiled outline
-            shape = outlines.shape_at(m.state["ships"]["outline"][args[0]].v)
-            m.state["display"] += outline.draw(outlines.tables[shape], m.state["pen"])
-            return
         before = list(m.state["objects"]["routine"])
         plain_run(name, args)
         if name == "collision" and m.state["objects"]["routine"] != before:

@@ -16,7 +16,9 @@ Petri net: Records are places, Processors are transitions.
   world gives it: reading it unknown is an error, and a top Network whose
   Processors read it declares its Record under reads:;
 - `wait` hands the world the firing: the host shows what has left the game
-  and may change what comes in, then the firing goes on.
+  and may change what comes in, then the firing goes on;
+- `jump` runs words of code a Record holds, by the original machine's rules
+  for the instructions the machine description declares (`type insn`).
 
 The word type is the PDP-1's 18-bit ones' complement word, with the
 operations as the machine computes them."""
@@ -171,6 +173,49 @@ BUILTINS = {
 }
 
 
+# ------------------------------------------------------------ instructions
+
+# The instructions of the original machine the game reaches, and the kind
+# of operand each takes: a word of a Record (`place`), a word of code or a
+# routine (`target`), a number, or none. The machine description declares
+# which of them the game uses (`type insn`); their rules are in Machine.execute.
+OPERANDS = {"lac": "place", "lio": "place", "dac": "place", "dio": "place", "add": "place",
+            "sub": "place", "jmp": "target", "stf": "number", "clf": "number", "szf": "number",
+            "rcl": "number", "cma": None, "ioh": None, "dpy": None}
+
+
+@dataclass(frozen=True)
+class Place:
+    """A word of a Record, as an instruction names it."""
+    record: str
+    field: str
+    slot: int | None = None
+
+
+@dataclass(frozen=True)
+class Insn:
+    """A word of code: an instruction and its operand (a Place, a routine's
+    name, a number, or None)."""
+    op: str
+    operand: object = None
+
+    def __repr__(self) -> str:
+        x = self.operand
+        if isinstance(x, Place):
+            x = f"{x.record}.{x.field}" + ("" if x.slot is None else f"[{x.slot:o}]")
+        return self.op if x is None else f"{self.op}({x})"
+
+
+# The instructions the program being loaded declares, for the parser.
+declared_instructions: set[str] = set()
+
+
+def instruction_call(name: str, args: list) -> bool:
+    """name(args) builds an instruction: one operand, or none. `rcl` with
+    three is the pair operator."""
+    return name in declared_instructions and len(args) == (OPERANDS[name] is not None)
+
+
 # ------------------------------------------------------------------ lexing
 
 class RunsError(Exception):
@@ -276,8 +321,6 @@ def postfix(c: Cursor):
             c.take("]")
             e = ("index", e, i)
         elif c.peek() == "(" and e[0] == "name":
-            if e[1] not in BUILTINS:
-                raise RunsError(f"{c.where}: {e[1]} is not an operator of the word; a routine is run, not called")
             c.take()
             args = []
             while c.peek() != ")":
@@ -285,6 +328,8 @@ def postfix(c: Cursor):
                 if c.peek() == ",":
                     c.take()
             c.take(")")
+            if e[1] not in BUILTINS and not instruction_call(e[1], args):
+                raise RunsError(f"{c.where}: {e[1]} is not an operator of the word; a routine is run, not called")
             e = ("call", e[1], args)
         else:
             return e
@@ -362,6 +407,10 @@ def statement(line: Line):
         return (head, where)
     if head == "return":
         return ("return", whole(t[1:], where) if len(t) > 1 else None, where)
+    if head == "jump":
+        if t[-3:-1] != ["at", "most"]:
+            raise RunsError(f"{where}: jump <word of code> at most N")
+        return ("jump", whole(t[1:-3], where), whole(t[-1:], where), where)
     if head == "emit":
         c = Cursor(t[3:], where)
         args = [expr(c)]
@@ -419,6 +468,8 @@ class Program:
     enums: dict[str, list[str]] = field(default_factory=dict)
     records: dict[str, Record] = field(default_factory=dict)
     routines: dict[str, Routine] = field(default_factory=dict)
+    instructions: set[str] = field(default_factory=set)     # type insn: the instructions the game reaches
+    display: str | None = None                              # type insn: the stream dpy plots on
 
     def member(self, name: str) -> str | None:
         return next((e for e, ms in self.enums.items() if name in ms), None)
@@ -438,10 +489,43 @@ def params_of(toks: list[str]) -> list[str]:
     return out
 
 
+def machine_types(prog: Program, files: list[list[Line]]) -> None:
+    """The machine description's `type insn`: the instructions the game
+    reaches, and the stream dpy plots on. Read before anything is parsed."""
+    for line in (line for f in files for line in f):
+        if line.toks[:2] != ["type", "insn"]:
+            continue
+        for c in line.children:
+            key, values = c.toks[0], c.toks[2:]
+            if key == "instructions":
+                if unknown := set(values) - set(OPERANDS):
+                    raise RunsError(f"{c.where}: the machine has no rules for {sorted(unknown)}")
+                prog.instructions = set(values)
+            elif key == "display":
+                prog.display = values[0]
+    declared_instructions.clear()
+    declared_instructions.update(prog.instructions)
+
+
+def initial(c: Line, count: int | None):
+    """A field's initial value: one expression, or, under a field of a
+    collection that ends in `=`, one line a slot."""
+    if "=" not in c.toks:
+        return None
+    eq = c.toks.index("=")
+    if eq < len(c.toks) - 1:
+        return whole(c.toks[eq + 1:], c.where)
+    if len(c.children) != count:
+        raise RunsError(f"{c.where}: {len(c.children)} initial values for {count} slots")
+    return ("slots", [whole(v.toks, v.where) for v in c.children])
+
+
 def load(paths: list[Path]) -> Program:
     prog = Program()
-    for path in paths:
-        for line in lines(path):
+    files = [lines(path) for path in paths]
+    machine_types(prog, files)
+    for path, file in zip(paths, files):
+        for line in file:
             t, where = line.toks, line.where
             kind = t[0]
             if kind == "type":
@@ -450,10 +534,7 @@ def load(paths: list[Path]) -> Program:
                 prog.enums[t[1]] = [c.toks[0] for c in line.children]
             elif kind in ("record", "stream"):
                 count = as_count(int(t[3], 8) if t[3].startswith("0") else int(t[3])) if len(t) > 2 else None
-                fields = {}
-                for c in line.children:
-                    eq = c.toks.index("=") if "=" in c.toks else len(c.toks)
-                    fields[c.toks[0]] = (c.toks[2], whole(c.toks[eq + 1:], c.where) if eq < len(c.toks) else None)
+                fields = {c.toks[0]: (c.toks[2], initial(c, count)) for c in line.children}
                 prog.records[t[1]] = Record(t[1], count, fields, kind == "stream")
             elif kind in ("processor", "network"):
                 r = Routine(kind, t[1], params_of(t), [])
@@ -482,8 +563,8 @@ FIRING_OPS = {"run", "stop", "match", "wait"}
 
 
 def guarded_exit(stmt) -> bool:
-    """An `if` whose arms only break: the exit of a network loop."""
-    return stmt[0] == "if" and all(body == [] or [s[0] for s in body] == ["break"]
+    """An `if` with an arm that ends in break: an exit of a network loop."""
+    return stmt[0] == "if" and any(body and body[-1][0] == "break"
                                    for body in [b for _, b in stmt[1]] + [stmt[2]])
 
 
@@ -499,7 +580,7 @@ def shape(stmts: list, r: Routine, in_loop: bool):
             if op == "break" and not in_loop:
                 raise RunsError(f"{where}: break outside a loop")
             if op == "loop" and not any(guarded_exit(x) for x in s[2]):
-                raise RunsError(f"{where}: a network loop needs an exit: if <guard>: break")
+                raise RunsError(f"{where}: a network loop needs an exit: an if with an arm that ends in break")
         elif op in FIRING_OPS:
             raise RunsError(f"{where}: {op} belongs to a network")
         if op == "if":
@@ -560,15 +641,23 @@ class Machine:
         self.stop_before: set[str] = set()
         self.fired: list[tuple[str, tuple]] = []
         self.on_wait = lambda machine: None     # the host's turn at a wait
+        self.jumped_to: str | None = None       # the routine code jumped to as it left
+        declared_instructions.clear()
+        declared_instructions.update(prog.instructions)
         for rec in prog.records.values():
             self.state[rec.name] = [] if rec.stream else self.fresh(rec)
 
     def fresh(self, rec: Record):
         def init(e, typ):
             return self.typed(self.eval(e, Scope("initial", {})), typ) if e is not None else UNKNOWN
+
+        def slots(e, typ):
+            if e is not None and e[0] == "slots":
+                return [init(x, typ) for x in e[1]]
+            return [init(e, typ) for _ in range(rec.count)]
         if rec.count is None:
             return {f: init(e, typ) for f, (typ, e) in rec.fields.items()}
-        return {f: [init(e, typ) for _ in range(rec.count)] for f, (typ, e) in rec.fields.items()}
+        return {f: slots(e, typ) for f, (typ, e) in rec.fields.items()}
 
     # ---- running
 
@@ -591,8 +680,13 @@ class Machine:
             raise RunsError(f"{name}: break or continue outside a loop")
 
     def block(self, stmts: list, scope: "Scope"):
-        for s in stmts:
+        for k, s in enumerate(stmts):
             self.stmt(s, scope)
+            if self.jumped_to is not None and scope.kind == "network":
+                nxt = stmts[k + 1] if k + 1 < len(stmts) else None
+                if not (nxt and nxt[0] == "run" and nxt[1] == self.jumped_to):
+                    raise RunsError(f"{s[-1]}: the code jumped to {self.jumped_to}, so the Network runs it next")
+                self.jumped_to = None
 
     def stmt(self, s, scope: "Scope"):
         op = s[0]
@@ -652,6 +746,12 @@ class Machine:
             raise Stop()
         elif op == "wait":
             self.on_wait(self)
+        elif op == "jump":
+            _, target, bound, where = s
+            rec, fld, at = self.place(target, scope, where)
+            if at is None:
+                raise RunsError(f"{where}: code is a slot of a collection")
+            self.jumped_to = self.execute(Place(rec, fld, at), as_count(self.eval(bound, scope)), scope, where)
         elif op == "unreachable":
             raise RunsError(f"{s[1]}: reached unreachable")
 
@@ -682,6 +782,8 @@ class Machine:
         value = self.typed(value, typ)
         if typ == "word":
             value = as_word(value)
+        elif typ == "insn" and not isinstance(value, Insn):
+            raise RunsError(f"{where}: {rec}.{fld} holds an instruction, not {value!r}")
         elif typ in self.prog.enums and not (isinstance(value, Member) and value.enum == typ):
             raise RunsError(f"{where}: {rec}.{fld} holds {typ}, not {value!r}")
         if idx is None:
@@ -693,7 +795,8 @@ class Machine:
         if target[0] == "field" and target[1][0] == "name" and target[1][1] in self.prog.records:
             return target[1][1], target[2], None
         if target[0] == "index" and target[1][0] == "field" and target[1][1][0] == "name":
-            return target[1][1][1], target[1][2], as_count(self.eval(target[2], scope))
+            rec, fld = target[1][1][1], target[1][2]
+            return rec, fld, slot(self.state[rec][fld], as_count(self.eval(target[2], scope)), target)
         raise RunsError(f"{where}: not a Record field")
 
     # ---- expressions
@@ -716,6 +819,8 @@ class Machine:
             enum = self.prog.member(n)
             if enum:
                 return Member(enum, n)
+            if n in self.prog.instructions and OPERANDS[n] is None:
+                return Insn(n)
             raise RunsError(f"unknown name {n}")
         if op == "field":
             base = self.eval(e[1], scope)
@@ -724,7 +829,9 @@ class Machine:
             return known(self.state[base[1]][e[2]], f"{base[1]}.{e[2]}")
         if op == "index":
             seq = self.eval(e[1], scope)
-            return known(seq[as_count(self.eval(e[2], scope))], repr(e[1]))
+            return known(seq[slot(seq, as_count(self.eval(e[2], scope)), e)], repr(e[1]))
+        if op == "call" and instruction_call(e[1], e[2]):
+            return Insn(e[1], self.operand(e[1], e[2][0], scope))
         if op == "call":
             return BUILTINS[e[1]](*[self.eval(a, scope) for a in e[2]])
         if op == "neg":
@@ -743,12 +850,108 @@ class Machine:
             return binary(o, a, b)
         raise RunsError(f"cannot evaluate {e!r}")
 
+    def operand(self, op: str, e, scope: "Scope"):
+        """An instruction's operand: the word of a Record it names (its slot
+        computed now, the word itself not read), a routine, or a number."""
+        kind = OPERANDS[op]
+        if kind == "number":
+            if e[0] != "num":
+                raise RunsError(f"{op} takes a number: {e!r}")
+            return e[1]
+        if kind == "target" and e[0] == "name" and e[1] in self.prog.routines:
+            return e[1]
+        if e[0] == "field" and e[1][0] == "name" and e[1][1] in self.prog.records:
+            rec, fld, slot = e[1][1], e[2], None
+        elif e[0] == "index" and e[1][0] == "field" and e[1][1][0] == "name":
+            rec, fld, slot = e[1][1][1], e[1][2], as_count(self.eval(e[2], scope))
+        else:
+            raise RunsError(f"{op} names a word of a Record{' or a routine' if kind == 'target' else ''}: {e!r}")
+        r = self.prog.records.get(rec)
+        if r is None or fld not in r.fields or (slot is None) != (r.count is None) \
+                or slot is not None and slot >= r.count:
+            raise RunsError(f"{op}: no word {rec}.{fld}{'' if slot is None else f'[{slot:o}]'}")
+        return Place(rec, fld, slot)
+
+    # ---- code
+
+    def execute(self, start: Place, bound: int, scope: "Scope", where: str) -> str:
+        """Run the words of code from start by the PDP-1's rules, until a
+        jump leaves for a routine: its name. AC, IO and the program flags
+        are the code's own, unknown until it sets them. The words it reads
+        and writes go through the running Processor's contract."""
+        ac = io = UNKNOWN
+        flags: dict[int, bool] = {}
+        pc = start.slot
+
+        def read(at: Place):
+            scope.check(at.record, write=False)
+            v = self.state[at.record][at.field]
+            return known(v if at.slot is None else v[at.slot], f"{at.record}.{at.field}")
+
+        def write(at: Place, value):
+            scope.check(at.record, write=True)
+            if self.prog.records[at.record].fields[at.field][0] != "word":
+                raise RunsError(f"{where}: {at.record}.{at.field} is not a word")
+            if at.slot is None:
+                self.state[at.record][at.field] = value
+            else:
+                self.state[at.record][at.field][at.slot] = value
+
+        for _ in range(bound):
+            insn = read(Place(start.record, start.field, pc))
+            if not isinstance(insn, Insn):
+                raise RunsError(f"{where}: {start.record}.{start.field}[{pc:o}] is not an instruction")
+            pc += 1
+            op, x = insn.op, insn.operand
+            if op == "lac":
+                ac = as_word(read(x))
+            elif op == "lio":
+                io = as_word(read(x))
+            elif op == "dac":
+                write(x, known(ac, "AC"))
+            elif op == "dio":
+                write(x, known(io, "IO"))
+            elif op == "add":
+                ac = add(known(ac, "AC"), as_word(read(x)))
+            elif op == "sub":
+                ac = sub(known(ac, "AC"), as_word(read(x)))
+            elif op == "cma":
+                ac = W(known(ac, "AC").v ^ MASK)
+            elif op == "rcl":
+                ac, io = rcl(known(ac, "AC"), known(io, "IO"), x)
+            elif op in ("stf", "clf"):
+                flags[x] = op == "stf"
+            elif op == "szf":
+                if not known(flags.get(x, UNKNOWN), f"program flag {x}"):
+                    pc += 1
+            elif op == "ioh":
+                pass                                    # waits for the display: timing
+            elif op == "dpy":
+                scope.check(self.prog.display, write=True)
+                self.state[self.prog.display].append((known(ac, "AC"), known(io, "IO"), 0))
+            elif op == "jmp" and isinstance(x, str):
+                return x
+            elif op == "jmp":
+                if (x.record, x.field) != (start.record, start.field):
+                    raise RunsError(f"{where}: a jump from {start.record}.{start.field} to {x.record}.{x.field}")
+                pc = x.slot
+            else:
+                raise RunsError(f"{where}: the machine has no rule for {op}")
+        raise RunsError(f"{where}: the code ran past {bound} instructions")
+
     def typed(self, value, enum: str):
         """A member's name is the member of the enum it is compared with or
         stored as, when two enums share the name (off, on)."""
         if isinstance(value, Member) and value.enum != enum and value.name in self.prog.enums.get(enum, []):
             return Member(enum, value.name)
         return value
+
+
+def slot(seq: list, n: int, e) -> int:
+    """A slot of a collection: reading or writing past its last is an error."""
+    if n >= len(seq):
+        raise RunsError(f"{e!r}: slot {n:o} is past the collection's {len(seq):o} slots")
+    return n
 
 
 def known(value, what: str):
@@ -818,11 +1021,14 @@ def source() -> Path:
 
 
 def mentions(tree, names: set[str]) -> set[str]:
-    """The names a statement or expression tree mentions."""
+    """The names a statement or expression tree mentions. An instruction
+    names a word it does not read: only its slot's expression counts."""
     if isinstance(tree, str):
         return {tree} & names
     if isinstance(tree, tuple) and tree[:1] == ("field",):
         return mentions(tree[1], names)         # a field's own name mentions nothing
+    if isinstance(tree, tuple) and tree[:1] == ("call",) and instruction_call(tree[1], tree[2]):
+        return mentions([tree[2][0][2]] if tree[2] and tree[2][0][0] == "index" else [], names)
     if isinstance(tree, (list, tuple)):
         return set().union(*(mentions(t, names) for t in tree)) if tree else set()
     if isinstance(tree, dict):

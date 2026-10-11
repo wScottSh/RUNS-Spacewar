@@ -11,15 +11,21 @@ routine is entered as the main loop enters it (jsp). The evaluator fires the
 Network on the same Records.
 
 The routine runs whole, through its compiled outline. The outlines are
-compiled once into the free core after the table by the original's own
-outline compiler in SIMH; the evaluator draws them with tools/outline.py,
-the stand-in for that presentation. So every point is compared, the
-outline's included.
+compiled once, into the free core after the table by the original's own
+outline compiler in SIMH, and into outline_code by the RUNS one in the
+evaluator; the two must lay out the same words. The evaluator runs its
+code by the machine's rules (draw_outline). So every point is compared,
+the outline's included.
 
 When the object table is full, the original halts in a loop at sr1+6; the
 check redirects that halt to the stub, and the evaluator must `stop` there.
 
-Usage: [N] (calls per routine, default 3000)."""
+With `moved`, SIMH's compiler lays the outlines out from 05000 instead of
+right after the table, and the ships' outline words point there: the
+evaluator, which knows only places in outline_code, must still match. Where
+the code space lies is the binding's.
+
+Usage: [N] [moved] (calls per routine, default 3000)."""
 from __future__ import annotations
 
 import copy
@@ -28,7 +34,6 @@ import random
 import sys
 from collections import Counter
 
-import outline
 import pdp1
 import runs
 from pdp1cc import program
@@ -60,26 +65,29 @@ def signed(rng: random.Random, bits: int) -> int:
 
 
 class Outlines:
-    """The two compiled outlines, laid out after the table by the original's
-    compiler in SIMH, and the outline tables they come from."""
+    """The two outlines, compiled one after the other from the start of the
+    free core: in SIMH by the original's compiler, after the table, and in
+    the evaluator by the RUNS one, into outline_code. `at` is where each
+    starts, a place in outline_code; the words must be the same."""
 
-    def __init__(self, sym: dict, image: dict):
-        start, self.code, self.at = sym["nnn"], {}, {}
-        for shape, label in (("needle", "ot1"), ("wedge", "ot2")):
+    def __init__(self, m: runs.Machine, b: pdp1.Binding):
+        sym = b.sym
+        start, self.code = b.address("outline_code", "insn", 0), {}
+        call = m.state["outline_call"]
+        call["code"] = runs.W(0)
+        self.at = {}
+        for shape, label, table in (("needle", "ot1", 0), ("wedge", "ot2", 0o10)):
             done, = simh.run_jda(pdp1.SIMH, pdp1.ORACLE, sym["oc"], [Inputs(start, byname=sym[label])],
                                  inline=True, watch=list(range(start, start + 0o1000)))
             self.code |= {start + k: w for k, w in enumerate(done.watched) if start + k < done.ac}
-            self.at[shape], start = start, done.ac
-        self.tables = {}
-        for shape, label in (("needle", "ot1"), ("wedge", "ot2")):
-            words = []
-            while outline.END not in outline.codes_so_far(words):
-                words.append(image[sym[label] + len(words)])
-            self.tables[shape] = words
+            self.at[shape], call["table"] = call["code"].v, runs.W(table)
+            m.run("compile_outline")
+            start = done.ac
+        words = {b.address("outline_code", "insn", k): b.encode("outline_code", "insn", w)
+                 for k, w in enumerate(m.state["outline_code"]["insn"][:call["code"].v])}
+        if words != self.code:
+            raise SystemExit("the RUNS outline compiler lays out other words than the original's")
         self.display = {a: w for a, w in self.code.items() if w == pdp1.DPY_NOWAIT}
-
-    def shape_at(self, address: int) -> str:
-        return next(s for s, a in self.at.items() if a == address)
 
 
 def a_state(m: runs.Machine, rng: random.Random, outlines: Outlines) -> tuple[str, int, dict, int]:
@@ -147,7 +155,7 @@ def deposits(b: pdp1.Binding, st: dict, slot: int, sym: dict, image: dict) -> di
         at = sym[first] + slot
         out[sym[cursor]] = at if cursor in shipref.POOL_CURSORS else image[sym[cursor]] & ~0o7777 | at
     out[sym["sr1"]] = image[sym["sr1"]] & ~0o7777 | mtb + st["launch"]["slot"].v
-    out[sym["sp5"]] = image[sym["sp5"]] & ~0o7777 | st["ships"]["outline"][slot].v
+    out[sym["sp5"]] = image[sym["sp5"]] & ~0o7777 | b.encode("ships", "outline", st["ships"]["outline"][slot])
     out[sym["cwg"]] = b.enum_word["control_source"][st["controls"]["source"].name]
     return out
 
@@ -156,9 +164,12 @@ def main() -> int:
     calls = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
     prog = runs.program(runs.source())
     b = pdp1.Binding(prog)
+    if "moved" in sys.argv[2:]:
+        b.moved[("outline_code", "insn")] = 0o5000
     sym = b.sym
     image = image_words()
-    outlines = Outlines(sym, image)
+    m = runs.Machine(prog)
+    outlines = Outlines(m, b)
     full = sym["sr1"] + 6                                   # hlt: no space for new objects
     display = {a: w for a, w in (corpus.display_words(built_listing()) | outlines.display).items() if a != full}
     places = list(b.places(RECORDS))
@@ -167,22 +178,11 @@ def main() -> int:
     halt_to = STUB + 4                                      # the stub's second halt: the table is full
     once = outlines.code | {full: JMP | halt_to}
     rng = random.Random(0o5700)
-    m = runs.Machine(prog)
     cases = [a_state(m, rng, outlines) for _ in range(calls)]
     inputs = [Inputs(0, rng.randrange(1 << 18), 0, sense, st["console"]["test_word"].v)
               for _, _, st, sense in cases]
     want = run_all(cases, inputs, sym, b, image, watch, display, once)
     differ, paths = 0, Counter()
-    plain = m.run
-
-    def run(name, args=()):
-        if name == "draw_outline":                          # presentation: the compiled outline
-            s = args[0]
-            shape = outlines.shape_at(m.state["ships"]["outline"][s].v)
-            m.state["display"] += outline.draw(outlines.tables[shape], m.state["pen"])
-            return
-        plain(name, args)
-    m.run = run
     for k, ((routine, slot, st, _), w) in enumerate(zip(cases, want)):
         m.state.update(copy.deepcopy(st))
         m.state["display"] = []
@@ -218,7 +218,8 @@ def main() -> int:
             if differ <= 5:
                 print(f"  call {k} {routine} slot {slot}: " + "; ".join(bad)[:600])
         paths.update(path(st, m.state, slot, halted))
-    print(f"spaceship: {len(cases)} calls, {len(cases) - differ} match, {differ} differ; "
+    moved = f" (the outlines at {b.address('outline_code', 'insn', 0):05o})" if b.moved else ""
+    print(f"spaceship{moved}: {len(cases)} calls, {len(cases) - differ} match, {differ} differ; "
           f"{sum(len(w.plotted) for w in want)} points")
     print("  " + ", ".join(f"{k} {n}" for k, n in paths.most_common()))
     return 1 if differ else 0

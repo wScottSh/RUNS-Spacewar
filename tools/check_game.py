@@ -21,17 +21,17 @@ Two kinds of run, each in one SIMH session:
    otherwise the restart delay must, and SIMH must not have reached the end
    of the game (a breakpoint at a).
 
-The spaceship and the heavens are not ported, so the evaluator never runs
-the object loop here (tools/check_frame.py covers it). The outline compiler
-is not ported either: when the evaluator fires it, the check leaves
-outline_call.code where the original's compiler leaves it, measured once in
-SIMH for each outline.
+The evaluator never runs the object loop here (tools/check_frame.py covers
+it). A new game runs the RUNS outline compiler, so where each ship's
+outline starts is compared too (tools/check_outline_compiler.py compares
+the words it lays out).
 
 Usage: [CASES] [STOPS] (seeded cases, default 3000; stops per scripted
 match, default 3000; 0 skips that part)."""
 from __future__ import annotations
 
 import copy
+import dataclasses
 import importlib.util
 import os
 import random
@@ -82,7 +82,7 @@ def house_rules(prog: runs.Program, deposits) -> runs.Program:
         new = ("neg", n) if value & 0o770000 == LAW_I else n
         routines[r.name] = runs.Routine(r.kind, r.name, r.params, [(op, target, new, where)],
                                         r.reads, r.writes, r.requires)
-    return runs.Program(prog.enums, prog.records, routines)
+    return dataclasses.replace(prog, routines=routines)
 
 
 class Game:
@@ -97,30 +97,9 @@ class Game:
         words = frames.read_listing(pdp1.SPACEWAR_C / "build/oracle.lst")
         self.next_game = next(a for a in range(self.sym["a2"], self.sym["mg1"])
                               if words[a].value == JMP | self.sym["ml0"])
-        self.lengths = self.outline_lengths()
-
-    def outline_lengths(self) -> dict[str, int]:
-        """How many words the original's outline compiler lays each outline out in."""
-        start = self.sym["nnn"]
-        out = {}
-        for shape, label in (("needle", "ot1"), ("wedge", "ot2")):
-            done = simh.run_jda(pdp1.SIMH, pdp1.ORACLE, self.sym["oc"],
-                                [Inputs(start, byname=self.sym[label])], inline=True)
-            out[shape] = done[0].ac - start
-        return out
 
     def machine(self) -> runs.Machine:
-        m = runs.Machine(self.prog)
-        plain = m.run
-
-        def run(name, args=()):
-            if name == "compile_outline":                  # the outline compiler, not ported
-                call = m.state["outline_call"]
-                call["code"] = runs.W(call["code"].v + self.lengths[call["shape"].name])
-                return
-            plain(name, args)
-        m.run = run
-        return m
+        return runs.Machine(self.prog)
 
     def snapshot_command(self) -> str:
         return "ex " + ",".join(f"{p[3]:o}" for p in self.places) + ",PF,AC,IO"
@@ -164,7 +143,6 @@ class Game:
             m.state[rec] = copy.deepcopy(recs)
         m.state["console"]["test_word"] = runs.W(test_word)
         m.state["console"]["control_boxes"] = runs.W(0)    # headless SIMH: no buttons pressed
-        m.state["outline_space"]["start"] = runs.W(self.sym["nnn"])
         m.state["scoreboard"] = []
 
 

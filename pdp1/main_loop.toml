@@ -12,14 +12,17 @@ pool = ["frame.spare_time", "frame.restart_delay", "frame.objects_seen",
 repeat = "frame"
 # A value moves from AC to IO by the swap macro (rcl 9s, rcl 9s).
 moves = "swap"
-# The fields that hold addresses: the C dialect types them as pointers.
-pointers = ["outline_call.code", "outline_call.shape", "outline_space.start"]
 
 [names]
 "controls.source" = "control_word_getter"
 
+# The compiled outlines lie in the free core right after the table (nnn).
 [addresses]
-"outline_space.start" = "after table"
+"outline_code.insn" = "after table"
+
+# Each ship's compiled outline is held as its address.
+[into]
+"ships.outline" = "outline_code.insn"
 
 # The object table: objects then ships, field after field, each field's
 # slots together, from object_table (core_layout.c). The clearing loop's
@@ -95,22 +98,10 @@ on = 1
 test_word = { routine = "read_test_word" }
 control_boxes = { routine = "control_word_routine" }
 
-[spell.outline]
-needle = { data = "needle_outline" }
-wedge = { data = "wedge_outline" }
-
 [streams]
 scoreboard = "hlt"
 
 # Routines of lifted C the main loop runs.
-[[extern]]
-routine = "compile_outline"
-name = "outline_compiler"
-convention = "JDA"
-entry = "outline_call.code"
-inline = "outline_call.shape"
-result = ["outline_call.code"]
-
 [[extern]]
 routine = "expensive_planetarium"
 convention = "JSP"

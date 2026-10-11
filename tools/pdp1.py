@@ -56,7 +56,24 @@ FIELDS = {
     ("pen", "x"): "sx1", ("pen", "y"): "sy1", ("pen", "down_x"): "ssn", ("pen", "down_y"): "scn",
     ("pen", "out_x"): "scm", ("pen", "out_y"): "ssm", ("pen", "out_down_x"): "ssc",
     ("pen", "out_down_y"): "csm", ("pen", "in_down_x"): "csn", ("pen", "in_down_y"): "ssd",
+    ("pen", "saved_x"): "ssa", ("pen", "saved_y"): "ssi",
+    ("outline_compiler", "codes_left"): "occ", ("outline_compiler", "codes_rest"): "oci",
+    ("outline_compiler", "start_over"): "ocm", ("outline_compiler", "to_other_side"): "ocn",
+    ("outline_code", "insn"): "nnn",
 }
+
+# A collection the binding lays out in pieces: (first slot, the symbol of its word).
+PIECES = {("outlines", "codes"): [(0, "ot1"), (0o10, "ot2")]}
+
+# Fields that hold a place in a collection: the binding keeps its address.
+INTO = {("ships", "outline"): ("outline_code", "insn"), ("outline_call", "code"): ("outline_code", "insn"),
+        ("outline_call", "table"): ("outlines", "codes"), ("outline_compiler", "table"): ("outlines", "codes")}
+
+# The PDP-1's words for the instructions of `type insn`: memory reference
+# instructions are an operation and an address, the rest whole words.
+MEMORY = {"lac": 0o20, "lio": 0o22, "dac": 0o24, "dio": 0o32, "add": 0o40, "sub": 0o42, "jmp": 0o60}
+# The routines code jumps to: the label of each.
+ROUTINES = {"after_outline": "sq6"}
 
 # Fields the original keeps inside an instruction, not in a word of their
 # own: the value is the shift count of the instruction at that label, which
@@ -65,7 +82,7 @@ FIELDS = {
 # the scl the program writes whole at mi1. handoff has no place in core: its
 # fields are AC and IO between two instructions.
 INSTRUCTION_FIELDS = {("explosion_cloud", "spread"): "msh", ("explosion_cloud", "scatter"): "mi1",
-                      ("launch", "slot"): "sr1"}
+                      ("launch", "slot"): "sr1", ("outline_compiler", "table"): "ocg"}
 
 # calc_routine: the routine's entry, and the sign bit when it does not collide.
 ROUTINE_WORDS = {"none": None, "first_spaceship": "ss1", "second_spaceship": "ss2",
@@ -76,7 +93,8 @@ ENUM_WORDS = {"calc_routine": ROUTINE_WORDS,
 
 # Fields the PDP-1 keeps in its program flags, an enum's first member
 # clear and its second set; SIMH's PF holds flag n as bit 1 << (6 - n).
-FLAGS = {("lights", "first_survived"): 1, ("lights", "second_survived"): 2, ("spaceship", "rocket"): 6}
+FLAGS = {("lights", "first_survived"): 1, ("lights", "second_survived"): 2, ("spaceship", "rocket"): 6,
+         ("outline_compiler", "six"): 6}
 
 DPY = 0o720007              # dpy, intensity in bits 6-8
 DPY_NOWAIT = 0o724007
@@ -92,17 +110,43 @@ class Binding:
                           for enum, words in ENUM_WORDS.items()}
         self.enum_of = {enum: {w: n for n, w in words.items()} for enum, words in self.enum_word.items()}
         self.routine_word = self.enum_word["calc_routine"]
+        self.moved: dict[tuple[str, str], int] = {}     # a field a check lays out elsewhere: its address
 
     def address(self, record: str, fld: str, slot: int | None = None) -> int:
+        if (record, fld) in self.moved:
+            return self.moved[(record, fld)] + (slot or 0)
+        if (record, fld) in PIECES:
+            first, name = next((f, n) for f, n in reversed(PIECES[(record, fld)]) if f <= slot)
+            return self.sym[name] + slot - first
         return self.sym[FIELDS[(record, fld)]] + (slot or 0)
 
     def encode(self, record: str, fld: str, value) -> int:
         if isinstance(value, runs.Member):
             return self.enum_word[value.enum][value.name]
+        if isinstance(value, runs.Insn):
+            return self.instruction(value)
+        if (record, fld) in INTO and INTO[(record, fld)] in PIECES:
+            return self.address(*INTO[(record, fld)], value.v)
+        if (record, fld) in INTO:
+            return (self.address(*INTO[(record, fld)], 0) + value.v) & runs.MASK
         return value.v
+
+    def instruction(self, i: runs.Insn) -> int:
+        """The word the PDP-1 runs for an instruction of the RUNS text."""
+        x = i.operand
+        if i.op in MEMORY:
+            where = self.sym[ROUTINES[x]] if isinstance(x, str) else self.address(x.record, x.field, x.slot)
+            return MEMORY[i.op] << 12 | where
+        return {"stf": lambda: 0o760010 | x, "clf": lambda: 0o760000 | x, "szf": lambda: 0o640000 | x,
+                "rcl": lambda: 0o663000 | (1 << x) - 1, "cma": lambda: 0o761000, "ioh": lambda: 0o730000,
+                "dpy": lambda: DPY_NOWAIT}[i.op]()
 
     def decode(self, record: str, fld: str, word: int):
         typ = self.prog.records[record].fields[fld][0]
+        if (record, fld) in INTO:
+            if INTO[(record, fld)] in PIECES:
+                raise ValueError(f"{record}.{fld}: no place in a collection laid out in pieces is read back")
+            return runs.W((word - self.address(*INTO[(record, fld)], 0)) % (runs.MASK + 1))
         if typ in self.enum_of:
             if word not in self.enum_of[typ]:
                 raise ValueError(f"{record}.{fld}: {word:06o} is no {typ}")
