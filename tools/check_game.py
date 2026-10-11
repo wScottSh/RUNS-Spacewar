@@ -50,6 +50,11 @@ sys.modules["frames"] = frames
 spec.loader.exec_module(frames)
 
 RECORDS = ["objects", "ships", "random", "frame", "tunables", "score", "controls"]
+# Fields the evaluator may hold unknown where SIMH holds a word: the lights,
+# program flags 1 and 2, keep what the machine held at power-on until a game
+# ends, and nothing in the game reads them. Any other field the evaluator
+# does not know while SIMH does is a difference.
+POWER_ON = {"lights.first_survived", "lights.second_survived"}
 NEG = lambda v: v ^ runs.MASK
 JMP = 0o600000
 BREAK = re.compile(r"Breakpoint, PC: ([0-7]+)")
@@ -128,12 +133,16 @@ class Game:
                     continue
                 got = m.state[rec][fld]
                 for s, (w, g) in enumerate(zip(want, got) if isinstance(want, list) else [(want, got)]):
-                    if g is not runs.UNKNOWN and w != g:
+                    if g is runs.UNKNOWN and (w is runs.UNKNOWN or f"{rec}.{fld}" in POWER_ON):
+                        continue
+                    if w != g:
                         where = f"[{s}]" if isinstance(want, list) else ""
                         bad.append(f"{rec}.{fld}{where} simh {self.word(rec, fld, w)} runs {self.word(rec, fld, g)}")
         return bad
 
     def word(self, rec: str, fld: str, v) -> str:
+        if v is runs.UNKNOWN:
+            return "unknown"
         if isinstance(v, runs.Member) and v.enum == "light":
             return v.name
         return f"{self.b.encode(rec, fld, v):06o}"
