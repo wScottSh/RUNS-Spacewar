@@ -77,3 +77,5 @@ ts	phase	decision	why	evidence	result
 2026-10-11T10:04:17Z	verify	check_game: 3000 seeded cases match (1226 power-on, 1009 halts, 2199 new games); 17 scripted matches 51000 stops, 71 games ended, 38 halts shown, 0 differ; control word 2000 calls match	done criterion 2	check_all.sh run this session	pass
 2026-10-11T10:04:17Z	verify	14 game-control mutations all caught by seeded cases, 9 also by scripted matches	a match could be vacuous	/tmp mutate runs via tools/mutate.sh, 600 cases x 1500 stops	caught
 2026-10-11T10:04:17Z	verify	check_all.sh passes: MATCH, gate 263/263, every check 0 differ	done criteria 4-6	check_all output this session	pass
+2026-10-11T10:05:06Z	verify	re-ran main loop claims: MATCH, gate 263/263, seven units generated	own the subagent's work	commits 3cc1769 9cf5da6 0e61d5c	confirmed
+2026-10-11T10:05:06Z	review	flagged for final review: binding vocabulary grows per unit (walk, carry, stray, spill); the mot read is a binding carry that emits a load	a binding that causes code edges toward logic; needs an independent verdict before the run ends	pdp1/main_loop.toml	open
