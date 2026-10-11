@@ -10,12 +10,16 @@ A unit of spacewar-c's lift.toml that has a binding is compiled from RUNS;
 the others still come from the lifted C, until each is ported."""
 from __future__ import annotations
 
-import subprocess
+import contextlib
+import io
 import sys
 import tomllib
 from pathlib import Path
 
 import runs
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "spacewar-c"))
+from tools.pdp1cc import program  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 SPACEWAR_C = ROOT.parent / "spacewar-c"
@@ -198,11 +202,12 @@ class Unit:
         return "\n".join(self.out) + "\n"
 
 
-def build() -> int:
-    prog = runs.program(runs.source())
+def write_tree(prog: runs.Program, out: Path) -> Path:
+    """spacewar-c's lift.toml under out: each bound unit compiled from RUNS,
+    the rest linked to the lifted C. Returns the toml."""
     lift = tomllib.loads((SPACEWAR_C / "lift.toml").read_text())
     bound = {tomllib.loads(b.read_text())["replaces"]: b for b in sorted(BINDINGS.glob("*.toml"))}
-    lifted = OUT / "lift"
+    lifted = out / "lift"
     if lifted.exists():
         for f in lifted.iterdir():
             f.unlink()
@@ -212,19 +217,30 @@ def build() -> int:
     units = []
     for u in lift["unit"]:
         if u["c"] in bound:
-            c = OUT / u["c"]
+            c = out / u["c"]
             c.unlink()
             c.write_text(Unit(prog, bound.pop(u["c"])).compile())
         units.append(f'[[unit]]\nc = "{u["c"]}"\nprefix = "{u["prefix"]}"\n')
     if bound:
         raise BindError(f"bindings replace no lift unit: {sorted(bound)}")
-    toml = OUT / "lift.toml"
+    toml = out / "lift.toml"
     head = "".join(f'{k} = "{SPACEWAR_C / v if k in ("macro1", "macro1_src", "oracle_listing") else v}"\n'
                    for k, v in lift.items() if k != "unit")
     toml.write_text(head + "\n" + "\n".join(units))
-    return subprocess.run(["uv", "run", "--project", str(SPACEWAR_C), "python", "-m", "tools.pdp1cc.cli",
-                           "build", str(toml)], cwd=SPACEWAR_C).returncode
+    return toml
+
+
+def build(prog: runs.Program, out: Path = OUT) -> int:
+    """Compile and assemble; pdp1cc prints the hash and, on a mismatch, the
+    first word that differs. 0 when the image is the original's."""
+    toml = write_tree(prog, out)
+    with contextlib.redirect_stdout(io.StringIO()) as said:
+        code = program.build(toml)
+    build.said = said.getvalue()
+    return code
 
 
 if __name__ == "__main__":
-    sys.exit(build())
+    code = build(runs.program(runs.source()))
+    print(build.said, end="")
+    sys.exit(code)

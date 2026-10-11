@@ -1,0 +1,11 @@
+#!/bin/sh
+# Every check of the port: the image compiled from RUNS, the mutation gate,
+# and each RUNS routine against SIMH running the original. Run from anywhere.
+set -e
+here=$(cd "$(dirname "$0")" && pwd)
+cd "$here/../../spacewar-c"
+uv run -q python "$here/runsc.py" | tail -1
+uv run -q python "$here/check_compiled.py" | tail -1
+PYTHONPATH=tools uv run -q python "$here/check_square_root.py"
+PYTHONPATH=tools uv run -q python "$here/check_calc_routines.py" 1000 | tail -4
+PYTHONPATH=tools uv run -q python "$here/check_frame.py" 300 | tail -1
