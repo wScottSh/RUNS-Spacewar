@@ -26,7 +26,7 @@
 - [x] multiply: RUNS mpy + imp Network, check_multiply vs SIMH, pdp1/multiply.toml, runsc networks/calls/byname/dword, MATCH, gate
 - [x] divide: RUNS dvd + idv Network, division enum for the skip, check_divide vs SIMH, block/skips/io_param/cells in the binding, MATCH, gate
 - [x] sincos: RUNS sin/cos Networks over mpy, check_sincos vs SIMH on all 2^18 words, exit-first loop layout + block_takes_entry, MATCH, gate
-- [ ] Open: sincos saturation branch is unreachable for every input word; only the image gate covers it
+- [x] sincos saturation branch: no word of 2^18 reaches it (exhaustive run by hand, round 9); only the image gate covers the branch's code
 
 ## Round 4 (autonomous): compile tunables and objects from RUNS
 - [x] tunables: all twelve xct tunables as Processors, the numbers as tunables fields; check_tunables vs SIMH; pdp1/tunables.toml with the machine's words (sequence break, start vectors, control word slot); XCT + ac_param, [names], MINUS_ZERO in runsc; MATCH, gate
@@ -76,3 +76,28 @@ Predicate: runsc MATCH 8744e9c9 with all 13 build/lift/*.c generated, none symli
 - [x] deslop; docs (INTENT, pdp1/README, todo); decisions.tsv
 - [ ] Open: runsc's layout rules for the planetarium (arms apart, exit_after, place comparisons) are shaped by one routine; an independent review should judge them
 - [ ] Open: a full window cycle of the planetarium (2*16*020000 frames in a row) is not run; set-word frames cover the margins instead
+
+## Round 9 (autonomous): close the review's holes in "the text holds the game, the binding no logic"
+Playbook (autonomous run), verbatim:
+- [x] 1. State the exit condition as a checkable predicate before the first iteration (tests green, repro fixed, all N PRs merged, pixel-diff zero).
+- skip: 2. Pick the wake mechanism (loop skill): no external event to watch; every check runs in the foreground or a background job I wait on
+- [x] 3. Each iteration makes the smallest change the evidence justifies, verifies it against the predicate, commits if it advanced, discards changes that didn't help.
+- [x] 4. Mid-run discoveries are yours.
+- [x] 5. Checkpoint every iteration via the show-me-your-work skill.
+- [x] 6. Stop when the predicate is met.
+
+Predicate: runsc MATCH 8744e9c9; the extended check_compiled passes (every mutant of numbers, field references, operators, statement deletion and adjacent swaps changes the image, is refused, or is evaluator-equivalent on seeded states); each reviewer mutant re-run is changed/refused/equivalent; check_all.sh passes on the final commit; findings 1-10 fixed or declined with a logged reason.
+
+- [x] Gate: structural mutants + evaluator equivalence, every same-type field swap, every binding key live (findings 6, 7)
+- [x] Dead binding keys gone; schema: unknown keys, missing keys and names that name nothing are errors (6)
+- [x] runsc checks the program as the evaluator does, plus a static scope check; crashes are BindErrors (3)
+- [x] Enum members resolved by the field's enum (4)
+- [x] carry derived from draw_outline's jump; refused when the walk does not load it for every slot that jumps (1)
+- [x] Shared words and registers: each RUNS read is of the name the word holds there, else a bit-level proof it is unused (2)
+- [x] [share] (via shared words) and stray checked; skip return set on every path (5)
+- [x] pdp1/devices.toml: sense switches, lights, start vectors in one place (8)
+- [x] check_game: UNKNOWN in the evaluator where SIMH knows is a failure, but for the lights (9)
+- [x] Docs: INTENT Verified, README contract, flush, saturation (10)
+- [x] deslop, check_all on the final commit, decisions.tsv
+- [ ] Open: no independent reviewer has re-read runsc's shared-words check and the bit-level proof (BLOCKED: independent review in this subagent)
+- [ ] Open: the gate does not mutate a match's arms or insert statements; cross-type field swaps were swept once by hand (939, none silent), not in the gate
