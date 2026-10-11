@@ -440,7 +440,7 @@ def load(paths: list[Path]) -> Program:
             elif kind in ("processor", "network"):
                 r = Routine(kind, t[1], params_of(t), [])
                 body = []
-                headers = ("reads", "writes", "requires") if kind == "processor" else ("requires",)
+                headers = ("reads", "writes", "requires")
                 for c in line.children:
                     if c.toks[0] in headers and c.toks[1:2] == [":"]:
                         if c.toks[0] == "requires":
@@ -768,5 +768,72 @@ def source() -> Path:
     return Path(os.environ.get("RUNS_SOURCE", Path(__file__).resolve().parents[1] / "runs"))
 
 
+def mentions(tree, names: set[str]) -> set[str]:
+    """The names a statement or expression tree mentions."""
+    if isinstance(tree, str):
+        return {tree} & names
+    if isinstance(tree, (list, tuple)):
+        return set().union(*(mentions(t, names) for t in tree)) if tree else set()
+    if isinstance(tree, dict):
+        return mentions(list(tree.values()), names)
+    return set()
+
+
+def runs_of(tree) -> set[str]:
+    """The routines a body's run statements name."""
+    if isinstance(tree, tuple) and tree and tree[0] == "run":
+        return {tree[1]}
+    if isinstance(tree, (list, tuple)):
+        return set().union(*(runs_of(t) for t in tree)) if tree else set()
+    if isinstance(tree, dict):
+        return runs_of(list(tree.values()))
+    return set()
+
+
+def fires(prog: Program, name: str, seen: set[str]) -> set[str]:
+    """Every routine a routine fires, itself included, through its sub-Networks."""
+    if name in seen or name not in prog.routines:
+        return seen
+    seen.add(name)
+    for target in runs_of(prog.routines[name].body):
+        fires(prog, target, seen)
+    return seen
+
+
+def check_contracts(prog: Program) -> None:
+    """A Network that declares reads or writes states its contract with the
+    world outside it, as a Processor does. A top Network, one that nothing
+    fires, is a whole game: it always has a contract, its boundary with
+    presentation. Every Record a Network's Processors touch is its own,
+    unless a Processor it does not fire touches it too, or it is a stream:
+    those cross its boundary and must be declared. Each declared Record must
+    be touched inside."""
+    records = set(prog.records)
+    fired = set().union(*(runs_of(r.body) - {r.name} for r in prog.routines.values()))
+    for n in prog.routines.values():
+        if n.kind != "network" or not (n.reads or n.writes or n.name not in fired):
+            continue
+        inside = fires(prog, n.name, set())
+        procs = [prog.routines[r] for r in inside if prog.routines[r].kind == "processor"]
+        read = set().union(*(p.reads | p.writes for p in procs))
+        written = set().union(*(p.writes for p in procs))
+        guarded = set().union(*(mentions(prog.routines[r].body, records) for r in inside
+                                if prog.routines[r].kind == "network"))
+        outside = [r for name, r in prog.routines.items() if name not in inside and r.kind == "processor"]
+        shared = set().union(*(p.reads | p.writes for p in outside))
+        for rec in sorted(written & (shared | {r for r in records if prog.records[r].stream})):
+            if rec not in n.writes:
+                raise RunsError(f"network {n.name}: {rec} leaves it; declare writes: {rec}")
+        for rec in sorted((read | guarded) - written & shared):
+            if rec not in n.reads and rec not in n.writes:
+                raise RunsError(f"network {n.name}: {rec} comes from outside it; declare reads: {rec}")
+        if stale := sorted(n.writes - written):
+            raise RunsError(f"network {n.name} declares writes: {stale}, but nothing inside writes them")
+        if stale := sorted(n.reads - read - guarded):
+            raise RunsError(f"network {n.name} declares reads: {stale}, but nothing inside reads them")
+
+
 def program(root: Path) -> Program:
-    return load(sorted(root.glob("*.runs")) + sorted(root.glob("*.runs-prim")))
+    prog = load(sorted(root.glob("*.runs")) + sorted(root.glob("*.runs-prim")))
+    check_contracts(prog)
+    return prog

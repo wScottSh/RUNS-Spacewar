@@ -51,7 +51,8 @@ record random
 record frame
   spare_time: word = 0      # mtc: the frame's instruction budget, counting up
   restart_delay: word = 0   # ntd: frames until the next game, counting up
-  objects_seen: word = 0    # moc: counted, never read
+  objects_seen: word = 0    # moc: counted, never read. The tape does not load it, so on the
+                            # PDP-1 it counts up from core's power-on contents (reach_oracle).
 
 # The tunables at the head of the tape (words 3-116). The ones the original
 # keeps as instructions to execute are Processors in tunables.runs-prim.
@@ -60,7 +61,8 @@ record tunables
   collision_radius_half: word = 03000       # me2
   hyperspatial_uncertainty: word = 040000   # hur
 
-# What the scope shows: each point in the order it is plotted.
+# What the scope shows: each point in the order it is plotted. It leaves the
+# game; the frame Network's contract declares it.
 stream display
   x: word
   y: word

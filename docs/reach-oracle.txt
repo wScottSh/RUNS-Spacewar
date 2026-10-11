@@ -1,0 +1,862 @@
+scenarios: 17; stops: 9649; instructions: 59289359; stops whose history overflowed: 0; words where the tool's copy of core differs from SIMH's at the end: 0
+
+one instruction, several places: 31 sites
+  00414 oc+2           line 426: lac i ocx
+      a3+2 x30, a6+36 x28
+  00434 ocg            line 435: ocg,	lio .
+      ot2 x30, ot2+1 x30, ot2+2 x30, ot2+3 x30, ot2+4 x30, ot2+5 x30, ot2+6 x30, ot2+7 x30 (+8 more)
+  01145 bcx+11         line 636: dislis 1j,1q,3
+      ot2+3145 x3516, ot2+3125 x3055, ot2+3143 x2920, ot2+3141 x2873, ot2+3133 x2757, ot2+3137 x2554, ot2+3127 x2459, ot2+3131 x2459 (+1 more)
+  01156 bcx+22         line 636: dislis 1j,1q,3
+      ot2+3144 x766, ot2+3142 x621, ot2+3146 x598, ot2+3134 x299, ot2+3136 x299, ot2+3126 x299, ot2+3130 x299, ot2+3132 x299 (+1 more)
+  01223 bcx+67         line 637: dislis 2j,2q,2
+      ot2+3147 x3614, ot2+3157 x3614, ot2+3167 x3613, ot2+3151 x3316, ot2+3153 x3316, ot2+3155 x3316, ot2+3161 x3315, ot2+3163 x3315 (+1 more)
+  01234 bcx+100        line 637: dislis 2j,2q,2
+      ot2+3166 x300, ot2+3170 x299, ot2+3160 x299, ot2+3162 x299, ot2+3150 x299, ot2+3152 x299, ot2+3154 x299, ot2+3156 x299
+  01301 bcx+145        line 638: dislis 3j,3q,1
+      ot2+3171 x1207, ot2+3173 x1207, ot2+3175 x1207, ot2+3177 x1207, ot2+3301 x926, ot2+3303 x926, ot2+3305 x926, ot2+3307 x926 (+73 more)
+  01312 bcx+156        line 638: dislis 3j,3q,1
+      ot2+3174 x1196, ot2+3176 x1196, ot2+3302 x921, ot2+3304 x921, ot2+3306 x921, ot2+3310 x921, ot2+3312 x921, ot2+3314 x921 (+72 more)
+  01357 bcx+223        line 639: dislis 4j,4q,0
+      ot2+3443 x1207, ot2+3445 x1207, ot2+3447 x1207, ot2+3451 x1207, ot2+3453 x1207, ot2+3455 x1207, ot2+3457 x1207, ot2+3435 x1191 (+362 more)
+  01370 bcx+234        line 639: dislis 4j,4q,0
+      ot2+3444 x1196, ot2+3446 x1196, ot2+3450 x1196, ot2+3452 x1196, ot2+3454 x1196, ot2+3456 x1196, ot2+3442 x1170, ot2+4252 x921 (+350 more)
+  01623 a6+10          line 792: a2,	clear mtb, nnn-1
+      objects.routine x720, objects.x x720, objects.y x720, objects.counter x720, objects.cycles x720, objects.dx x720, objects.dy x720, ships.angular_momentum x60 (+9 more)
+  01732 mot            line 865: mot,	lac .
+      ships.outline x16228, ships.previous_control x8105, ships.saved_routine x5794, ships.jumps_left x4405, ships.recharge x2974, ships.uncertainty x1333, free core x786
+  04015 nnn+23         not on the tape
+      ssn x12932, ssc x1436
+  04020 nnn+26         not on the tape
+      scn x12932, csm x1436
+  04035 nnn+43         not on the tape
+      ssc x12932, ssn x1436
+  04040 nnn+46         not on the tape
+      csm x12932, scn x1436
+  04045 nnn+53         not on the tape
+      ssn x12932, ssc x1436
+  04050 nnn+56         not on the tape
+      scn x12932, csm x1436
+  04075 nnn+103        not on the tape
+      ssn x12932, ssc x1436
+  04100 nnn+106        not on the tape
+      scn x12932, csm x1436
+  04155 nnn+163        not on the tape
+      ssn x12932, ssa x1436
+  04257 nnn+265        not on the tape
+      ssc x12932, ssn x1436
+  04262 nnn+270        not on the tape
+      csm x12932, scn x1436
+  04267 nnn+275        not on the tape
+      ssc x12932, ssn x1436
+  04272 nnn+300        not on the tape
+      csm x12932, scn x1436
+  04277 nnn+305        not on the tape
+      ssn x12932, ssa x1436
+  04371 nnn+377        not on the tape
+      ssn x12932, ssa x1436
+  04424 nnn+432        not on the tape
+      scn x12932, ssi x1436
+  04503 nnn+511        not on the tape
+      sx1 x6466, ssd x718
+  04504 nnn+512        not on the tape
+      sy1 x6466, csm x718
+  04507 nnn+515        not on the tape
+      scm x6466, csn x718
+
+reads of core the tape never loaded, before any write: 5 words
+  1sc            03255 read at 01545
+  2sc            03256 read at 01553
+  gct            03260 read at 01564
+  frame.objects_seen 03261 read at 01710
+  mas            03263 read at 02021
+
+words written whole, then executed (generated code): 685 words
+  02120        mi1           1 words, written by ms1
+  03772-05245  nnn+0       684 words, written by oc, oc6, oc9, ocd, oce, ocn, ocr, ocs
+
+instruction words read whole as values, other than cursors: 11 words
+  03772-04004  nnn+0        11 words, read at 01732 mot
+
+indirect jumps and xcts to an address no label names, other than returns from a call: 0 sites
+
+the word's machine behavior: 730 sites
+  the tool's model of each instruction against SIMH's AC after it: ADD 2831650/2831650, RAL 54902/54902, RAR 70872/70872, SAL 577273/577273, SAR 281124/281124, SUB 2151808/2151808
+  rotates bits: 486 sites
+      00265 sqx+5          line 326: rcl 2s  x196560
+      00176 mpy+5          line 278: rcr 9s  x195436
+      00177 mpy+6          line 279: rcr 9s  x195436
+      00235 mp1+35         line 293: rcr 9s  x75410
+      00236 mp1+36         line 294: rcr 9s  x75410
+      00240 mp1+40         line 296: rcr 9s  x75410
+      00241 mp1+41         line 297: rcr 9s  x75410
+      01706 ml1+3          line 846: swap  x41455
+      01707 ml1+4          line 846: swap  x41455
+      00105 si3            line 217: si3,	ral 2s  x27111
+      00164 im1+4          line 266: rir 1s  x21850
+      00165 im1+5          line 267: rcr 9s  x21850
+      00166 im1+6          line 268: rcr 9s  x21850
+      00364 dv2+30         line 381: rcr 1s  x21802
+      00373 dv2+37         line 388: rcr 9s  x21802
+      00374 dv2+40         line 389: rcr 9s  x21802
+      02101 ms1+4          line 964: mz1,	random  x16878
+      02111 ms1+14         line 968: random  x16878
+      02122 mi1+2          line 974: swap  x16878
+      02123 mi1+3          line 974: swap  x16878
+      01007 bjm+72         line 553: bds,	repeat 20, starp  x15638
+      01010 bjm+73         line 553: bds,	repeat 20, starp  x15638
+      01012 bjm+75         line 553: bds,	repeat 20, starp  x15638
+      01013 bjm+76         line 553: bds,	repeat 20, starp  x15638
+      01017 bjm+102        line 553: bds,	repeat 20, starp  x15638
+      01020 bjm+103        line 553: bds,	repeat 20, starp  x15638
+      01022 bjm+105        line 553: bds,	repeat 20, starp  x15638
+      01023 bjm+106        line 553: bds,	repeat 20, starp  x15638
+      01027 bjm+112        line 553: bds,	repeat 20, starp  x15638
+      01030 bjm+113        line 553: bds,	repeat 20, starp  x15638
+      01032 bjm+115        line 553: bds,	repeat 20, starp  x15638
+      01033 bjm+116        line 553: bds,	repeat 20, starp  x15638
+      01037 bjm+122        line 553: bds,	repeat 20, starp  x15638
+      01040 bjm+123        line 553: bds,	repeat 20, starp  x15638
+      01042 bjm+125        line 553: bds,	repeat 20, starp  x15638
+      01043 bjm+126        line 553: bds,	repeat 20, starp  x15638
+      01047 bjm+132        line 553: bds,	repeat 20, starp  x15638
+      01050 bjm+133        line 553: bds,	repeat 20, starp  x15638
+      01052 bjm+135        line 553: bds,	repeat 20, starp  x15638
+      01053 bjm+136        line 553: bds,	repeat 20, starp  x15638
+      01057 bjm+142        line 553: bds,	repeat 20, starp  x15638
+      01060 bjm+143        line 553: bds,	repeat 20, starp  x15638
+      01062 bjm+145        line 553: bds,	repeat 20, starp  x15638
+      01063 bjm+146        line 553: bds,	repeat 20, starp  x15638
+      01067 bjm+152        line 553: bds,	repeat 20, starp  x15638
+      01070 bjm+153        line 553: bds,	repeat 20, starp  x15638
+      01072 bjm+155        line 553: bds,	repeat 20, starp  x15638
+      01073 bjm+156        line 553: bds,	repeat 20, starp  x15638
+      01077 bjm+162        line 553: bds,	repeat 20, starp  x15638
+      01100 bjm+163        line 553: bds,	repeat 20, starp  x15638
+      01102 bjm+165        line 553: bds,	repeat 20, starp  x15638
+      01103 bjm+166        line 553: bds,	repeat 20, starp  x15638
+      01107 bjm+172        line 553: bds,	repeat 20, starp  x15638
+      01110 bjm+173        line 553: bds,	repeat 20, starp  x15638
+      01112 bjm+175        line 553: bds,	repeat 20, starp  x15638
+      01113 bjm+176        line 553: bds,	repeat 20, starp  x15638
+      03776 nnn+4          not on the tape  x14368
+      03777 nnn+5          not on the tape  x14368
+      04001 nnn+7          not on the tape  x14368
+      04002 nnn+10         not on the tape  x14368
+      04006 nnn+14         not on the tape  x14368
+      04007 nnn+15         not on the tape  x14368
+      04011 nnn+17         not on the tape  x14368
+      04012 nnn+20         not on the tape  x14368
+      04016 nnn+24         not on the tape  x14368
+      04017 nnn+25         not on the tape  x14368
+      04021 nnn+27         not on the tape  x14368
+      04022 nnn+30         not on the tape  x14368
+      04026 nnn+34         not on the tape  x14368
+      04027 nnn+35         not on the tape  x14368
+      04031 nnn+37         not on the tape  x14368
+      04032 nnn+40         not on the tape  x14368
+      04036 nnn+44         not on the tape  x14368
+      04037 nnn+45         not on the tape  x14368
+      04041 nnn+47         not on the tape  x14368
+      04042 nnn+50         not on the tape  x14368
+      04046 nnn+54         not on the tape  x14368
+      04047 nnn+55         not on the tape  x14368
+      04051 nnn+57         not on the tape  x14368
+      04052 nnn+60         not on the tape  x14368
+      04056 nnn+64         not on the tape  x14368
+      04057 nnn+65         not on the tape  x14368
+      04061 nnn+67         not on the tape  x14368
+      04062 nnn+70         not on the tape  x14368
+      04066 nnn+74         not on the tape  x14368
+      04067 nnn+75         not on the tape  x14368
+      04071 nnn+77         not on the tape  x14368
+      04072 nnn+100        not on the tape  x14368
+      04076 nnn+104        not on the tape  x14368
+      04077 nnn+105        not on the tape  x14368
+      04101 nnn+107        not on the tape  x14368
+      04102 nnn+110        not on the tape  x14368
+      04106 nnn+114        not on the tape  x14368
+      04107 nnn+115        not on the tape  x14368
+      04111 nnn+117        not on the tape  x14368
+      04112 nnn+120        not on the tape  x14368
+      04116 nnn+124        not on the tape  x14368
+      04117 nnn+125        not on the tape  x14368
+      04121 nnn+127        not on the tape  x14368
+      04122 nnn+130        not on the tape  x14368
+      04126 nnn+134        not on the tape  x14368
+      04127 nnn+135        not on the tape  x14368
+      04131 nnn+137        not on the tape  x14368
+      04132 nnn+140        not on the tape  x14368
+      04136 nnn+144        not on the tape  x14368
+      04137 nnn+145        not on the tape  x14368
+      04141 nnn+147        not on the tape  x14368
+      04142 nnn+150        not on the tape  x14368
+      04146 nnn+154        not on the tape  x14368
+      04147 nnn+155        not on the tape  x14368
+      04151 nnn+157        not on the tape  x14368
+      04152 nnn+160        not on the tape  x14368
+      04161 nnn+167        not on the tape  x14368
+      04171 nnn+177        not on the tape  x14368
+      04201 nnn+207        not on the tape  x14368
+      04211 nnn+217        not on the tape  x14368
+      04221 nnn+227        not on the tape  x14368
+      04231 nnn+237        not on the tape  x14368
+      04241 nnn+247        not on the tape  x14368
+      04251 nnn+257        not on the tape  x14368
+      04260 nnn+266        not on the tape  x14368
+      04261 nnn+267        not on the tape  x14368
+      04263 nnn+271        not on the tape  x14368
+      04264 nnn+272        not on the tape  x14368
+      04270 nnn+276        not on the tape  x14368
+      04271 nnn+277        not on the tape  x14368
+      04273 nnn+301        not on the tape  x14368
+      04274 nnn+302        not on the tape  x14368
+      04303 nnn+311        not on the tape  x14368
+      04313 nnn+321        not on the tape  x14368
+      04323 nnn+331        not on the tape  x14368
+      04333 nnn+341        not on the tape  x14368
+      04343 nnn+351        not on the tape  x14368
+      04353 nnn+361        not on the tape  x14368
+      04363 nnn+371        not on the tape  x14368
+      04375 nnn+403        not on the tape  x14368
+      04405 nnn+413        not on the tape  x14368
+      04415 nnn+423        not on the tape  x14368
+      04426 nnn+434        not on the tape  x14368
+      04432 nnn+440        not on the tape  x14368
+      04436 nnn+444        not on the tape  x14368
+      04442 nnn+450        not on the tape  x14368
+      04446 nnn+454        not on the tape  x14368
+      04452 nnn+460        not on the tape  x14368
+      04456 nnn+464        not on the tape  x14368
+      04462 nnn+470        not on the tape  x14368
+      00777 bjm+62         line 553: bds,	repeat 20, starp  x13620
+      01000 bjm+63         line 553: bds,	repeat 20, starp  x13620
+      01002 bjm+65         line 553: bds,	repeat 20, starp  x13620
+      01003 bjm+66         line 553: bds,	repeat 20, starp  x13620
+      02324 sc1+4          line 1096: ril 1s  x13558
+      02335 sr8            line 1105: sr8,	ril 1s  x13558
+      02533 sq6+2          line 1218: ranct sar 9s, sar 4s, \src  x13553
+      02545 sq6+14         line 1220: ril 2s  x13553
+      04156 nnn+164        not on the tape  x12932
+      04157 nnn+165        not on the tape  x12932
+      04162 nnn+170        not on the tape  x12932
+      04166 nnn+174        not on the tape  x12932
+      04167 nnn+175        not on the tape  x12932
+      04172 nnn+200        not on the tape  x12932
+      04176 nnn+204        not on the tape  x12932
+      04177 nnn+205        not on the tape  x12932
+      04202 nnn+210        not on the tape  x12932
+      04206 nnn+214        not on the tape  x12932
+      04207 nnn+215        not on the tape  x12932
+      04212 nnn+220        not on the tape  x12932
+      04216 nnn+224        not on the tape  x12932
+      04217 nnn+225        not on the tape  x12932
+      04222 nnn+230        not on the tape  x12932
+      04226 nnn+234        not on the tape  x12932
+      04227 nnn+235        not on the tape  x12932
+      04232 nnn+240        not on the tape  x12932
+      04236 nnn+244        not on the tape  x12932
+      04237 nnn+245        not on the tape  x12932
+      04242 nnn+250        not on the tape  x12932
+      04246 nnn+254        not on the tape  x12932
+      04247 nnn+255        not on the tape  x12932
+      04252 nnn+260        not on the tape  x12932
+      04300 nnn+306        not on the tape  x12932
+      04301 nnn+307        not on the tape  x12932
+      04304 nnn+312        not on the tape  x12932
+      04310 nnn+316        not on the tape  x12932
+      04311 nnn+317        not on the tape  x12932
+      04314 nnn+322        not on the tape  x12932
+      04320 nnn+326        not on the tape  x12932
+      04321 nnn+327        not on the tape  x12932
+      04324 nnn+332        not on the tape  x12932
+      04330 nnn+336        not on the tape  x12932
+      04331 nnn+337        not on the tape  x12932
+      04334 nnn+342        not on the tape  x12932
+      04340 nnn+346        not on the tape  x12932
+      04341 nnn+347        not on the tape  x12932
+      04344 nnn+352        not on the tape  x12932
+      04350 nnn+356        not on the tape  x12932
+      04351 nnn+357        not on the tape  x12932
+      04354 nnn+362        not on the tape  x12932
+      04360 nnn+366        not on the tape  x12932
+      04361 nnn+367        not on the tape  x12932
+      04364 nnn+372        not on the tape  x12932
+      04372 nnn+400        not on the tape  x12932
+      04373 nnn+401        not on the tape  x12932
+      04376 nnn+404        not on the tape  x12932
+      04402 nnn+410        not on the tape  x12932
+      04403 nnn+411        not on the tape  x12932
+      04406 nnn+414        not on the tape  x12932
+      04412 nnn+420        not on the tape  x12932
+      04413 nnn+421        not on the tape  x12932
+      04416 nnn+424        not on the tape  x12932
+      04422 nnn+430        not on the tape  x12932
+      04423 nnn+431        not on the tape  x12932
+      04425 nnn+433        not on the tape  x12932
+      04433 nnn+441        not on the tape  x12932
+      04435 nnn+443        not on the tape  x12932
+      04443 nnn+451        not on the tape  x12932
+      04445 nnn+453        not on the tape  x12932
+      04453 nnn+461        not on the tape  x12932
+      04455 nnn+463        not on the tape  x12932
+      04463 nnn+471        not on the tape  x12932
+      04465 nnn+473        not on the tape  x12932
+      04466 nnn+474        not on the tape  x12932
+      04472 nnn+500        not on the tape  x12932
+      04473 nnn+501        not on the tape  x12932
+      04475 nnn+503        not on the tape  x12932
+      04476 nnn+504        not on the tape  x12932
+      04532 nnn+540        not on the tape  x12738
+      04533 nnn+541        not on the tape  x12738
+      04535 nnn+543        not on the tape  x12738
+      04536 nnn+544        not on the tape  x12738
+      04542 nnn+550        not on the tape  x12738
+      04543 nnn+551        not on the tape  x12738
+      04545 nnn+553        not on the tape  x12738
+      04546 nnn+554        not on the tape  x12738
+      04552 nnn+560        not on the tape  x12738
+      04553 nnn+561        not on the tape  x12738
+      04555 nnn+563        not on the tape  x12738
+      04556 nnn+564        not on the tape  x12738
+      04562 nnn+570        not on the tape  x12738
+      04563 nnn+571        not on the tape  x12738
+      04565 nnn+573        not on the tape  x12738
+      04566 nnn+574        not on the tape  x12738
+      04572 nnn+600        not on the tape  x12738
+      04573 nnn+601        not on the tape  x12738
+      04575 nnn+603        not on the tape  x12738
+      04576 nnn+604        not on the tape  x12738
+      04602 nnn+610        not on the tape  x12738
+      04603 nnn+611        not on the tape  x12738
+      04605 nnn+613        not on the tape  x12738
+      04606 nnn+614        not on the tape  x12738
+      04612 nnn+620        not on the tape  x12738
+      04613 nnn+621        not on the tape  x12738
+      04615 nnn+623        not on the tape  x12738
+      04616 nnn+624        not on the tape  x12738
+      04622 nnn+630        not on the tape  x12738
+      04623 nnn+631        not on the tape  x12738
+      04625 nnn+633        not on the tape  x12738
+      04626 nnn+634        not on the tape  x12738
+      04632 nnn+640        not on the tape  x12738
+      04633 nnn+641        not on the tape  x12738
+      04635 nnn+643        not on the tape  x12738
+      04636 nnn+644        not on the tape  x12738
+      04642 nnn+650        not on the tape  x12738
+      04643 nnn+651        not on the tape  x12738
+      04645 nnn+653        not on the tape  x12738
+      04646 nnn+654        not on the tape  x12738
+      04652 nnn+660        not on the tape  x12738
+      04653 nnn+661        not on the tape  x12738
+      04655 nnn+663        not on the tape  x12738
+      04656 nnn+664        not on the tape  x12738
+      04662 nnn+670        not on the tape  x12738
+      04663 nnn+671        not on the tape  x12738
+      04665 nnn+673        not on the tape  x12738
+      04666 nnn+674        not on the tape  x12738
+      04672 nnn+700        not on the tape  x12738
+      04673 nnn+701        not on the tape  x12738
+      04675 nnn+703        not on the tape  x12738
+      04676 nnn+704        not on the tape  x12738
+      04702 nnn+710        not on the tape  x12738
+      04703 nnn+711        not on the tape  x12738
+      04705 nnn+713        not on the tape  x12738
+      04706 nnn+714        not on the tape  x12738
+      04714 nnn+722        not on the tape  x12738
+      04715 nnn+723        not on the tape  x12738
+      04717 nnn+725        not on the tape  x12738
+      04720 nnn+726        not on the tape  x12738
+      04724 nnn+732        not on the tape  x12738
+      04725 nnn+733        not on the tape  x12738
+      04727 nnn+735        not on the tape  x12738
+      04730 nnn+736        not on the tape  x12738
+      04734 nnn+742        not on the tape  x12738
+      04735 nnn+743        not on the tape  x12738
+      04737 nnn+745        not on the tape  x12738
+      04740 nnn+746        not on the tape  x12738
+      04744 nnn+752        not on the tape  x12738
+      04745 nnn+753        not on the tape  x12738
+      04747 nnn+755        not on the tape  x12738
+      04750 nnn+756        not on the tape  x12738
+      04754 nnn+762        not on the tape  x12738
+      04755 nnn+763        not on the tape  x12738
+      04757 nnn+765        not on the tape  x12738
+      04760 nnn+766        not on the tape  x12738
+      04764 nnn+772        not on the tape  x12738
+      04765 nnn+773        not on the tape  x12738
+      04767 nnn+775        not on the tape  x12738
+      04770 nnn+776        not on the tape  x12738
+      04774 nnn+1002       not on the tape  x12738
+      04775 nnn+1003       not on the tape  x12738
+      04777 nnn+1005       not on the tape  x12738
+      05000 nnn+1006       not on the tape  x12738
+      05004 nnn+1012       not on the tape  x12738
+      05005 nnn+1013       not on the tape  x12738
+      05007 nnn+1015       not on the tape  x12738
+      05010 nnn+1016       not on the tape  x12738
+      05014 nnn+1022       not on the tape  x12738
+      05015 nnn+1023       not on the tape  x12738
+      05017 nnn+1025       not on the tape  x12738
+      05020 nnn+1026       not on the tape  x12738
+      05024 nnn+1032       not on the tape  x12738
+      05025 nnn+1033       not on the tape  x12738
+      05027 nnn+1035       not on the tape  x12738
+      05030 nnn+1036       not on the tape  x12738
+      05036 nnn+1044       not on the tape  x12738
+      05037 nnn+1045       not on the tape  x12738
+      05041 nnn+1047       not on the tape  x12738
+      05042 nnn+1050       not on the tape  x12738
+      05046 nnn+1054       not on the tape  x12738
+      05047 nnn+1055       not on the tape  x12738
+      05051 nnn+1057       not on the tape  x12738
+      05052 nnn+1060       not on the tape  x12738
+      05056 nnn+1064       not on the tape  x12738
+      05057 nnn+1065       not on the tape  x12738
+      05061 nnn+1067       not on the tape  x12738
+      05062 nnn+1070       not on the tape  x12738
+      05066 nnn+1074       not on the tape  x12738
+      05067 nnn+1075       not on the tape  x12738
+      05071 nnn+1077       not on the tape  x12738
+      05072 nnn+1100       not on the tape  x12738
+      05076 nnn+1104       not on the tape  x12738
+      05077 nnn+1105       not on the tape  x12738
+      05101 nnn+1107       not on the tape  x12738
+      05102 nnn+1110       not on the tape  x12738
+      05106 nnn+1114       not on the tape  x12738
+      05107 nnn+1115       not on the tape  x12738
+      05111 nnn+1117       not on the tape  x12738
+      05112 nnn+1120       not on the tape  x12738
+      05116 nnn+1124       not on the tape  x12738
+      05117 nnn+1125       not on the tape  x12738
+      05121 nnn+1127       not on the tape  x12738
+      05122 nnn+1130       not on the tape  x12738
+      05130 nnn+1136       not on the tape  x12738
+      05131 nnn+1137       not on the tape  x12738
+      05133 nnn+1141       not on the tape  x12738
+      05134 nnn+1142       not on the tape  x12738
+      05140 nnn+1146       not on the tape  x12738
+      05141 nnn+1147       not on the tape  x12738
+      05143 nnn+1151       not on the tape  x12738
+      05144 nnn+1152       not on the tape  x12738
+      05150 nnn+1156       not on the tape  x12738
+      05151 nnn+1157       not on the tape  x12738
+      05153 nnn+1161       not on the tape  x12738
+      05154 nnn+1162       not on the tape  x12738
+      05162 nnn+1170       not on the tape  x12738
+      05163 nnn+1171       not on the tape  x12738
+      05165 nnn+1173       not on the tape  x12738
+      05166 nnn+1174       not on the tape  x12738
+      05172 nnn+1200       not on the tape  x12738
+      05173 nnn+1201       not on the tape  x12738
+      05175 nnn+1203       not on the tape  x12738
+      05176 nnn+1204       not on the tape  x12738
+      05202 nnn+1210       not on the tape  x12738
+      05203 nnn+1211       not on the tape  x12738
+      05205 nnn+1213       not on the tape  x12738
+      05206 nnn+1214       not on the tape  x12738
+      05212 nnn+1220       not on the tape  x12738
+      05213 nnn+1221       not on the tape  x12738
+      05215 nnn+1223       not on the tape  x12738
+      05216 nnn+1224       not on the tape  x12738
+      01700 mg2+2          line 839: swap  x11934
+      01701 mg2+3          line 839: swap  x11934
+      00767 bjm+52         line 553: bds,	repeat 20, starp  x11680
+      00770 bjm+53         line 553: bds,	repeat 20, starp  x11680
+      00772 bjm+55         line 553: bds,	repeat 20, starp  x11680
+      00773 bjm+56         line 553: bds,	repeat 20, starp  x11680
+      02334 mom+5          line 1104: ral 7s  x11546
+      00327 dv1+10         line 369: rcr 9s  x11264
+      00330 dv1+11         line 370: rcr 9s  x11264
+      00332 dv1+13         line 372: rcr 9s  x11264
+      00333 dv1+14         line 373: rcr 9s  x11264
+      00757 bjm+42         line 553: bds,	repeat 20, starp  x9724
+      00760 bjm+43         line 553: bds,	repeat 20, starp  x9724
+      00762 bjm+45         line 553: bds,	repeat 20, starp  x9724
+      00763 bjm+46         line 553: bds,	repeat 20, starp  x9724
+      02604 mco+5          line 1239: ral 3s  x8426
+      00654 blp+4          line 525: random  x7819
+      00660 blp+10         line 526: rar 9s  x7819
+      00666 blp+16         line 532: ral 4s  x7819
+      00700 bpt+2          line 542: random  x7819
+      01122 bpx+3          line 558: swap  x7819
+      01123 bpx+4          line 558: swap  x7819
+      01125 bpx+6          line 560: swap  x7819
+      01126 bpx+7          line 560: swap  x7819
+      00747 bjm+32         line 553: bds,	repeat 20, starp  x7682
+      00750 bjm+33         line 553: bds,	repeat 20, starp  x7682
+      00752 bjm+35         line 553: bds,	repeat 20, starp  x7682
+      00753 bjm+36         line 553: bds,	repeat 20, starp  x7682
+      02316 ss2+2          line 1088: rir 4s  x6702
+      00737 bjm+22         line 553: bds,	repeat 20, starp  x5710
+      00740 bjm+23         line 553: bds,	repeat 20, starp  x5710
+      00742 bjm+25         line 553: bds,	repeat 20, starp  x5710
+      00743 bjm+26         line 553: bds,	repeat 20, starp  x5710
+      00727 bjm+12         line 553: bds,	repeat 20, starp  x3772
+      00730 bjm+13         line 553: bds,	repeat 20, starp  x3772
+      00732 bjm+15         line 553: bds,	repeat 20, starp  x3772
+      00733 bjm+16         line 553: bds,	repeat 20, starp  x3772
+      00436 och+1          line 437: rcl 3s  x2494
+      00717 bjm+2          line 553: bds,	repeat 20, starp  x1848
+      00720 bjm+3          line 553: bds,	repeat 20, starp  x1848
+      00722 bjm+5          line 553: bds,	repeat 20, starp  x1848
+      00723 bjm+6          line 553: bds,	repeat 20, starp  x1848
+      04160 nnn+166        not on the tape  x1436
+      04163 nnn+171        not on the tape  x1436
+      04164 nnn+172        not on the tape  x1436
+      04170 nnn+176        not on the tape  x1436
+      04173 nnn+201        not on the tape  x1436
+      04174 nnn+202        not on the tape  x1436
+      04200 nnn+206        not on the tape  x1436
+      04203 nnn+211        not on the tape  x1436
+      04204 nnn+212        not on the tape  x1436
+      04210 nnn+216        not on the tape  x1436
+      04213 nnn+221        not on the tape  x1436
+      04214 nnn+222        not on the tape  x1436
+      04220 nnn+226        not on the tape  x1436
+      04223 nnn+231        not on the tape  x1436
+      04224 nnn+232        not on the tape  x1436
+      04230 nnn+236        not on the tape  x1436
+      04233 nnn+241        not on the tape  x1436
+      04234 nnn+242        not on the tape  x1436
+      04240 nnn+246        not on the tape  x1436
+      04243 nnn+251        not on the tape  x1436
+      04244 nnn+252        not on the tape  x1436
+      04250 nnn+256        not on the tape  x1436
+      04253 nnn+261        not on the tape  x1436
+      04254 nnn+262        not on the tape  x1436
+      04302 nnn+310        not on the tape  x1436
+      04305 nnn+313        not on the tape  x1436
+      04306 nnn+314        not on the tape  x1436
+      04312 nnn+320        not on the tape  x1436
+      04315 nnn+323        not on the tape  x1436
+      04316 nnn+324        not on the tape  x1436
+      04322 nnn+330        not on the tape  x1436
+      04325 nnn+333        not on the tape  x1436
+      04326 nnn+334        not on the tape  x1436
+      04332 nnn+340        not on the tape  x1436
+      04335 nnn+343        not on the tape  x1436
+      04336 nnn+344        not on the tape  x1436
+      04342 nnn+350        not on the tape  x1436
+      04345 nnn+353        not on the tape  x1436
+      04346 nnn+354        not on the tape  x1436
+      04352 nnn+360        not on the tape  x1436
+      04355 nnn+363        not on the tape  x1436
+      04356 nnn+364        not on the tape  x1436
+      04362 nnn+370        not on the tape  x1436
+      04365 nnn+373        not on the tape  x1436
+      04366 nnn+374        not on the tape  x1436
+      04374 nnn+402        not on the tape  x1436
+      04377 nnn+405        not on the tape  x1436
+      04400 nnn+406        not on the tape  x1436
+      04404 nnn+412        not on the tape  x1436
+      04407 nnn+415        not on the tape  x1436
+      04410 nnn+416        not on the tape  x1436
+      04414 nnn+422        not on the tape  x1436
+      04417 nnn+425        not on the tape  x1436
+      04420 nnn+426        not on the tape  x1436
+      04427 nnn+435        not on the tape  x1436
+      04431 nnn+437        not on the tape  x1436
+      04437 nnn+445        not on the tape  x1436
+      04441 nnn+447        not on the tape  x1436
+      04447 nnn+455        not on the tape  x1436
+      04451 nnn+457        not on the tape  x1436
+      04457 nnn+465        not on the tape  x1436
+      04461 nnn+467        not on the tape  x1436
+      02200 hp1+10         line 1018: random  x36
+      02211 hp1+21         line 1024: swap  x36
+      02212 hp1+22         line 1024: swap  x36
+      02216 hp1+26         line 1027: random  x36
+      02266 hp7+6          line 1064: random  x32
+      01614 a6+1           line 787: rar 6s  x2
+  wraps around: 190 sites
+      01740 mx2            line 871: mx2,	sub .  x23520
+      02103 ms1+6          line 964: mz1,	random  x7907
+      02113 ms1+16         line 968: random  x7755
+      02535 sq6+4          line 1218: ranct sar 9s, sar 4s, \src  x6300
+      00702 bpt+4          line 542: random  x3640
+      00656 blp+6          line 525: random  x3613
+      01750 my2            line 879: my2,	sub .  x602
+      00361 dv2+25         line 378: add idv  x254
+      02473 bsg+43         line 1191: sub \ssn  x158
+      04175 nnn+203        not on the tape  x95
+      02475 bsg+45         line 1193: sub \ssn  x87
+      00274 sqx+14         line 333: sub sqt  x85
+      04165 nnn+173        not on the tape  x77
+      04205 nnn+213        not on the tape  x76
+      02566 sq6+35         line 1229: st2,	yincr \sx1, \sy1, sub  x65
+      04230 nnn+236        not on the tape  x63
+      04220 nnn+226        not on the tape  x61
+      04210 nnn+216        not on the tape  x55
+      04215 nnn+223        not on the tape  x53
+      04713 nnn+721        not on the tape  x52
+      02163 tc1+15         line 1003: diff \mdx, mx1, (sar 3s  x51
+      02500 bsg+50         line 1196: add \scn  x50
+      02502 bsg+52         line 1198: add \scn  x48
+      04272 nnn+300        not on the tape  x46
+      04601 nnn+607        not on the tape  x43
+      04631 nnn+637        not on the tape  x43
+      04150 nnn+156        not on the tape  x39
+      04571 nnn+577        not on the tape  x39
+      04733 nnn+741        not on the tape  x38
+      04170 nnn+176        not on the tape  x37
+      05055 nnn+1063       not on the tape  x37
+      02121 mi1+1          line 973: add i my1  x37
+      04250 nnn+256        not on the tape  x36
+      05065 nnn+1073       not on the tape  x36
+      04235 nnn+243        not on the tape  x35
+      04262 nnn+270        not on the tape  x35
+      04277 nnn+305        not on the tape  x34
+      04641 nnn+647        not on the tape  x34
+      04240 nnn+246        not on the tape  x32
+      04621 nnn+627        not on the tape  x32
+      05100 nnn+1106       not on the tape  x30
+      04245 nnn+253        not on the tape  x29
+      04312 nnn+320        not on the tape  x28
+      04225 nnn+233        not on the tape  x27
+      04371 nnn+377        not on the tape  x27
+      04651 nnn+657        not on the tape  x27
+      02154 tc1+6          line 1000: diff \mdy, my1, (sar 3s  x27
+      05161 nnn+1167       not on the tape  x26
+      04160 nnn+166        not on the tape  x25
+      04551 nnn+557        not on the tape  x25
+      05035 nnn+1043       not on the tape  x25
+      04200 nnn+206        not on the tape  x23
+      04302 nnn+310        not on the tape  x23
+      04322 nnn+330        not on the tape  x23
+      04723 nnn+731        not on the tape  x23
+      04766 nnn+774        not on the tape  x23
+      05075 nnn+1103       not on the tape  x23
+      04561 nnn+567        not on the tape  x22
+      04267 nnn+275        not on the tape  x19
+      04753 nnn+761        not on the tape  x19
+      04763 nnn+771        not on the tape  x19
+      05211 nnn+1217       not on the tape  x19
+      02124 mi1+4          line 975: add i mx1  x19
+      02202 hp1+12         line 1018: random  x18
+      04307 nnn+315        not on the tape  x17
+      04671 nnn+677        not on the tape  x17
+      04701 nnn+707        not on the tape  x17
+      04743 nnn+751        not on the tape  x17
+      05045 nnn+1053       not on the tape  x17
+      05105 nnn+1113       not on the tape  x17
+      05110 nnn+1116       not on the tape  x17
+      05127 nnn+1135       not on the tape  x17
+      02220 hp1+30         line 1027: random  x17
+      05115 nnn+1123       not on the tape  x16
+      04401 nnn+407        not on the tape  x15
+      04611 nnn+617        not on the tape  x15
+      04776 nnn+1004       not on the tape  x15
+      05137 nnn+1145       not on the tape  x15
+      04541 nnn+547        not on the tape  x14
+      04130 nnn+136        not on the tape  x13
+      04773 nnn+1001       not on the tape  x13
+      05147 nnn+1155       not on the tape  x13
+      05152 nnn+1160       not on the tape  x13
+      02270 hp7+10         line 1064: random  x13
+      04257 nnn+265        not on the tape  x12
+      04531 nnn+537        not on the tape  x12
+      04716 nnn+724        not on the tape  x12
+      05003 nnn+1011       not on the tape  x12
+      05006 nnn+1014       not on the tape  x12
+      05132 nnn+1140       not on the tape  x12
+      05171 nnn+1177       not on the tape  x12
+      04020 nnn+26         not on the tape  x11
+      05013 nnn+1021       not on the tape  x11
+      05023 nnn+1031       not on the tape  x11
+      05142 nnn+1150       not on the tape  x11
+      05164 nnn+1172       not on the tape  x11
+      02213 hp1+23         line 1025: add i my1  x11
+      04414 nnn+422        not on the tape  x10
+      04736 nnn+744        not on the tape  x10
+      05026 nnn+1034       not on the tape  x10
+      02462 bsg+32         line 1186: diff \mdx, mx1, (sar 3s  x9
+      04362 nnn+370        not on the tape  x9
+      04661 nnn+667        not on the tape  x9
+      05016 nnn+1024       not on the tape  x9
+      05060 nnn+1066       not on the tape  x9
+      05120 nnn+1126       not on the tape  x9
+      05201 nnn+1207       not on the tape  x9
+      04374 nnn+402        not on the tape  x8
+      04756 nnn+764        not on the tape  x8
+      05050 nnn+1056       not on the tape  x8
+      02207 hp1+17         line 1022: add i mx1  x8
+      04030 nnn+36         not on the tape  x7
+      04040 nnn+46         not on the tape  x7
+      04317 nnn+325        not on the tape  x7
+      04704 nnn+712        not on the tape  x7
+      04746 nnn+754        not on the tape  x7
+      05174 nnn+1202       not on the tape  x7
+      05214 nnn+1222       not on the tape  x7
+      02563 sq6+32         line 1229: st2,	yincr \sx1, \sy1, sub  x7
+      02446 bsg+16         line 1178: diff \mdy, my1, (sar 3s  x6
+      03775 nnn+3          not on the tape  x6
+      04000 nnn+6          not on the tape  x6
+      04010 nnn+16         not on the tape  x6
+      04035 nnn+43         not on the tape  x6
+      04332 nnn+340        not on the tape  x6
+      04337 nnn+345        not on the tape  x6
+      04404 nnn+412        not on the tape  x6
+      04441 nnn+447        not on the tape  x6
+      05070 nnn+1076       not on the tape  x6
+      05204 nnn+1212       not on the tape  x6
+      04070 nnn+76         not on the tape  x5
+      04110 nnn+116        not on the tape  x5
+      04140 nnn+146        not on the tape  x5
+      04554 nnn+562        not on the tape  x5
+      04634 nnn+642        not on the tape  x5
+      04726 nnn+734        not on the tape  x5
+      05040 nnn+1046       not on the tape  x5
+      04050 nnn+56         not on the tape  x4
+      04055 nnn+63         not on the tape  x4
+      04075 nnn+103        not on the tape  x4
+      04105 nnn+113        not on the tape  x4
+      04162 nnn+170        not on the tape  x4
+      04202 nnn+210        not on the tape  x4
+      04411 nnn+417        not on the tape  x4
+      04421 nnn+427        not on the tape  x4
+      04544 nnn+552        not on the tape  x4
+      04654 nnn+662        not on the tape  x4
+      04664 nnn+672        not on the tape  x4
+      04674 nnn+702        not on the tape  x4
+      04060 nnn+66         not on the tape  x3
+      04115 nnn+123        not on the tape  x3
+      04120 nnn+126        not on the tape  x3
+      04125 nnn+133        not on the tape  x3
+      04135 nnn+143        not on the tape  x3
+      04145 nnn+153        not on the tape  x3
+      04155 nnn+163        not on the tape  x3
+      04212 nnn+220        not on the tape  x3
+      04347 nnn+355        not on the tape  x3
+      04357 nnn+365        not on the tape  x3
+      04431 nnn+437        not on the tape  x3
+      04461 nnn+467        not on the tape  x3
+      04471 nnn+477        not on the tape  x3
+      04604 nnn+612        not on the tape  x3
+      04015 nnn+23         not on the tape  x2
+      04025 nnn+33         not on the tape  x2
+      04100 nnn+106        not on the tape  x2
+      04172 nnn+200        not on the tape  x2
+      04222 nnn+230        not on the tape  x2
+      04232 nnn+240        not on the tape  x2
+      04242 nnn+250        not on the tape  x2
+      04252 nnn+260        not on the tape  x2
+      04304 nnn+312        not on the tape  x2
+      04314 nnn+322        not on the tape  x2
+      04324 nnn+332        not on the tape  x2
+      04334 nnn+342        not on the tape  x2
+      04344 nnn+352        not on the tape  x2
+      04364 nnn+372        not on the tape  x2
+      04376 nnn+404        not on the tape  x2
+      04406 nnn+414        not on the tape  x2
+      04416 nnn+424        not on the tape  x2
+      04430 nnn+436        not on the tape  x2
+      04440 nnn+446        not on the tape  x2
+      04451 nnn+457        not on the tape  x2
+      04574 nnn+602        not on the tape  x2
+      04624 nnn+632        not on the tape  x2
+      04644 nnn+652        not on the tape  x2
+      04045 nnn+53         not on the tape  x1
+      04065 nnn+73         not on the tape  x1
+      04327 nnn+335        not on the tape  x1
+      04614 nnn+622        not on the tape  x1
+  multiply or divide step: 35 sites
+      00205 mp1+5          line 285: repeat 21, mus mp2  x195436
+      00206 mp1+6          line 285: repeat 21, mus mp2  x195436
+      00207 mp1+7          line 285: repeat 21, mus mp2  x195436
+      00210 mp1+10         line 285: repeat 21, mus mp2  x195436
+      00211 mp1+11         line 285: repeat 21, mus mp2  x195436
+      00212 mp1+12         line 285: repeat 21, mus mp2  x195436
+      00213 mp1+13         line 285: repeat 21, mus mp2  x195436
+      00214 mp1+14         line 285: repeat 21, mus mp2  x195436
+      00215 mp1+15         line 285: repeat 21, mus mp2  x195436
+      00216 mp1+16         line 285: repeat 21, mus mp2  x195436
+      00217 mp1+17         line 285: repeat 21, mus mp2  x195436
+      00220 mp1+20         line 285: repeat 21, mus mp2  x195436
+      00221 mp1+21         line 285: repeat 21, mus mp2  x195436
+      00222 mp1+22         line 285: repeat 21, mus mp2  x195436
+      00223 mp1+23         line 285: repeat 21, mus mp2  x195436
+      00224 mp1+24         line 285: repeat 21, mus mp2  x195436
+      00225 mp1+25         line 285: repeat 21, mus mp2  x195436
+      00337 dv2+3          line 377: repeat 22, dis idv  x21802
+      00340 dv2+4          line 377: repeat 22, dis idv  x21802
+      00341 dv2+5          line 377: repeat 22, dis idv  x21802
+      00342 dv2+6          line 377: repeat 22, dis idv  x21802
+      00343 dv2+7          line 377: repeat 22, dis idv  x21802
+      00344 dv2+10         line 377: repeat 22, dis idv  x21802
+      00345 dv2+11         line 377: repeat 22, dis idv  x21802
+      00346 dv2+12         line 377: repeat 22, dis idv  x21802
+      00347 dv2+13         line 377: repeat 22, dis idv  x21802
+      00350 dv2+14         line 377: repeat 22, dis idv  x21802
+      00351 dv2+15         line 377: repeat 22, dis idv  x21802
+      00352 dv2+16         line 377: repeat 22, dis idv  x21802
+      00353 dv2+17         line 377: repeat 22, dis idv  x21802
+      00354 dv2+20         line 377: repeat 22, dis idv  x21802
+      00355 dv2+21         line 377: repeat 22, dis idv  x21802
+      00356 dv2+22         line 377: repeat 22, dis idv  x21802
+      00357 dv2+23         line 377: repeat 22, dis idv  x21802
+      00360 dv2+24         line 377: repeat 22, dis idv  x21802
+  bit operation on a negative: 24 sites
+      00230 mp1+30         line 288: xor mpy  x96584
+      02106 ms1+11         line 966: ior (scl  x16878
+      00372 dv2+36         line 387: xor dvd  x11391
+      00131 si3+24         line 231: xor sin  x10594
+      02700 sr7+12         line 1297: and (600000  x10164
+      02677 sr7+11         line 1296: ior i mco  x8797
+      02112 ms1+15         line 968: random  x8500
+      02105 ms1+10         line 965: and (777  x8498
+      02603 mco+4          line 1238: and \scw  x8426
+      02102 ms1+5          line 964: mz1,	random  x8382
+      00661 blp+11         line 527: and (add 340  x7819
+      00667 blp+17         line 533: and (add 340  x7819
+      02534 sq6+3          line 1218: ranct sar 9s, sar 4s, \src  x6790
+      00671 blp+21         line 535: xor (377777  x3976
+      00663 blp+13         line 529: xor (377777  x3955
+      00655 blp+5          line 525: random  x3916
+      00701 bpt+3          line 542: random  x3894
+      01511 fpr+46         line 718: xor mtb  x608
+      01515 fpr+52         line 722: xor mtb 1  x341
+      02272 hp7+12         line 1065: ior (400000  x32
+      02201 hp1+11         line 1018: random  x18
+      02217 hp1+27         line 1027: random  x17
+      02267 hp7+7          line 1064: random  x16
+      01577 a5+1           line 774: and (40  x5
+  shift right rounds toward zero: 20 sites
+      02554 sq6+23         line 1224: scale \cs, 8s, \scn  x13386
+      02156 tc1+10         line 1001: sar 9s  x12379
+      02551 sq6+20         line 1223: sq7,	scale \sn, 8s, \ssn  x11569
+      02147 tc1+1          line 998: sar 9s  x10195
+      02537 sq6+6          line 1218: ranct sar 9s, sar 4s, \src  x6786
+      02540 sq6+7          line 1218: ranct sar 9s, sar 4s, \src  x6361
+      02436 bsg+6          line 1173: sar 9s  x6010
+      02510 bsg+60         line 1201: scale \cs, 9s, \scn  x6010
+      02470 bsg+40         line 1188: sp2,	scale \cs, 5s, \scn  x5849
+      02367 mth+24         line 1134: sar 9s  x5638
+      02360 mth+15         line 1125: sar 9s  x4805
+      02451 bsg+21         line 1180: sar 9s  x4579
+      02505 bsg+55         line 1200: scale \sn, 9s, \ssn  x4579
+      02370 mth+25         line 1135: sar 2s  x4497
+      02465 bsg+35         line 1187: sp1,	scale \sn, 5s, \ssn  x4491
+      00704 bpt+6          line 543: sar 9s  x3897
+      02361 mth+16         line 1126: sar 2s  x3878
+      00705 bpt+7          line 544: sar 5s  x3768
+      01770 mb2+2          line 895: sar 8s  x9
+      02073 mex+21         line 959: sar 3s  x2
+  combined shift of a negative: 7 sites
+      00311 idv+3          line 354: scr 9s  x11264
+      00312 idv+4          line 355: scr 8s  x11264
+      00127 si3+22         line 229: scl 3s  x10594
+      02115 ms1+20         line 969: scr 9s  x8353
+      02120 mi1            line 972: mi1,	hlt  x8353
+      02204 hp1+14         line 1019: scr 9s  x20
+      02222 hp1+32         line 1028: scr 9s  x18
+  tests minus zero: 5 sites
+      00324 dv1+5          line 366: sma  x11264
+      00706 bpt+10         line 545: spa  x464
+      02541 sq6+10         line 1218: ranct sar 9s, sar 4s, \src  x446
+      00174 mpy+3          line 276: spa  x48
+      00201 mp1+1          line 281: spa  x48
+
+halts: 02623 sr1+6          line 1250: hlt x4
+
+idioms, counted: 54 instructions whose address field the program steps (cursors); 14 instruction words used as pointers; 14 return addresses

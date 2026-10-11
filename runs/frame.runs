@@ -1,8 +1,16 @@
 # One pass of the main loop is one frame (ml0 .. ml0). The Network only
 # decides what fires: its guards read Records, and every value it moves
 # between Processors goes through a Record.
+#
+# The frame is the whole game, so its contract is the game's boundary with
+# presentation: what crosses it is declared here, as a Processor declares
+# its Records. Every other Record is the game's own. So far only the
+# display's points leave; the control word, the sense switches and the
+# words the game reads from core at power-on come in once the Processors
+# that read them are ported.
 
 network frame                                               # ml0
+  writes: display
   run begin_frame
   # The restart checks: while both ships fly on their own calc routines and
   # one still has torpedoes, the restart delay is held; otherwise it counts

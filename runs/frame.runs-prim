@@ -49,7 +49,9 @@ processor charge_time(slot)                                 # mq4
   reads: objects
   set frame.spare_time = objects.cycles[slot] + frame.spare_time
 
-# The spare-time loop burns the rest of the frame's instruction budget.
+# The spare-time loop burns the rest of the frame's instruction budget. It
+# is pacing: begin_frame, charge_time and spare_time alone use the budget,
+# and nothing in the game reads it after, so its effects are presentation.
 processor spare_time
   writes: frame
   loop at most 0400001:

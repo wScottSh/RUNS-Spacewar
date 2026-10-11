@@ -2,6 +2,11 @@
 a value is spelled as a word. It is what a RUNS-to-PDP-1 compiler would
 place by, and what the checks use to read Ground Truth's core as Records.
 
+The binding holds only choices that play cannot observe. Where play reads
+the layout, the RUNS text has to state it, and the binding follows the
+text. tools/reach_oracle.py finds where play reaches the layout; so far it
+finds no layout read that play observes (INTENT.md).
+
 The addresses come from the oracle listing's symbol table, never from a
 hard-coded number."""
 from __future__ import annotations
@@ -33,7 +38,18 @@ FIELDS = {
     ("frame", "spare_time"): "mtc", ("frame", "restart_delay"): "ntd", ("frame", "objects_seen"): "moc",
     ("tunables", "collision_radius"): "me1", ("tunables", "collision_radius_half"): "me2",
     ("tunables", "hyperspatial_uncertainty"): "hur",
+    ("explosion_cloud", "particles"): "mxc",
+    ("square_root_call", "entry"): "sqt", ("square_root_call", "passes_left"): "sq1",
+    ("square_root_call", "root"): "sq2",
 }
+
+# Fields the original keeps inside an instruction, not in a word of their
+# own: the value is the shift count of the instruction at that label, which
+# the program builds or sets and then executes. explosion_cloud.spread picks
+# mst's scr 1s or scr 3s (dap msh); explosion_cloud.scatter is the count of
+# the scl the program writes whole at mi1. handoff has no place in core: its
+# fields are AC and IO between two instructions.
+INSTRUCTION_FIELDS = {("explosion_cloud", "spread"): "msh", ("explosion_cloud", "scatter"): "mi1"}
 
 # calc_routine: the routine's entry, and the sign bit when it does not collide.
 ROUTINE_WORDS = {"none": None, "first_spaceship": "ss1", "second_spaceship": "ss2",

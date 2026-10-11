@@ -28,6 +28,8 @@ processor scatter_particle
   writes: explosion_cloud
   set explosion_cloud.scatter = popcount(random.number & 0777)
 
+# The dot is presentation. The random numbers drawn for it, and the count of
+# dots left, are the game: hyperspace draws from the same generator.
 processor plot_particle(slot)
   reads: random, objects
   writes: explosion_cloud, display
