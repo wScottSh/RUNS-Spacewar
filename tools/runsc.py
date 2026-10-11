@@ -1098,7 +1098,7 @@ class Unit:
         if end is not None:
             exit_(end, b.name)
 
-    def flat(self, r: runs.Routine, names: dict | None = None) -> list:
+    def flat(self, r: runs.Routine, names: dict | None = None, tail: bool = True) -> list:
         """A routine's statements in the order the PDP-1 runs them: a
         Processor's body; a Network's Processors in the order it fires
         them, under its guards and loops, with a call where it runs another
@@ -1111,7 +1111,7 @@ class Unit:
             if (cleared := self.clears_table(body)) is not None:
                 return [cleared]
             return body
-        return self.flat_body(body, r)
+        return self.flat_body(body, r, tail=tail)
 
     def label(self, what: str) -> str:
         self.labels += 1
@@ -1168,17 +1168,19 @@ class Unit:
             return out
         return rebuild(stmts)
 
-    def flat_body(self, items: list, r: runs.Routine, in_slots: bool = False) -> list:
+    def flat_body(self, items: list, r: runs.Routine, in_slots: bool = False, tail: bool = False) -> list:
+        """tail: the routine ends where items end."""
         out: list = []
         back = None
         for n, s in enumerate(items):
             op = s[0]
+            last = tail and n == len(items) - 1
             if back and op == "run" and s[1] == back:
                 back = None                 # the code jumps back into it
                 continue
             if op == "if":
-                out.append(("if", [(c, self.flat_body(b, r, in_slots)) for c, b in s[1]],
-                            self.flat_body(s[2], r, in_slots), s[3]))
+                out.append(("if", [(c, self.flat_body(b, r, in_slots, last)) for c, b in s[1]],
+                            self.flat_body(s[2], r, in_slots, last), s[3]))
             elif op == "loop":
                 out.append(("loop", s[1], self.flat_body(s[2], r, in_slots), s[3]))
             elif op == "for":
@@ -1198,19 +1200,23 @@ class Unit:
                     self.callees.add(name)
                     out.append(("call", name, {}, s[-1]))
                     callee = self.binds.bound[name]
+                    if callee.convention == "BLOCK" and not callee.code and not last:
+                        raise BindError(f"{s[-1]}: {name} is a block, entered by a jump that does not come back: "
+                                        f"run it as the last thing {r.name} does")
                     if callee.code:
                         # code a Record holds jumps back to the routine the Network runs next
                         if n + 1 >= len(items) or items[n + 1][0] != "run":
                             raise BindError(f"{s[-1]}: {name} runs code that jumps back: run where next")
                         callee.back = items[n + 1][1]
                     back = callee.back
-                    if back and (n + 1 >= len(items) or items[n + 1][:2] != ("run", back)):
-                        raise BindError(f"{s[-1]}: {name} jumps back to {back}, so run {back} comes next")
+                    if back and (n + 1 >= len(items) or items[n + 1][:3] != ("run", back, args)):
+                        raise BindError(f"{s[-1]}: {name} jumps back to {back}, so run {back}"
+                                        f"({', '.join(a[1] for a in args)}) comes next")
                     continue
                 inner = self.prog.routines.get(name)
                 if inner is None:
                     raise BindError(f"{s[-1]}: {name} is neither ported nor bound")
-                body = self.flat(inner, dict(zip(inner.params, args)))
+                body = self.flat(inner, dict(zip(inner.params, args)), last)
                 if inner.kind == "processor":
                     body = self.own_copy(body, s[-1])
                 if name == self.current.exit_after:
