@@ -1623,6 +1623,8 @@ def check(prog: Program) -> Program:
         check_scope(prog, r)
         if r.kind == "processor":
             check_declarations(prog, r)
+        if any(r.name in fires(prog, t, set()) for t in runs_of(r.body)):
+            raise RunsError(f"{r.name} fires itself: a recursion is a stack Record and a bounded Network loop")
     check_types(prog)
     check_contracts(prog)
     return prog

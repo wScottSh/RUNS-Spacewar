@@ -578,14 +578,31 @@ class Bindings:
 
     def check_names(self):
         """Every value of a binding that names a field, a routine, a member
-        or a local names one the RUNS text has, and no two fields share a
-        cursor."""
+        or a local names one the RUNS text has, and each name a binding gives
+        a C word of its own names nothing else."""
         bound = set(self.bound)
-        cursors = list(self.cursors.values()) + [c for m in self.slot_cursors.values() for c in m.values()] \
-            + [c for s in self.specs.values() for c in s.get("walk", {}).get("other", {}).values()] \
-            + [self.table[k] for k in ("clear",) if k in self.table]
-        if twice := sorted({c for c in cursors if cursors.count(c) > 1}):
-            raise BindError(f"cursors {twice} each point at two fields' words")
+        for f, other in self.shared.items():
+            if other in self.shared or other == f:
+                raise BindError(f"[share] {f} lives in {other}'s word, which is a word of its own: "
+                                f"not {f} itself, and not shared with a third")
+        made = self.made_names()
+        taken = set(self.prog.routines) | set(self.prog.records) | {self.c_name(f) for f in self.field_names()}
+        if clash := sorted({n for n in made if made.count(n) > 1 or n in taken}):
+            raise BindError(f"{clash}: a name a binding gives a cursor, the table, a block, an exit or a slot "
+                            f"names nothing else")
+        for r in self.table.get("records", []):
+            if self.prog.records.get(r) is None or self.prog.records[r].count is None or self.prog.records[r].stream:
+                raise BindError(f"[table] records: {r!r} is no collection of the RUNS")
+        homed: dict[str, list[str]] = {}
+        for path, spec in self.specs.items():
+            for f in spec.get("walk", {}).get("homes", []) + list(spec.get("walk", {}).get("home_in", {})):
+                homed.setdefault(f, []).append(path.name)
+        if twice := sorted(f for f, units in homed.items() if len(units) > 1):
+            raise BindError(f"{twice}: a cursor is homed in one instruction, of one unit ({homed[twice[0]]})")
+        for f, how in self.devices.items():
+            if len({"read", "sense"} & set(how)) != 1 or "or_into_io" in how and "read" not in how:
+                raise BindError(f"{DEVICES}: {f} is read by an instruction (read) or held in a sense switch "
+                                f"(sense): {how}")
         for path, spec in self.specs.items():
             def routine(name: str, what: str):
                 if name not in self.prog.routines:
@@ -621,18 +638,14 @@ class Bindings:
                     raise BindError(f"{path.name}: [walk] homes {f}, which has no cursor ([cursors])")
             if "set_after" in walk and "index" not in walk:
                 raise BindError(f"{path.name}: [walk] names the field whose cursor ends the walk (index)")
+            if "index" in walk and (walk["index"] not in self.cursors
+                                    or "other" in walk and walk["index"] not in walk["other"]):
+                raise BindError(f"{path.name}: [walk] index {walk['index']}, which has no cursor in each walk "
+                                f"([cursors], [walk.other])")
             for f in [walk.get("index")] + walk.get("homes", []) + list(walk.get("home_in", {})) \
                     + list(walk.get("other", {})) + ([walk["stray"]["after"]] if "stray" in walk else []):
                 if f:
                     self.check_field(path, f)
-            if "stray" in walk:
-                cursor = walk["stray"]["cursor"]
-                taken = set(self.cursors.values()) | set(walk.get("other", {}).values()) \
-                    | {c for m in self.slot_cursors.values() for c in m.values()} \
-                    | {self.table.get("clear")} | {self.c_name(f) for f in self.field_names()}
-                if cursor in taken:
-                    raise BindError(f"{path.name}: [walk] stray {cursor!r} is a name a field or a cursor has: "
-                                    f"a stray cursor is one no field has")
             for r in spec.get("table", {}).get("records", []):
                 if r not in self.prog.records:
                     raise BindError(f"{path.name}: table.records {r!r} is no Record")
@@ -665,6 +678,16 @@ class Bindings:
                 for key in ("args_done", "exit_after"):
                     if key in p and p[key] not in runs_here:
                         raise BindError(f"{path.name}: {b.name} {key}: {p[key]!r} is no routine it runs")
+
+    def made_names(self) -> list[str]:
+        """The names the bindings give C words of their own: the cursors, the
+        table, the blocks, the exits and the slots. They never reach the image."""
+        return list(self.cursors.values()) + [c for m in self.slot_cursors.values() for c in m.values()] \
+            + [c for s in self.specs.values() for c in s.get("walk", {}).get("other", {}).values()] \
+            + [self.table[k] for k in ("at", "clear") if k in self.table] \
+            + [s["walk"]["stray"]["cursor"] for s in self.specs.values() if "stray" in s.get("walk", {})] \
+            + [p[k] for s in self.specs.values() for p in s.get("place", []) for k in ("block", "exit", "jsp_slot")
+               if k in p]
 
     def field_names(self):
         return (f"{r}.{f}" for r, rec in self.prog.records.items() for f in rec.fields)
@@ -958,7 +981,8 @@ class Unit:
         tape: an entry word is punched as 0, a register holds what the
         caller left, a pool word or an instruction what the program first
         stores there. Its RUNS initial value must be 0."""
-        fields = set(self.binds.pool) | set(self.binds.homes)
+        fields = set(self.binds.pool) | set(self.binds.homes) \
+            | {f for f in self.binds.field_names() if self.binds.in_register(f, self.path)}
         for p in self.spec.get("place", []) + self.spec.get("inline", []):
             if "routine" in p:
                 b = self.binds.bound[p["routine"]]
@@ -1439,7 +1463,7 @@ class Unit:
         for f in sorted(self.kinds):
             name = self.binds.c_name(f)
             if self.binds.homes[f] == "table":
-                head += [f"HOMED const shift *{name};", f"extern shift {name}_shifts[{len(self.tables[f])}];"]
+                head += [f"HOMED const shift *{name};", f"extern shift {name}_shifts[{len(self.shift_table(f))}];"]
             else:
                 head.append(f"HOMED shift {name} = SHIFT_UNSET;")
         return "\n".join(head + inline + body) + "\n"
@@ -1886,6 +1910,10 @@ class Function:
                     continue
                 sets = [k for k in range(j) if any(y[0] in ("let", "set") and y[1] == ("name", local)
                                                    for y in walk([stmts[k]]))]
+                if sum(y[0] in ("let", "set") and y[1] == ("name", local) for y in walk(self.stmts)) \
+                        != sum(y[0] in ("let", "set") and y[1] == ("name", local) for y in walk(stmts[:j])):
+                    raise BindError(f"{d[-1]}: the jump into the loop's copies holds {local} as it is before "
+                                    f"the loop: {local} is set only before it")
                 if sets:
                     home = f"{self.b.name}_{local}"
                     self.unit.duff_homes.add(home)
@@ -1964,6 +1992,13 @@ class Function:
     def read_later(self, name: str) -> bool:
         names = {name}
         return any(runs.mentions(r, names) or self.mentions_field(r, name) for r in self.rest)
+
+    def reads_target(self, e, target) -> bool:
+        """e reads the place target names: the local, or the field at any slot."""
+        base = target[1] if target[0] == "index" else target
+        if base[0] == "name":
+            return bool(runs.mentions(e, {base[1]}))
+        return self.mentions_field(e, dotted_of(base))
 
     @staticmethod
     def mentions_field(tree, dotted: str) -> bool:
@@ -2115,9 +2150,11 @@ class Function:
             self.preinc = target[1]             # the comparison steps it (I_LIO(++p))
             return 1
         if op == "set" and nxt and nxt[0] == "set" and nxt[2] == s[2] and s[1][0] != "tuple" \
-                and self.incremented(s) is None \
+                and self.incremented(s) is None and not self.reads_target(s[2], s[1]) \
                 and nxt[1][0] != "tuple" and not re.fullmatch(r"-?\w+", self.expr(s[2])):
-            # One value stored in two places: loaded once, kept in AC.
+            # One value stored in two places: loaded once, kept in AC. The
+            # value must not read the first place, which the second set would
+            # see changed.
             local = self.label("value")
             self.emit(depth, f"word {local} = {self.expr(s[2])};")
             self.scopes[-1].add(local)
@@ -2126,6 +2163,9 @@ class Function:
             return 2
         if (target := self.incremented(s)) is not None:
             text = self.expr(target)
+            if text.startswith("*home("):
+                raise BindError(f"{s[-1]}: the cursor's home is the first instruction that touches "
+                                f"{dotted_of(target[1]) or target}, here; a home loads or stores, it does not step")
             if nxt and nxt[0] == "if" and len(nxt[1]) == 1 \
                     and nxt[1][0][0][0] == "bin" and nxt[1][0][0][2] == target and nxt[1][0][0][3] == ("num", 0):
                 self.if_stmt(nxt, depth, f"++{text} {nxt[1][0][0][1]} 0")
@@ -3064,6 +3104,8 @@ class Function:
         callee = self.binds.bound[name]
         jump = self.unit.jumps(callee, s, self.stmts)
         target = callee.block if jump else callee.name
+        if missing := [f for f, _ in callee.params(block=jump) if f not in args]:
+            raise BindError(f"{where}: {name} takes {missing} as parameters: the RUNS sets them just before the run")
         text = f"{target}({', '.join(self.value(f, args[f]) for f, _ in callee.params(block=jump))})"
         if callee.convention == "BLOCK":
             # A run of a block is a jump to it; the firing goes on there.

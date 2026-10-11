@@ -90,7 +90,7 @@ The keys that hold for a whole unit:
 - A guard joined with `and` and `or` is laid out as jumps: each test jumps to the arm it decides, and the last falls into the first arm. A sign test that jumps on its failure keeps its own skip with the i bit flipped (`spa i`).
 - A guard on one enum field whose members' words decide it by sign and zero is a test of the word: `!= m` for every member spelled 0 is `!= 0`, for every member spelled with the sign bit `>= 0`, for both `> 0`. The guard reads the field into a local; when the arm's next guard on the field or jump through it comes first, AC keeps it, else it moves to IO.
 - `field == m` for a member spelled as an address is the member's word xor the field. Two guards in a row on one comparison share the xor.
-- Two sets in a row of one value, not a name or a number, load it once.
+- Two sets in a row of one value, not a name or a number, load it once, when the value does not read the place the first set writes.
 - `let v = ...rar(e, n)...` with `e` not a local takes `e` into `v` first: pdp1cc rotates a local in place.
 - A `match` whose arms each run the routine their member is spelled as is a jump through the field's word (`lac i ml1 / dap .+1 / jsp .`).
 - A Processor that sets every field of the table to its zero word in every slot is the clearing loop over the whole table.
@@ -113,7 +113,7 @@ The keys that hold for a whole unit:
 - An if-chain with no else whose guards test one value for `== n`, or an `or` of such tests, over 0 to some n, is a jump table (`switch`, `add (T / dap J / J, jmp .`). The arm of n lies in the table and must end in a jump; the other arms lie apart. The first lies right after the table and falls into the code after the chain; the rest lie after the routine's code, each jumping back to that code. A Network that the arms run last is laid out in the first arm, and the others jump to it (`jmp oce`). A jump after an arm's last if/else goes into both of its branches. The arms share their locals, which are declared at the routine's top.
 - A loop whose body ends with `if c: X`, no else, is laid out with the test at the bottom: back to the top while c fails, then X. When X ends with the statements just before the loop, they are laid out once and X jumps back to them, the loop's second entry (`jmp ocj`, then `och`). A break of a loop that is the routine's last statement is its return.
 - An entry word of another unit's routine is, to the caller, AC: a value carried into the call and out of it (`jda oc`).
-- A counted loop from a local up to n, that does not read its index, is a jump into a run of n + 1 copies of its body past as many as the local says (Duff's device, `bjm, jmp .` into `bds`). The jump's address is set right after the local's last set before the loop.
+- A counted loop from a local up to n, that does not read its index, is a jump into a run of n + 1 copies of its body past as many as the local says (Duff's device, `bjm, jmp .` into `bds`). The jump's address is set right after the local's last set before the loop, and `runsc` refuses a local set anywhere else.
 - A program flag set, then a new AC local and a new IO local set to 0, is one instruction (`cla cli clf 6`).
 - A plain loop that ends the routine leaves it through its breaks: each is a return.
 - An initial value may be an expression of numbers (`8192 - 1537`, `371 << 8`); the word is its value.

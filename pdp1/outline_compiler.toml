@@ -40,6 +40,6 @@ convention = "JDA"
 entry = "outline_call.code"
 inline = "outline_call.table"
 result = ["outline_call.code"]
-io = ["handoff.codes", "handoff.swap"]
+io = ["handoff.codes"]
 args_done = "mark_start"
 data = ["outline_compiler.start_over", "outline_compiler.to_other_side"]

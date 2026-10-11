@@ -28,7 +28,7 @@ homes = ["ships.angular_momentum", "ships.angle", "ships.previous_control"]
 # The cursors on the new torpedo's slot: the search's cursor (sr1) for the
 # routine word, the rest set from it in the table's order.
 [cursors."launch.slot"]
-"objects.routine" = "free_slot"
+"objects.routine" = "torpedo_routine_slot"
 "objects.x" = "torpedo_x_slot"
 "objects.y" = "torpedo_y_slot"
 "objects.counter" = "torpedo_counter_slot"
