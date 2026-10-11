@@ -12,6 +12,7 @@ hard-coded number."""
 from __future__ import annotations
 
 import sys
+import tomllib
 from pathlib import Path
 
 import runs
@@ -96,10 +97,20 @@ ROUTINE_WORDS = {"none": None, "first_spaceship": "ss1", "second_spaceship": "ss
 ENUM_WORDS = {"calc_routine": ROUTINE_WORDS,
               "control_source": {"test_word": "mg2", "control_boxes": "cwr"}}
 
+# The devices, as the binding states them in one place (pdp1/devices.toml):
+# the sense switch of each console field, the start address of each top
+# Network.
+DEVICES = tomllib.loads((ROOT / "pdp1/devices.toml").read_text())
+SWITCHES = {f.split(".")[1]: how["sense"] for f, how in DEVICES["console"].items()
+            if isinstance(how, dict) and "sense" in how}
+START = {v["at"]: v["network"] for v in DEVICES["start"]}
+
 # Fields the PDP-1 keeps in its program flags, an enum's first member
-# clear and its second set; SIMH's PF holds flag n as bit 1 << (6 - n).
-FLAGS = {("lights", "first_survived"): 1, ("lights", "second_survived"): 2, ("spaceship", "rocket"): 6,
-         ("outline_compiler", "six"): 6}
+# clear and its second set: the lights (devices.toml) and each binding's
+# [flags]. SIMH's PF holds flag n as bit 1 << (6 - n).
+FLAGS = {tuple(f.split(".")): n for f, n in DEVICES["lights"].items()} | {
+    tuple(f.split(".")): n for b in sorted((ROOT / "pdp1").glob("*.toml"))
+    for f, n in tomllib.loads(b.read_text()).get("flags", {}).items()}
 
 # The Expensive Planetarium lays out each magnitude's words in its code
 # (dislis: fpo, flo), with no symbol of their own: each instance of the

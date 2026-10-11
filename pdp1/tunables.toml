@@ -9,12 +9,9 @@ replaces = "lift/tunables.c"
 [[place]]
 machine = "sequence break"
 
+# The start vectors, from pdp1/devices.toml.
 [[place]]
-jump = "start_with_control_boxes"
-start = true
-
-[[place]]
-jump = "start_with_test_word"
+machine = "start vectors"
 
 [[place]]
 routine = "torpedo_supply"

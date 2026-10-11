@@ -77,16 +77,6 @@ stray = { after = "ships.angle", cursor = "stray_cursor" }
 "objects.counter" = "other_counter_slot"
 "objects.cycles" = "other_cycles_slot"
 
-# The console: lat reads the test word into AC; iot 11 ors the control
-# boxes into IO.
-[devices]
-"console.test_word" = "lat"
-"console.control_boxes" = { read = "control_boxes", or_into_io = true }
-
-[flags]
-"lights.first_survived" = 1
-"lights.second_survived" = 2
-
 [spell.light]
 off = 0
 on = 1

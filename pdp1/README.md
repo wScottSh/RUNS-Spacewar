@@ -10,6 +10,7 @@ A binding holds only choices that play cannot observe:
 - **Calling convention.** How a routine is entered and left: `JDA`, `JSP`, `BLOCK`, `XCT`, laid out in place, a skip return.
 - **Storage.** Which register or word carries a value: an AC or IO local, a JDA entry word, a pool word, the address field of an instruction (a cursor), the word after a call (by name).
 - **Layout of code.** Where a block of a routine's code lies when the original lays it out of order.
+- **Devices.** Which console instruction or sense switch holds each input field, which program flag lights for each output field, and at which address the operator starts each top Network. This is the presentation side of the boundary: play sees the input's value and the output's value, never the device, and a binding for another machine maps the same fields to its own controls and lights. All of it is in one file, `pdp1/devices.toml`, which `runsc` and the checks (`tools/pdp1.py`) both read; no other file names a switch, a light or a start address.
 
 ## The vocabulary
 
@@ -52,7 +53,7 @@ The keys that hold for a whole unit:
 - `[spell.<enum>]`: the word each member is: a number, or a routine's address, with the sign bit when `sign` is set (the object does not collide).
 - `[streams]`: the instruction that takes a stream's values, its first in AC and its second in IO: `dpy` plots a point; `hlt` shows the two on the console lights, and must be followed by the Network's `wait`, which the halt is.
 - `[spell.<enum>]` may also spell a member of an enum held in a program flag as 0 or 1.
-- `[devices]`: a field read by an instruction of the console (`lat`, `control_boxes`), not from core. `or_into_io`: the device ors into IO, so IO is cleared first.
+- `pdp1/devices.toml`, `[console]`: a field read by an instruction of the console (`lat`, `control_boxes`), not from core. `or_into_io`: the device ors into IO, so IO is cleared first. `{ sense = n }`: a field the console's sense switch n holds (`szs`), an enum spelled 0 and 1. `[lights]`: a field held in a program flag that lights on the console. `[[start]]`: a start address (`at`) and the top Network the operator's start there fires; `tape = true` on the tape's own start.
 - `[flags]`: a field held in a program flag; setting it to the member spelled 1 is `stf`, to the one spelled 0 `clf`.
 - `pointers`: fields that hold addresses, which the C dialect types as `word *`.
 - `[addresses]`: a field that always holds an address the layout fixes. `"after table"`: the first word after the table.
@@ -61,7 +62,6 @@ The keys that hold for a whole unit:
 - `repeat`: the Network the PDP-1 runs again when a firing ends, as the host does.
 - `[[place]] exit = "<name>"`: the shared exit of the unit's JSP routines (`srt, jmp .`), laid out where it stands. Every block of the unit that runs off its end jumps there, and it returns to the caller of the JSP routine that entered the blocks. It replaces `repeat` for the unit.
 - `[cursors."<field>"]`: the cursors on the slot a field holds, not on a routine's own slot (`launch.slot`: the free slot a new torpedo takes). Each is homed in the first instruction of the unit that uses it. Setting the field to 0 sets the first cursor to the table's start (`init sr1, mtb`). The rest are set in the table's order, each from the one before (`law nob / add sr1 / dap ss3`, then `add (nob / dap ss4`).
-- `[devices]` with `{ sense = n }`: a field the console's sense switch n holds (`szs`), an enum spelled 0 and 1.
 - `[spell.<enum>]` with `literal = true` on a routine member: its word is taken from a constant (`lac (tcr`) where the others are built by `law`. The two are the same word; which the original wrote is an encoding.
 - `[walk] homes` also serves a unit that holds no walk: the cursors the main loop steps whose homes are in this unit's instructions (`mom`, `mth`, `mco`).
 - `moves = "swap"`: a value moves from AC to IO by the `swap` macro.
@@ -122,7 +122,7 @@ The keys that hold for a whole unit:
 A `[[place]]` may instead lay out words that the PDP-1 and its operator need and that no game rule reads. `runsc` knows each kind as the PDP-1 back end, the way it knows `jda`:
 
 - `machine = "sequence break"`: words 0-2, where a sequence break saves AC, PC and IO (not punched), and word 3, a jump to the flush. `machine = "sequence break flush"`: the flush, which resumes the interrupted program. Play never raises a sequence break (spacewar-c's README: the frame check never runs these words).
-- `jump`: a start address, a jump to the named routine. `start = true` makes it the tape's own start.
+- `machine = "start vectors"`: a jump to each top Network at its start address, from `pdp1/devices.toml`.
 - `jsp_slot`: a JSP routine the operator may rewrite in place, laid out `at` an address. By default it jumps to `jump` and returns what that returns (`returns`: `ac` or `io`); `reserve` words of room follow it.
 - `machine = "constants"` and `machine = "variables"`: where the assembler lays out its literal constants and its pool words. `machine = "patch space"`: `reserve` words of room for the operator's patches (`p, . 200/`). No rule reads any of them as a place: a constant is a number of the RUNS text, and a pool word is a field.
 - `table = true`: the object table's words, from `[table] at`. The tape does not load them and a new game clears them before anything reads them, so `runsc` requires each table field's RUNS initial value to be its zero word.

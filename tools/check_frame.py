@@ -87,7 +87,7 @@ def a_frame(m: runs.Machine, rng: random.Random, outlines) -> tuple[dict, int]:
                 st[rec][f] = runs.W(rng.randrange(1 << 18))
     st["launch"]["slot"] = runs.W(rng.randrange(0o30))
     sense = rng.randrange(1 << 6)
-    for name, n in ship.SWITCHES.items():
+    for name, n in pdp1.SWITCHES.items():
         st["console"][name] = runs.Member("switch", "on" if sense >> (6 - n) & 1 else "off")
     st["controls"]["source"] = runs.Member("control_source", "test_word")
     st["console"]["test_word"] = runs.W(rng.randrange(1 << 18))

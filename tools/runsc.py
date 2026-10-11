@@ -33,6 +33,7 @@ from tools.pdp1cc import program  # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 SPACEWAR_C = ROOT.parent / "spacewar-c"
 BINDINGS = ROOT / "pdp1"
+DEVICES = "devices.toml"                   # in BINDINGS: the presentation side of the boundary
 OUT = ROOT / "build"
 
 # C precedence, loosest first, for the operators RUNS shares with C.
@@ -321,8 +322,10 @@ class Bound:
 
 # The keys a binding may hold, by where they stand.
 SCHEMA = {
-    "unit": {"replaces", "registers", "pool", "repeat", "moves", "place", "inline", "code", "share", "devices",
+    "unit": {"replaces", "registers", "pool", "repeat", "moves", "place", "inline", "code", "share",
              "into", "spell", "flags", "homes", "addresses", "table", "cursors", "walk", "streams"},
+    "devices": {"console", "lights", "start"},
+    "start": {"at", "network", "tape"},
     "walk": {"set_after", "index", "homes", "home_in", "carry", "stray", "other"},
     "stray": {"after", "cursor"},
     "table": {"at", "records", "clear"},
@@ -334,7 +337,6 @@ SCHEMA = {
     "fields": {"fields"},
     "slots": {"slots", "range", "reserve", "at"},
     "machine": {"machine", "reserve"},
-    "jump": {"jump", "start"},
     "jsp_slot": {"jsp_slot", "at", "returns", "jump", "reserve"},
     "exit": {"exit"},
     "table place": {"table"},
@@ -342,7 +344,8 @@ SCHEMA = {
 }
 VALUES = {"convention": {"JDA", "JSP", "XCT", "BLOCK"}, "loops": {"exit first"}, "shifts": {"xct"},
           "arms": {"apart"}, "moves": {"swap"}, "returns": {"io", "ac"},
-          "machine": {"constants", "variables", "patch space", "sequence break", "sequence break flush"}}
+          "machine": {"constants", "variables", "patch space", "sequence break", "sequence break flush",
+                      "start vectors"}}
 
 
 def check_schema(path: Path, spec: dict):
@@ -362,7 +365,7 @@ def check_schema(path: Path, spec: dict):
     for section in ("place", "inline", "code"):
         for p in spec.get(section, []):
             kind = section if section != "place" else next(
-                (k for k in ("routine", "fields", "slots", "machine", "jsp_slot", "jump", "exit") if k in p),
+                (k for k in ("routine", "fields", "slots", "machine", "jsp_slot", "exit") if k in p),
                 "table place" if "table" in p else "shifts" if "shifts" in p else None)
             if kind is None:
                 raise BindError(f"{path.name}: a place is a routine, fields, slots or a machine word: {p}")
@@ -382,7 +385,8 @@ class Bindings:
 
     def __init__(self, prog: runs.Program, paths: list[Path]):
         self.prog = prog
-        self.specs = {p: tomllib.loads(p.read_text()) for p in paths}
+        self.specs = {p: tomllib.loads(p.read_text()) for p in paths if p.name != DEVICES}
+        self.starts: list[dict] = []           # the start vectors: address, top Network, the tape's own
         self.bound: dict[str, Bound] = {}
         self.placed: dict[str, Path] = {}       # field -> the unit that lays out its data word
         self.cell_of: dict[str, str] = {}       # field -> the JDA routine whose entry word holds it
@@ -407,6 +411,7 @@ class Bindings:
         self.compiled: list[tuple] = []         # (Function, its statements as run) of every routine compiled
         self.insns = {f"{r}.{f}" for r, rec in prog.records.items() for f, (typ, _) in rec.fields.items()
                       if typ == "insn"}
+        self.device_file(next((p for p in paths if p.name == DEVICES), None))
         for path, spec in self.specs.items():
             check_schema(path, spec)
             for f, target in spec.get("into", {}).items():
@@ -436,9 +441,6 @@ class Bindings:
                 self.homes[f] = how
             self.spelled |= spec.get("spell", {})
             self.streams |= spec.get("streams", {})
-            for f, how in spec.get("devices", {}).items():
-                self.check_field(path, f)
-                self.devices[f] = how if isinstance(how, dict) else {"read": how}
             for f, n in spec.get("flags", {}).items():
                 self.check_field(path, f)
                 self.flags[f] = n
@@ -462,6 +464,31 @@ class Bindings:
                     self.pieces.setdefault(p["slots"], []).append((lo, hi, f"{self.c_name(p['slots'])}_{octal(lo)}"))
                     self.placed[p["slots"]] = path
         self.check_names()
+
+    def device_file(self, path: Path | None):
+        """pdp1/devices.toml: which console instruction or sense switch holds
+        each input field, which program flag lights each output, and where
+        the operator starts each top Network. Presentation: play sees the
+        values, never the devices."""
+        if path is None:
+            raise BindError(f"no {DEVICES}: the devices are bound in one place")
+        spec = tomllib.loads(path.read_text())
+        if unknown := set(spec) - SCHEMA["devices"]:
+            raise BindError(f"{path.name}: unknown keys {sorted(unknown)}")
+        for f, how in spec.get("console", {}).items():
+            self.check_field(path, f)
+            self.devices[f] = how if isinstance(how, dict) else {"read": how}
+        for f, n in spec.get("lights", {}).items():
+            self.check_field(path, f)
+            self.flags[f] = n
+        fired = set().union(set(), *(runs.runs_of(r.body) for r in self.prog.routines.values()))
+        for v in spec.get("start", []):
+            if set(v) - SCHEMA["start"] or v.get("network") not in self.prog.routines or v["network"] in fired:
+                raise BindError(f"{path.name}: a start is an address and a top Network: {v}")
+            self.starts.append(v)
+        if self.starts and sum(bool(v.get("tape")) for v in self.starts) != 1:
+            raise BindError(f"{path.name}: one start is the tape's own")
+        self.starts.sort(key=lambda v: v["at"])
 
     def check_names(self):
         """Every value of a binding that names a field, a routine, a member
@@ -513,8 +540,6 @@ class Bindings:
                 if r not in self.prog.records:
                     raise BindError(f"{path.name}: table.records {r!r} is no Record")
             for p in spec.get("place", []) + spec.get("inline", []) + spec.get("code", []):
-                if "jump" in p and "jsp_slot" not in p:
-                    routine(p["jump"], "jump")
                 if "jsp_slot" in p:
                     routine(p["jump"], "jsp_slot jump")
                 if "shifts" in p and "routine" not in p and self.homes.get(p["shifts"]) != "table":
@@ -1229,10 +1254,14 @@ class Unit:
             if p.get("reserve"):
                 out.append(f"RESERVE word {p['jsp_slot']}_space[{octal(p['reserve'])}];")
             return out
-        if "jump" in p:
-            head.append(f"BLOCK void {p['jump']}(void);")
-            start = "START " if p.get("start") else ""
-            return [f"{start}BLOCK void vector_{p['jump']}(void)", "{", f"    return {p['jump']}();", "}"]
+        if p.get("machine") == "start vectors":
+            out = []
+            for v in self.binds.starts:
+                head.append(f"BLOCK void {v['network']}(void);")
+                start = "START " if v.get("tape") else ""
+                out += [f"AT({octal(v['at'])}) {start}BLOCK void vector_{v['network']}(void)", "{",
+                        f"    return {v['network']}();", "}"]
+            return out
         raise BindError(f"{self.path.name}: a place is a routine, fields, or a machine word: {p}")
 
     def compile(self) -> str:
@@ -3505,6 +3534,7 @@ def write_tree(prog: runs.Program, out: Path) -> Path:
     paths = sorted(BINDINGS.glob("*.toml"))
     binds = Bindings(prog, paths)
     bound = {spec["replaces"]: p for p, spec in binds.specs.items()}
+
     generated = out / "lift"
     if generated.exists():
         for f in generated.iterdir():

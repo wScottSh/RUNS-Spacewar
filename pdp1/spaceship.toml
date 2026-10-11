@@ -16,14 +16,6 @@ pool = ["spaceship.controls", "spaceship.sine", "spaceship.cosine", "spaceship.g
 off = 0
 firing = 1
 
-# The sense switches: szs reads them.
-[devices]
-"console.angular_momentum" = { sense = 1 }
-"console.light_star" = { sense = 2 }
-"console.single_shot" = { sense = 3 }
-"console.star_kills" = { sense = 5 }
-"console.no_star" = { sense = 6 }
-
 [spell.switch]
 off = 0
 on = 1

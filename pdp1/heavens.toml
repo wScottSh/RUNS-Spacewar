@@ -11,9 +11,6 @@ pool = ["central_star.slope_x", "central_star.slope_y"]
 "central_star.slope_x" = "spaceship.gravity_x"
 "central_star.slope_y" = "spaceship.gravity_y"
 
-[devices]
-"console.no_planetarium" = { sense = 4 }
-
 # Each magnitude's cursor holds its place in the catalog as an address.
 [into]
 "magnitudes.cursor" = "star_catalog.words"

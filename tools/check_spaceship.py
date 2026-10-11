@@ -51,8 +51,6 @@ RECORDS = ["objects", "ships", "random", "spaceship", "pen"]
 # The arithmetic routines' own words that have a place in core.
 SCRATCH = [(rec, fld) for rec, fld in pdp1.FIELDS
            if rec in ("square_root_call", "multiply_call", "integer_multiply_call", "divide_call", "sine_call")]
-SWITCHES = {"angular_momentum": 1, "light_star": 2, "single_shot": 3, "no_planetarium": 4, "star_kills": 5,
-            "no_star": 6}
 TWO_PI = 0o311040
 
 
@@ -134,7 +132,7 @@ def a_state(m: runs.Machine, rng: random.Random, outlines: Outlines) -> tuple[st
     st["spaceship"]["rocket"] = member("rocket", rng.choice(["off", "firing"]))
     st["launch"]["slot"] = runs.W(rng.randrange(0o30))
     sense = rng.randrange(1 << 6)
-    for name, n in SWITCHES.items():
+    for name, n in pdp1.SWITCHES.items():
         st["console"][name] = member("switch", "on" if sense >> (6 - n) & 1 else "off")
     source = rng.choice(["test_word"] * 4 + ["control_boxes"])
     st["controls"]["source"] = member("control_source", source)

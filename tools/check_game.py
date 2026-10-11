@@ -257,7 +257,7 @@ def run_cases(cases: list[dict], game: Game) -> tuple[int, dict]:
                 waits.append(list(machine.state["scoreboard"]))
                 machine.state["console"]["test_word"] = runs.W(tw[1])
             m.on_wait = at_wait
-            name = {None: "frame", 4: "start_with_control_boxes", 5: "start_with_test_word"}[case["start"]]
+            name = {None: "frame", **pdp1.START}[case["start"]]
             ended = "new game"
             try:
                 m.run(name)
@@ -390,7 +390,7 @@ def play(scenario, stops: int) -> tuple[str, int, dict, list[str]]:
                 trouble += [f"stop {nxt}: {d}" for d in game.differences(m, record[nxt][2])]
         return nxt, trouble
 
-    start = {4: "start_with_control_boxes", 5: "start_with_test_word"}[scenario.start]
+    start = pdp1.START[scenario.start]
     k, trouble = fire(start, power_on, first_tw, -1)
     bad += trouble
     for k, (kind, pc, state, ac, io, tw, _) in enumerate(record):
@@ -410,7 +410,7 @@ def main() -> int:
     if cases:
         rng = random.Random(1962)
         status |= bool(control_words(game, rng, min(cases, 1000)))
-        starts = [rng.choice([None, None, None, 4, 5]) for _ in range(cases)]
+        starts = [rng.choice([None, None, None, *sorted(pdp1.START)]) for _ in range(cases)]
         batch = [a_case(game, rng, s) for s in starts]
         differ, seen = run_cases(batch, game)
         print(f"game control: {cases} cases, {cases - differ} match, {differ} differ; {seen}")

@@ -101,7 +101,7 @@ def compiled(prog: runs.Program, name: str, bound: set[str]):
 
 
 def bound_places(prog: runs.Program):
-    specs = [tomllib.loads(b.read_text()) for b in sorted(runsc.BINDINGS.glob("*.toml"))]
+    specs = [tomllib.loads(b.read_text()) for b in sorted(runsc.BINDINGS.glob("*.toml")) if b.name != runsc.DEVICES]
     places = [p for spec in specs for p in spec.get("place", []) + spec.get("inline", []) + spec.get("code", [])]
     return specs, places, {p["routine"] for p in places if "routine" in p}
 

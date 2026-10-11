@@ -36,7 +36,6 @@ from oracle_check import built_listing
 from pdp1cc.gate import corpus, simh
 from pdp1cc.gate.simh import Inputs
 
-SWITCHES = ship.SWITCHES
 PROCESSORS = ["star_slope", "draw_star", "count_frames", "skip_a_frame", "show_magnitude", "count_steps",
               "move_window"]
 MAGNITUDES = [(0, 0o22, 3), (0o22, 0o44, 2), (0o44, 0o306, 1), (0o306, 0o1652, 0)]
@@ -49,7 +48,7 @@ def flag(pf: int, n: int) -> bool:
 
 
 def console(m: runs.Machine, sense: int):
-    for name, n in SWITCHES.items():
+    for name, n in pdp1.SWITCHES.items():
         m.state["console"][name] = runs.Member("switch", "on" if sense >> (6 - n) & 1 else "off")
 
 
@@ -224,7 +223,7 @@ def main() -> int:
     failed |= bool(differ)
     m = runs.Machine(prog)
     cover_sky = Coverage(m)
-    off = 1 << (6 - SWITCHES["no_planetarium"])
+    off = 1 << (6 - pdp1.SWITCHES["no_planetarium"])
     row = [(None, rng.randrange(1 << 6) & ~off if rng.random() < 0.95 else off) for _ in range(4 * n)]
     differ, _ = planetarium(m, b, sym, display, words, row, "frames in a row")
     failed |= bool(differ)
