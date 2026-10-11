@@ -564,11 +564,11 @@ class Machine:
             self.state[rec.name] = [] if rec.stream else self.fresh(rec)
 
     def fresh(self, rec: Record):
-        def init(e):
-            return self.eval(e, Scope("initial", {})) if e is not None else UNKNOWN
+        def init(e, typ):
+            return self.typed(self.eval(e, Scope("initial", {})), typ) if e is not None else UNKNOWN
         if rec.count is None:
-            return {f: init(e) for f, (_, e) in rec.fields.items()}
-        return {f: [init(e) for _ in range(rec.count)] for f, (_, e) in rec.fields.items()}
+            return {f: init(e, typ) for f, (typ, e) in rec.fields.items()}
+        return {f: [init(e, typ) for _ in range(rec.count)] for f, (typ, e) in rec.fields.items()}
 
     # ---- running
 
@@ -679,6 +679,7 @@ class Machine:
         rec, fld, idx = self.place(target, scope, where)
         scope.check(rec, write=True)
         typ = self.prog.records[rec].fields[fld][0]
+        value = self.typed(value, typ)
         if typ == "word":
             value = as_word(value)
         elif typ in self.prog.enums and not (isinstance(value, Member) and value.enum == typ):
@@ -736,8 +737,18 @@ class Machine:
                 return self.truth(self.eval(l, scope)) and self.truth(self.eval(r, scope))
             if o == "or":
                 return self.truth(self.eval(l, scope)) or self.truth(self.eval(r, scope))
-            return binary(o, self.eval(l, scope), self.eval(r, scope))
+            a, b = self.eval(l, scope), self.eval(r, scope)
+            if isinstance(a, Member) and isinstance(b, Member):
+                b = self.typed(b, a.enum)
+            return binary(o, a, b)
         raise RunsError(f"cannot evaluate {e!r}")
+
+    def typed(self, value, enum: str):
+        """A member's name is the member of the enum it is compared with or
+        stored as, when two enums share the name (off, on)."""
+        if isinstance(value, Member) and value.enum != enum and value.name in self.prog.enums.get(enum, []):
+            return Member(enum, value.name)
+        return value
 
 
 def known(value, what: str):
@@ -810,6 +821,8 @@ def mentions(tree, names: set[str]) -> set[str]:
     """The names a statement or expression tree mentions."""
     if isinstance(tree, str):
         return {tree} & names
+    if isinstance(tree, tuple) and tree[:1] == ("field",):
+        return mentions(tree[1], names)         # a field's own name mentions nothing
     if isinstance(tree, (list, tuple)):
         return set().union(*(mentions(t, names) for t in tree)) if tree else set()
     if isinstance(tree, dict):
@@ -846,6 +859,8 @@ def reads_of(tree, records: set[str]) -> set[str]:
         targets = target[1] if target[0] == "tuple" else [target]
         inner = [t[2] for t in targets if t[0] == "index"]
         return mentions(tree[2], records) | mentions(inner, records)
+    if isinstance(tree, tuple) and tree[:1] == ("field",):
+        return mentions(tree, records)
     if isinstance(tree, (list, tuple)):
         return set().union(*(reads_of(s, records) for s in tree)) if tree else set()
     return mentions(tree, records)

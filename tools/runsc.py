@@ -179,6 +179,8 @@ class Bound:
     c_name: str | None = None           # a routine of lifted C, not compiled from RUNS: its name there
     pointers: set[str] = field(default_factory=set)     # fields that hold addresses (word *)
     io_reads: set[str] = field(default_factory=set)     # fields a guard reads into IO, AC being busy
+    back: str | None = None             # an extern block: the routine it jumps back to
+    pulse: bool = False                 # an extern block that waits for a display completion pulse
 
     @property
     def symbol(self) -> str:
@@ -241,7 +243,9 @@ class Bindings:
         self.pointers: set[str] = set()         # fields that hold addresses
         self.addresses: dict[str, str] = {}     # field -> the address it always holds
         self.table: dict = {}                   # the Records laid out field after field in one array
-        self.jsp_slots: dict[str, str] = {}     # a JSP slot's name -> what it returns in
+        self.jsp_slots: dict[str, dict] = {}    # a JSP slot's name -> what it jumps to
+        self.slot_cursors: dict[str, dict] = {} # a field holding a slot -> field -> the cursor on it
+        self.carried: set[str] = set()          # homed jumps a walk carries a field's word into
         for path, spec in self.specs.items():
             for f, name in spec.get("names", {}).items():
                 self.check_field(path, f)
@@ -249,7 +253,13 @@ class Bindings:
             self.registers |= set(spec.get("registers", []))
             for f, cursor in spec.get("cursors", {}).items():
                 self.check_field(path, f)
-                self.cursors[f] = cursor
+                if isinstance(cursor, dict):
+                    for g in cursor:
+                        self.check_field(path, g)
+                    self.slot_cursors[f] = cursor
+                else:
+                    self.cursors[f] = cursor
+            self.carried |= set(spec.get("walk", {}).get("carry", {}).values())
             for f in spec.get("pool", []):
                 self.check_field(path, f)
                 self.pool.add(f)
@@ -273,7 +283,7 @@ class Bindings:
             self.table |= spec.get("table", {})
             for p in spec.get("place", []):
                 if "jsp_slot" in p:
-                    self.jsp_slots[p["jsp_slot"]] = p["returns"]
+                    self.jsp_slots[p["jsp_slot"]] = p
             for p in spec.get("place", []) + [{**i, "convention": "INLINE"} for i in spec.get("inline", [])] \
                     + [{**e, "extern": True} for e in spec.get("extern", [])]:
                 if "routine" in p:
@@ -298,7 +308,8 @@ class Bindings:
                   p.get("byname"), p.get("result", []), p.get("block"), p.get("block_takes_entry", False),
                   tuple(p["skips"]) if "skips" in p else None, set(p.get("io", [])), p.get("cells", []),
                   p.get("loops"), p.get("shifts"), set(p.get("pool", [])), set(p.get("spill", [])),
-                  p.get("inline"), p.get("name"), self.pointers, set(p.get("io_reads", [])))
+                  p.get("inline"), p.get("name"), self.pointers, set(p.get("io_reads", [])),
+                  p.get("back"), p.get("pulse", False))
         for f in [b.entry, b.ac_param, b.io_param, b.byname, b.inline, *b.result, *b.cells] + \
                 ([b.skips[0]] if b.skips else []):
             if f:
@@ -360,12 +371,17 @@ class Unit:
             self.homed[binds.cursors[f]] = proc
         for c in self.walk.get("other", {}).values():
             self.homed[c] = None
+        for f, cursors in self.spec.get("cursors", {}).items():
+            if isinstance(cursors, dict):       # the cursors on a slot a field holds: homed here
+                for c in cursors.values():
+                    self.homed[c] = None
         self.home_kind: dict[str, str] = {}     # cursor -> its home's instruction ("LAC" in a guard), once laid out
         self.named: set[str] = set()            # routines a member's word names
         self.named_data: set[str] = set()       # arrays of lifted C a member's word names
         self.typedefs: set[str] = set()
         self.carried: dict[str, str] = {}      # a jump's home -> the field whose word it carries
         self.cleared: str | None = None        # the cursor the table's clearing loop is homed in
+        self.exit = next((p["exit"] for p in self.spec.get("place", []) if "exit" in p), None)
         self.labels = 0
 
     def initial(self, dotted: str) -> str:
@@ -417,10 +433,10 @@ class Unit:
             args = ", ".join(leaf(f) for f, _ in b.params(block=True))
             wrapper.emit(1, f"return {b.block}({args});")
             out += [b.declaration(), "{", *wrapper.out, "}"]
-            fn = Function(self, b, {f: leaf(f) for f, _ in b.params(block=True)}, self.arguments(self.flat(r)))
+            fn = Function(self, b, {f: leaf(f) for f, _ in b.params(block=True)}, self.arguments(self.flat_routine(r)))
             out += [b.declaration(block=True), "{", *fn.compile(), "}"]
         else:
-            fn = Function(self, b, {f: leaf(f) for f, _ in b.params()}, self.arguments(self.flat(r)))
+            fn = Function(self, b, {f: leaf(f) for f, _ in b.params()}, self.arguments(self.flat_routine(r)))
             out += [b.declaration(), "{", *fn.compile(), "}"]
         return out
 
@@ -442,10 +458,55 @@ class Unit:
         self.labels += 1
         return f"{what}{self.labels}"
 
+    def flat_routine(self, r: runs.Routine) -> list:
+        """A bound routine's statements. A Network it runs as the last thing
+        of several branches is laid out once, where the last of them runs
+        it, and the others jump there."""
+        stmts = self.flat(r)
+        runs_at: list[str] = []
+
+        def collect(items):
+            for s in items:
+                if s[0] == "shared":
+                    runs_at.append(s[1])
+                    collect(s[2])
+                elif s[0] == "if":
+                    for _, b in s[1]:
+                        collect(b)
+                    collect(s[2])
+                elif s[0] in ("loop", "slots"):
+                    collect(s[-2])
+        collect(stmts)
+        seen: dict[str, int] = {}
+
+        def rebuild(items):
+            out = []
+            for s in items:
+                if s[0] == "shared":
+                    seen[s[1]] = seen.get(s[1], 0) + 1
+                    if runs_at.count(s[1]) == 1:
+                        out += rebuild(s[2])
+                    elif seen[s[1]] == runs_at.count(s[1]):
+                        out += [("label", s[1], s[-1])] + rebuild(s[2])
+                    else:
+                        out.append(("goto", s[1], s[-1]))
+                elif s[0] == "if":
+                    out.append(("if", [(c, rebuild(b)) for c, b in s[1]], rebuild(s[2]), s[3]))
+                elif s[0] in ("loop", "slots"):
+                    out.append((*s[:-2], rebuild(s[-2]), s[-1]))
+                else:
+                    out.append(s)
+            return out
+        return rebuild(stmts)
+
     def flat_body(self, items: list, r: runs.Routine, in_slots: bool = False) -> list:
         out: list = []
+        back = None
         for n, s in enumerate(items):
             op = s[0]
+            if back and op == "run" and s[1] == back:
+                back = None                 # the extern jumps back into it
+                continue
             if op == "if":
                 out.append(("if", [(c, self.flat_body(b, r, in_slots)) for c, b in s[1]],
                             self.flat_body(s[2], r, in_slots), s[3]))
@@ -456,16 +517,20 @@ class Unit:
                 out.append(("slots", var, lo, hi, self.flat_body(body, r, True), where))
             elif op == "match":
                 out.append(self.dispatch(s))
-            elif op in ("break", "wait"):
+            elif op in ("break", "wait", "stop"):
                 out.append(s)
             elif op == "run":
                 name, args = s[1], s[2]
                 if name in self.binds.bound and name != r.name:
-                    params = self.prog.routines[name].params if name in self.prog.routines else []
+                    params = self.prog.routines[name].params if name in self.prog.routines else \
+                        [a[1] for a in args if a[0] == "name"]
                     if args != [("name", p) for p in params] or not set(params) <= set(r.params):
                         raise BindError(f"{s[-1]}: run {name} passes only the slot the cursors point at")
                     self.callees.add(name)
                     out.append(("call", name, {}, s[-1]))
+                    back = self.binds.bound[name].back
+                    if back and (n + 1 >= len(items) or items[n + 1][:2] != ("run", back)):
+                        raise BindError(f"{s[-1]}: {name} jumps back to {back}, so run {back} comes next")
                     continue
                 inner = self.prog.routines.get(name)
                 if inner is None:
@@ -475,6 +540,9 @@ class Unit:
                     end = self.label("done")
                     body = returns_to(body, end) + [("label", end, s[-1])]
                 homes = {f for f, proc in self.walk.get("home_in", {}).items() if proc == name}
+                if inner.kind == "network" and n == len(items) - 1:
+                    out.append(("shared", name, mark_homes(body, homes), s[-1]))
+                    continue
                 out += mark_homes(body, homes)
                 if name == self.walk.get("set_after"):
                     out.append(("cursors", s[-1]))
@@ -492,10 +560,12 @@ class Unit:
             how = self.binds.spelled.get(enum, {}).get(member)
             if body and body[0][0] == "unreachable" and how == 0:
                 continue
-            if not (len(body) == 1 and body[0][0] == "run" and isinstance(how, dict)
-                    and how.get("routine") == body[0][1]):
+            named = how.get("routine") if isinstance(how, dict) else None
+            if named in self.binds.jsp_slots:       # a slot that jumps on to another routine
+                named = self.binds.jsp_slots[named]["jump"] if body and body[0][1] != named else named
+            if not (len(body) == 1 and body[0][0] == "run" and named == body[0][1]):
                 raise BindError(f"{where}: {member} runs {body}, not the routine its word names")
-        return ("dispatch", e, where)
+        return ("dispatch", e, where, [body[0][1] for body in arms.values() if body[0][0] == "run"])
 
     def clears_table(self, body: list):
         """A Processor that sets every field of the table's Records to its
@@ -590,7 +660,7 @@ class Unit:
         self.check_unstored()
         for p in self.spec["place"]:
             if "routine" in p:
-                self.shift_homes(self.flat(self.prog.routines[p["routine"]]))
+                self.shift_homes(self.flat_routine(self.prog.routines[p["routine"]]))
         body: list[str] = []
         head: list[str] = [f'#include "{h}"' for h in self.spec.get("include", [])]
         for p in self.spec["place"]:
@@ -599,6 +669,9 @@ class Unit:
             elif "fields" in p:
                 for f in p["fields"]:
                     body.append(f"word {self.binds.c_name(f)} = {self.initial(f)};")
+            elif "exit" in p:
+                head.append(f"BLOCK void {p['exit']}(void);")
+                body += [f"BLOCK void {p['exit']}(void)", "{", "}"]
             elif "shifts" in p:
                 f = p["shifts"]
                 entries = ", ".join(f"I_{self.kinds[f].upper()}({octal(n)})" for n in self.tables[f])
@@ -613,6 +686,11 @@ class Unit:
                 inline = self.routine(self.binds.bound[name]) + inline
         for name in [p["routine"] for p in self.spec["place"] if "routine" in p] + sorted(self.callees - done):
             b = self.binds.bound[name]
+            if name in self.binds.carried:
+                # a jump through the homed word a walk carries a field's word into
+                self.typedefs.add("typedef void block_code(void) BLOCK;")
+                head.append(f"HOMED block_code *{name};")
+                continue
             head.append(b.declaration() + ";")
             if b.block and b.unit == self.path:
                 head.append(b.declaration(block=True) + ";")
@@ -620,15 +698,16 @@ class Unit:
         head += [f"extern word {self.binds.c_name(f)};" for f in sorted(self.externs)]
         head += [f"ENTRY_CELL({self.binds.cell_of[f]}) word {self.binds.c_name(f)};"
                  for f in sorted(self.cells_used)]
-        # A pool field the lifted C names is declared by the lifted header that names it.
+        # A pool field a lifted header of the unit names is declared there.
+        headers = "".join((SPACEWAR_C / "lift" / h).read_text() for h in self.spec.get("include", []))
         head += [f"POOL word {self.binds.c_name(f)};" for f in sorted(self.spec.get("pool", []))
-                 if f not in self.binds.names]
+                 if not re.search(rf"\b{self.binds.c_name(f)}\b", headers)]
         head += [f"POOL word {name};" for name in sorted(self.pool_locals)]
         for name in sorted(self.named):
             if name in self.binds.bound:
                 head.append(self.binds.bound[name].declaration() + ";")
             elif name in self.binds.jsp_slots:
-                head.append(f"JSP {'io_word' if self.binds.jsp_slots[name] == 'io' else 'word'} {name}(void);")
+                head.append(f"JSP {'io_word' if self.binds.jsp_slots[name]['returns'] == 'io' else 'word'} {name}(void);")
             else:
                 raise BindError(f"{self.path.name}: a member's word names {name}, which no binding binds")
         head += [f"extern word {name}[];" for name in sorted(self.named_data)]
@@ -679,6 +758,8 @@ class Function:
         self.resting: tuple[int, dict] | None = None    # the slot the cursors rest on after a walk
         self.held: dict = {}                    # a guard's read of a field, kept: key -> (C local, "ac"/"io")
         self.held_xor: tuple | None = None      # (field and member, C local, guards left) of a shared xor
+        self.chained: dict[str, list[str]] = {} # a field holding a slot -> the fields whose cursors are set
+        self.depth = 1                          # the depth of the statement being compiled
         self.pair_halves(stmts)
 
     # ---- names
@@ -753,6 +834,9 @@ class Function:
             cursors = self.resting[1]
         elif slot[0] == "num" and self.binds.table:
             return f"{self.binds.table['at']}[{octal(self.binds.table_offset(d) + slot[1])}]"
+        elif (held := dotted_of(slot)) in self.binds.slot_cursors:
+            cursors = self.binds.slot_cursors[held]
+            self.chain(held, d)
         if cursors is None or d not in cursors:
             raise BindError(f"{self.b.name}: no cursor for {e!r}")
         c = cursors[d]
@@ -761,6 +845,49 @@ class Function:
             self.unit.home_kind[c] = "laid out"
             return f"*home({c})"
         return f"*{c}"
+
+    def chain(self, held: str, upto: str | None = None):
+        """The cursors on the slot a field holds are set in the table's
+        order, each from the one before: the first adds the field's slots
+        to the index cursor's home word, the rest add them to the one
+        before, which AC still holds. Set up to `upto`, or all of them."""
+        cursors = self.binds.slot_cursors[held]
+        order = self.table_order(cursors)
+        done = self.chained.setdefault(held, [order[0]])
+        last = order.index(upto) if upto else len(order) - 1
+        for n in range(len(done), last + 1):
+            count = octal(self.unit.prog.records[order[n - 1].split(".")[0]].count)
+            prev = cursors[order[n - 1]]
+            text = f"{count} + {prev}" if n == 1 else f"{prev} + {count}"
+            self.emit(self.depth, f"{cursors[order[n]]} = {text};")
+            done.append(order[n])
+
+    def slot_store(self, s, depth: int) -> bool:
+        """A store into the slot a field holds. A plain value goes through
+        IO, for AC holds the cursors' chain; before any other value the rest
+        of the chain is set. A value that keeps the word's high bits and
+        sets its address part is a dap."""
+        _, target, e, _ = s
+        held = dotted_of(target[2])
+        d = dotted_of(target[1])
+        cursors = self.binds.slot_cursors[held]
+        if d in self.chained.get(held, [self.table_order(cursors)[0]]):
+            plain = False
+        else:
+            plain = dotted_of(e) is not None or e[0] == "name"
+            self.chain(held, d if plain else None)
+        if e[0] == "bin" and e[1] == "|" and e[2][0] == "bin" and e[2][1] == "&" and e[2][2] == target \
+                and e[2][3] == ("num", 0o770000) and e[3][0] == "num" and e[3][1] < 0o10000:
+            word = self.cursor(target)
+            word = f"home({word[6:-1]})" if word.startswith("*home(") else word[1:]
+            self.emit(depth, f"{word}->addr = {octal(e[3][1])};")
+            return True
+        if plain:
+            local = f"{leaf(d)}_io"
+            self.emit(depth, f"register word {local} = {self.expr(e)};")
+            self.emit(depth, f"{self.cursor(target)} = {local};")
+            return True
+        return False
 
     def member(self, name: str) -> str | None:
         """An enum member as the word that spells it."""
@@ -776,7 +903,9 @@ class Function:
             self.unit.named_data.add(how["data"])
             return how["data"]
         self.unit.named.add(how["routine"])
-        return f"{how['routine']} | (word){octal(runs.SIGN)}" if how.get("sign") else how["routine"]
+        if how.get("sign"):
+            return f"{how['routine']} | (word){octal(runs.SIGN)}"
+        return f"{how['routine']} | (word)0" if how.get("literal") else how["routine"]
 
     def _expr(self, e) -> tuple[str, int]:
         op = e[0]
@@ -815,7 +944,26 @@ class Function:
     def io_resident(self) -> set[str]:
         return self.io_names | {c for c in self.alias.values() if c.endswith(".lo")}
 
+    def switch_test(self, e, negate: bool = False) -> str | None:
+        """`field == m` for a field held in a sense switch or a program
+        flag: the machine's test of it, `sense(n)` or `flag(n)`."""
+        if e[0] != "bin" or e[1] not in ("==", "!=") or (d := dotted_of(e[2])) is None or e[3][0] != "name":
+            return None
+        if "sense" in self.binds.devices.get(d, {}):
+            test = f"sense({self.binds.devices[d]['sense']})"
+        elif d in self.binds.flags:
+            test = f"flag({self.binds.flags[d]})"
+        else:
+            return None
+        how = self.binds.spelled.get(self.unit.prog.member(e[3][1]), {}).get(e[3][1])
+        if how not in (0, 1):
+            raise BindError(f"{self.b.name}: {d} holds a member spelled 0 or 1")
+        holds = (how == 1) == (e[1] == "==") != negate
+        return test if holds else f"!{test}"
+
     def cond(self, e, negate: bool = False) -> str:
+        if (text := self.switch_test(e, negate)) is not None:
+            return text
         if negate:
             if e[0] != "bin" or e[1] not in NEGATED:
                 raise BindError(f"cannot negate {e!r}")
@@ -828,6 +976,8 @@ class Function:
         self.out.append("    " * depth + text)
 
     def compile(self) -> list[str]:
+        if any(b.pulse and b.back == self.b.name for b in self.binds.bound.values()):
+            self.emit(1, "ioh();")              # wait for the pulse the code that jumps here left pending
         self.block(self.stmts, 1, top=True)
         if self.tail:
             if not self.out or not self.out[-1].lstrip().startswith("return"):
@@ -913,6 +1063,9 @@ class Function:
     def return_text(self, value: str | None = None) -> str:
         if value is not None:
             return f"return {value};"
+        if self.b.convention == "BLOCK" and self.unit.exit:
+            # the unit's blocks leave through its shared exit
+            return f"return {self.unit.exit}();"
         if self.b.convention == "BLOCK":
             # a firing ends here: the machine runs the frame again
             return f"return {self.unit.spec['repeat']}();"
@@ -932,7 +1085,16 @@ class Function:
 
     def one_instruction(self, s, nxt) -> str | None:
         """`set a = -a` on an AC local, then `set f = 0` on a place in IO:
-        cma and cli, which the PDP-1 does as one instruction."""
+        cma and cli, which the PDP-1 does as one instruction. Likewise a
+        program flag set, then a new AC local set to 0: clf and cla."""
+        if nxt and s[0] == "set" and dotted_of(s[1]) in self.binds.flags and nxt[0] == "let" \
+                and nxt[1][0] == "name" and nxt[2] == ("num", 0) and nxt[1][1] not in self.b.io:
+            name = nxt[1][1]
+            self.declare_top(f"word {name};")
+            self.scopes[0].add(name)
+            flag = self.binds.flags[dotted_of(s[1])]
+            how = self.binds.spelled.get(self.unit.prog.member(s[2][1]), {}).get(s[2][1])
+            return f"{'stf' if how else 'clf'}({flag}), {name} = 0;"
         if not (nxt and s[0] == nxt[0] == "set" and s[1][0] == "name" and s[2] == ("neg", s[1])
                 and nxt[2] == ("num", 0) and nxt[1][0] != "tuple"):
             return None
@@ -946,6 +1108,32 @@ class Function:
         op = s[0]
         nxt = stmts[k + 1] if k + 1 < len(stmts) else None
         last = top and nxt is None
+        self.depth = depth
+        if op == "stop":
+            # the machine halts, and halts again each time it is continued
+            self.emit(depth, "for (;;)")
+            self.emit(depth + 1, "hlt();")
+            return 1
+        if op == "set" and (held := dotted_of(s[1])) in self.binds.slot_cursors:
+            if s[2] != ("num", 0):
+                raise BindError(f"{s[-1]}: {held} is a cursor: it starts at slot 0 and steps in a search")
+            first = self.table_order(self.binds.slot_cursors[held])[0]
+            offset = self.binds.table_offset(first)
+            self.emit(depth, f"{self.binds.slot_cursors[held][first]} = {self.binds.table['at']}"
+                             + (f" + {octal(offset)}" if offset else "") + ";")
+            self.chained[held] = [first]
+            return 1
+        plain_store = op == "set" and s[1][0] == "index" and dotted_of(s[1][2]) in self.binds.slot_cursors \
+            and (dotted_of(s[2]) is not None or s[2][0] == "name")
+        for held, done in list(self.chained.items()):
+            if 1 < len(done) < len(self.binds.slot_cursors[held]) and not plain_store:
+                self.chain(held)                # AC is wanted for something else: finish the chain
+        if op == "set" and s[1][0] == "index" and dotted_of(s[1][2]) in self.binds.slot_cursors \
+                and self.slot_store(s, depth):
+            return 1
+        if op == "loop" and (search := self.search(s)) is not None:
+            self.search_loop(s, search, depth)
+            return 1
         if op == "slots":
             self.slots(s, depth)
             return 1
@@ -997,6 +1185,9 @@ class Function:
                 return 1
             if name in self.alias or name in self.b.pool:
                 self.emit(depth, f"{self.alias.get(name, name)} = {self.expr(s[2])};")
+                return 1
+            if self.declared(name):             # a let of another Processor laid out in this function
+                self.emit(depth, f"{name} = {self.expr(s[2])};")
                 return 1
             self.emit(depth, f"{'register word' if name in self.b.io else 'word'} {name} = {self.expr(s[2])};")
             self.scopes[-1].add(name)
@@ -1149,9 +1340,60 @@ class Function:
         if outer:
             self.resting = (hi[1] + 1, cursors)
 
+    def search(self, s):
+        """A loop that steps a field holding a slot and stops when it
+        reaches a slot by number: (the field, that slot), else None."""
+        body = s[2]
+        if len(body) < 2 or body[-1][0] != "if" or len(body[-1][1]) != 1 or body[-1][2]:
+            return None
+        c = body[-1][1][0][0]
+        held = dotted_of(c[2]) if c[0] == "bin" and c[1] == "==" else None
+        if held not in self.binds.slot_cursors or c[3][0] != "num" or self.incremented(body[-2]) != c[2]:
+            return None
+        return held, c[3][1]
+
+    def search_loop(self, s, search, depth: int):
+        """The search: the loop's body, then one index of the cursor and a
+        test of its home instruction against the one past the last slot
+        (idx; sas; jmp), and what the loop runs when it gets there."""
+        held, end = search
+        body = s[2]
+        cursors = self.binds.slot_cursors[held]
+        first = self.table_order(cursors)[0]
+        top, after = self.label("search"), self.label("found")
+        self.emit(depth, f"{top}:")
+        self.loops.append((after, top))
+        self.block(body[:-2], depth)
+        self.loops.pop()
+        c = cursors[first]
+        kind = self.unit.home_kind.get(c)
+        if kind not in ("LAC",):
+            raise BindError(f"{s[-1]}: the search's cursor {c} has no home in a guard of its loop")
+        past = self.binds.table_offset(first) + end
+        self.emit(depth, f"if (I_{kind}(++{c}) != I_{kind}({self.binds.table['at']} + {octal(past)}))")
+        self.emit(depth + 1, f"goto {top};")
+        self.block(body[-1][1][0][1], depth)
+        self.emit(depth, f"{after}:")
+        self.chained[held] = [first]
+
     def dispatch(self, s, depth: int):
-        """A jump through the routine word, to the calc routine it names."""
-        _, e, _ = s
+        """A jump through the routine word, to the calc routine it names. A
+        field in a pool word is a call through it (jsp i), whose result is
+        the one every routine it may name returns."""
+        _, e, where, targets = s
+        if dotted_of(e) in self.binds.pool:
+            results = {tuple(self.binds.bound[n].result) for n in targets}
+            if len(results) != 1:
+                raise BindError(f"{where}: the routines a pool word names return different results")
+            (result,) = results
+            call = f"{self.place(dotted_of(e))}()"
+            if len(result) == 1 and result[0] in self.binds.io_fields:
+                self.emit(depth, f"register word {leaf(result[0])} = {call};")
+            elif result:
+                raise BindError(f"{where}: a call through a pool word returns in IO")
+            else:
+                self.emit(depth, f"{call};")
+            return
         self.unit.typedefs.add("typedef void jsp_routine(void) JSP;")
         key = repr(e)
         held = self.held.pop(key, None)
@@ -1256,7 +1498,7 @@ class Function:
     def xor_test(self, c):
         """`field == m` or `!=` for a member spelled as an address: (the
         field, the member's word, the C test of their xor against 0)."""
-        if c[0] != "bin" or c[1] not in ("==", "!=") or c[3][0] != "name":
+        if c[0] != "bin" or c[1] not in ("==", "!=") or c[3][0] != "name" or self.switch_test(c) is not None:
             return None
         enum = self.unit.prog.member(c[3][1])
         if enum is None or self.declared(c[3][1]) or self.enum_test(c) is not None:
@@ -1268,6 +1510,8 @@ class Function:
         sign and zero reads the field into a local first, and keeps it for
         the arm's next guard or jump through it: in AC when that comes
         first, else moved to IO (swap), past what the arm runs before it."""
+        if (text := self.switch_test(c)) is not None:
+            return text
         if (pair := self.xor_test(c)) is not None:
             held = self.held_xor
             if held and held[0] == pair[:2]:
@@ -1275,8 +1519,14 @@ class Function:
                 return f"{held[1]} {pair[2]}"
             return f"({pair[1]} ^ {self.expr(pair[0])}) {pair[2]}"
         if (test := self.enum_test(c)) is None:
+            sign_test = c[0] == "bin" and c[1] in ("<", ">=") and c[3] == ("num", 0)
             for d in sorted(self.b.io_reads):
-                if self.mentions_field(c, d):
+                if sign_test and c[2][0] == "index" and dotted_of(c[2][1]) == d:
+                    # IO tests only the sign (spi)
+                    local = f"{self.binds.c_name(d)}_io"
+                    self.emit(depth, f"register word {local} = {self.cursor(c[2])};")
+                    return f"{local} {c[1]} 0"
+                if sign_test and self.mentions_field(c, d):
                     local = f"{self.binds.c_name(d)}_io"
                     self.emit(depth, f"register word {local} = {self.place(d)};")
                     self.alias[d] = local
@@ -1324,6 +1574,8 @@ class Function:
         used: set[str] = set()
 
         def test(e, negate: bool) -> str:
+            if (text := self.switch_test(e, negate)) is not None:
+                return text
             if (pair := self.xor_test(e)) is not None:
                 op = NEGATED[pair[2][:2].strip()] if negate else pair[2][:2].strip()
                 return f"({pair[1]} ^ {self.expr(pair[0])}) {op} 0"
@@ -1354,6 +1606,8 @@ class Function:
                 raise BindError(f"{where}: the first arm of a jumping guard ends in a jump")
             self.emit(depth - 1, f"{no}:")
             self.block(other, depth)
+        elif no in used:
+            self.emit(depth - 1, f"{no}: ;")
 
     def shared_tail(self, stmts: list, tail: list):
         """stmts with `tail`, where it ends the last arm of its last if,
@@ -1400,6 +1654,12 @@ class Function:
         names = list(self.unit.prog.records[stream].fields)
         if how == "dpy" and args[2][0] == "num":
             x_text, y_text = self.registers(stream, names[:2], args[:2], depth)
+            if nxt is not None and nxt[0] == "call" and self.binds.bound[nxt[1]].pulse:
+                # the code that runs next waits for a completion pulse: ask for one
+                if args[2][1] != 0:
+                    raise BindError(f"{where}: a point that asks for a pulse is plotted at intensity 0")
+                self.emit(depth, f"dpy_nowait({x_text}, {y_text});")
+                return 1
             self.emit(depth, f"dpy({x_text}, {y_text}, {args[2][1]});")
             return 1
         if how == "hlt" and nxt is not None and nxt[0] == "wait":
@@ -1409,9 +1669,17 @@ class Function:
         raise BindError(f"{where}: the binding shows no stream {stream} here")
 
     def registers(self, stream: str, names: list[str], args: list, depth: int) -> tuple[str, str]:
-        """The two values in AC and IO."""
+        """The two values in AC and IO. Two zeros are cleared by one
+        instruction (cla cli); a pool word goes straight into AC."""
         x_text, y_text = self.expr(args[0]), self.expr(args[1])
-        if not self.ac_resident(x_text):
+        if args[0] == args[1] == ("num", 0):
+            self.declare_top(f"word {stream}_{names[0]};")
+            self.declare_top(f"register word {stream}_{names[1]};")
+            self.emit(depth, f"{stream}_{names[0]} = 0, {stream}_{names[1]} = 0;")
+            return f"{stream}_{names[0]}", f"{stream}_{names[1]}"
+        if self.binds.streams.get(stream) == "dpy" and dotted_of(args[0]) in self.binds.pool:
+            pass
+        elif not self.ac_resident(x_text):
             self.declare_top(f"word {stream}_{names[0]};")
             self.emit(depth, f"{stream}_{names[0]} = {x_text};")
             x_text = f"{stream}_{names[0]}"
@@ -1474,6 +1742,11 @@ class Function:
             if e[1] == self.b.skips[1]:
                 self.emit(depth, "skip_return();")
             return 1
+        if e[0] == "call" and e[1] in IO_ROTATE and e[2][0] == target and self.expr(target) in self.io_resident():
+            # a rotate of IO in place
+            moved = self.expr(target)
+            self.emit(depth, f"{moved} = {IO_ROTATE[e[1]]}({moved}, {self.expr(e[2][1])});")
+            return 1
         if e[0] == "call" and e[1] in IO_ROTATE and self.expr(src := e[2][0]) in self.io_resident() \
                 and not self.read_later(dotted_of(src) or src[1]):
             # pdp1cc rotates only AC: rotate IO in place, then move it
@@ -1481,6 +1754,10 @@ class Function:
             self.emit(depth, f"{moved} = {IO_ROTATE[e[1]]}({moved}, {self.expr(e[2][1])});")
             e = src
         value = self.word_of(e, into_pointer=dotted in self.binds.pointers)
+        if dotted and self.binds.in_register(dotted) and dotted not in self.alias \
+                and re.fullmatch(r"\w+\.(hi|lo)", value):
+            self.alias[dotted] = value          # the half of the pair the register already holds
+            return 1
         device = self.binds.devices.get(dotted_of(e) or "")
         into_io = dotted in self.binds.io_fields or (target[0] == "name" and target[1] in self.b.io)
         if device and into_io and not device.get("or_into_io"):
@@ -1534,6 +1811,8 @@ class Function:
         text = f"{target}({', '.join(self.expr(args[f]) for f, _ in callee.params(block=jump))})"
         if callee.convention == "BLOCK":
             # A run of a block is a jump to it; the firing goes on there.
+            if name in self.binds.carried:
+                text = f"(*home({name}))()"
             self.emit(depth, f"return {text};")
             return
         if last and callee.result == self.b.result and bool(callee.skips) == bool(self.b.skips):

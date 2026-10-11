@@ -59,8 +59,9 @@ clear = "clearing"
 # object's outline is carried to the spaceship in draw_outline's home (sp5,
 # the jump into the compiled outline), loaded as the second walk begins: for
 # a torpedo it reads past the outline array (reach_oracle), and only the
-# spaceship, which a ship's own slot sets it for, jumps through it. mas is
-# stepped with the cursors, and nothing reads it.
+# spaceship, which a ship's own slot sets it for, jumps through it. Play
+# never observes the read past the array (check_frame.py poison, INTENT.md).
+# mas is stepped with the cursors, and nothing reads it.
 [walk]
 set_after = "begin_frame"
 index = "objects.routine"
@@ -116,14 +117,6 @@ convention = "JSP"
 
 [[extern]]
 routine = "central_star"
-convention = "JSP"
-
-[[extern]]
-routine = "first_spaceship"
-convention = "JSP"
-
-[[extern]]
-routine = "second_spaceship"
 convention = "JSP"
 
 [[place]]

@@ -1,29 +1,43 @@
 """The frame Network of frame.runs against SIMH running the oracle image,
 from the frame seam (ml0) to the heavens (mq3): the restart checks and the
-whole object loop, collisions and calc routines included.
+whole object loop, collisions and calc routines included, the spaceships'.
 
-Each frame starts from one set of Records the game can hold. The ships'
-slots never hold a flying spaceship (its calc routine is not ported yet),
-so the restart delay counts down; it starts low enough not to reach 0.
-Objects are bunched so that collisions happen. In SIMH the Records are
-deposited where the PDP-1 binding places them, the image's word at mq3 is
-replaced by a jump to the stub's halt, and the run enters at ml0. The
-evaluator runs the frame Network until it would fire the heavens.
+Each frame starts from one set of Records the game can hold. Most frames
+have both ships flying; the restart delay starts low enough not to reach
+0. Objects are bunched so that collisions happen. In SIMH the Records are
+deposited where the PDP-1 binding places them, the compiled outlines are
+laid out after the table (tools/check_spaceship.py), the image's word at
+mq3 is replaced by a jump to the stub's halt, and the run enters at ml0.
+The main loop itself loads each ship's outline into the jump at sp5, read
+past the outline array for every other colliding object. The evaluator runs
+the frame Network until it would fire the heavens, drawing the outlines
+with tools/outline.py. A full object table halts both, at the launch.
 
-Usage: [N] (frames, default 1500)."""
+The main loop loads ships.outline[slot] into sp5 for every colliding
+object, so for a torpedo it reads past the 2-word array. With `poison`,
+SIMH's main loop instead loads a jump to address 0 there for every slot
+past the ships (an undefined instruction, which stops the machine): the
+frames still match only if no ship ever jumps through a value read for
+another slot. The RUNS frame never reads past the array.
+
+`poison-all` poisons the ships' slots too, the control: SIMH must then stop.
+
+Usage: [N] [poison|poison-all] (frames, default 1500)."""
 from __future__ import annotations
 
 import copy
 import random
 import sys
 
+import check_spaceship as ship
+import outline
 import pdp1
 import runs
 from pdp1cc.gate import corpus, simh
-from pdp1cc.gate.simh import Inputs, STUB
+from pdp1cc.gate.simh import Inputs, STUB, CALL
 from oracle_check import built_listing
 
-RECORDS = ["objects", "ships", "random", "frame", "tunables"]
+RECORDS = ["objects", "ships", "random", "frame", "tunables", "spaceship", "pen"]
 NEG = lambda v: v ^ runs.MASK
 JMP = 0o600000
 
@@ -36,13 +50,16 @@ def near(rng: random.Random, centre: int, spread: int) -> runs.W:
     return runs.word_of(max(-0o377777, min(0o377777, centre + rng.randrange(-spread, spread))))
 
 
-def a_frame(m: runs.Machine, rng: random.Random) -> dict:
-    st = copy.deepcopy({r: m.state[r] for r in RECORDS})
+def a_frame(m: runs.Machine, rng: random.Random, outlines) -> tuple[dict, int]:
+    st = copy.deepcopy({r: m.state[r] for r in RECORDS + ["console", "controls", "launch"]})
     o, sh = st["objects"], st["ships"]
     cx, cy = rng.randrange(-0o300000, 0o300000), rng.randrange(-0o300000, 0o300000)
     spread = rng.choice([0o4000, 0o20000, 0o100000, 0o400000])
+    full = rng.random() < 0.02
     for s in range(0o30):
-        o["routine"][s] = member(rng.choice(["explosion", "in_hyperspace", "breakout", "none"] if s < 2
+        ships = [("first_spaceship", "second_spaceship")[s % 2]] * 6 + ["explosion", "in_hyperspace", "breakout",
+                                                                       "none"]
+        o["routine"][s] = member(rng.choice(ships if s < 2 else ["torpedo", "explosion"] if full
                                             else ["none", "none", "torpedo", "torpedo", "explosion"]))
         o["x"][s], o["y"][s] = near(rng, cx, spread), near(rng, cy, spread)
         o["dx"][s], o["dy"][s] = runs.W(rng.randrange(1 << 18)), runs.W(rng.randrange(1 << 18))
@@ -52,51 +69,117 @@ def a_frame(m: runs.Machine, rng: random.Random) -> dict:
         for f in sh:
             sh[f][s] = runs.W(rng.randrange(1 << 18))
         sh["saved_routine"][s] = member(("first_spaceship", "second_spaceship")[s])
+        sh["outline"][s] = runs.W(outlines.at[rng.choice(["needle", "wedge"])])
+        sh["fuel"][s] = runs.W(rng.choice([NEG(rng.randrange(1, 0o20000)), 0, NEG(1), rng.randrange(1 << 18)]))
+        sh["torpedoes"][s] = runs.W(rng.choice([NEG(rng.randrange(1, 0o41)), 0, rng.randrange(1 << 18)]))
+        sh["previous_control"][s] = runs.W(rng.choice([0, 0, rng.randrange(1 << 18)]))
+        if o["routine"][s].name.endswith("spaceship"):
+            o["cycles"][s] = runs.W(rng.choice([0o2000, 0o2000, rng.randrange(1 << 18)]))
+    for rec in ("spaceship", "pen"):
+        for f, (typ, _) in m.prog.records[rec].fields.items():
+            if typ == "word":
+                st[rec][f] = runs.W(rng.randrange(1 << 18))
+    st["launch"]["slot"] = runs.W(rng.randrange(0o30))
+    sense = rng.randrange(1 << 6)
+    for name, n in ship.SWITCHES.items():
+        st["console"][name] = runs.Member("switch", "on" if sense >> (6 - n) & 1 else "off")
+    st["controls"]["source"] = runs.Member("control_source", "test_word")
+    st["console"]["test_word"] = runs.W(rng.randrange(1 << 18))
+    st["console"]["control_boxes"] = runs.W(0)
     st["random"]["number"] = runs.W(rng.randrange(1 << 18))
     st["frame"]["restart_delay"] = runs.W(NEG(rng.randrange(2, 0o377777)))
     st["frame"]["objects_seen"] = runs.W(rng.randrange(1 << 18))
     st["frame"]["spare_time"] = runs.W(rng.randrange(1 << 18))
-    return st
+    return st, sense
+
+
+def poisoned(sym: dict, first: int = 2) -> dict[int, int]:
+    """A patch of the main loop's outline read (mot, lac . / dap sp5): the
+    dap jumps here instead. For a slot past the ships, sp5 becomes a jump
+    to 0; for a ship, it takes the word read, as the original does. In free
+    core above the star catalog."""
+    at, mask, ships_end, bad, save = 0o7700, 0o7720, 0o7721, 0o7722, 0o7723
+    words = [0o240000 | save,                       # dac save: the word mot read
+             0o200000 | sym["ml1"],                 # lac ml1: the routine word's cursor
+             0o020000 | mask,                       # and (7777
+             0o420000 | ships_end,                  # sub (mtb+2
+             0o640400,                              # sma: a ship's slot
+             JMP | at + 0o11,
+             0o200000 | save,
+             0o260000 | sym["sp5"],                 # dap sp5
+             JMP | sym["ml2"],
+             0o200000 | bad,                        # lac (jmp 0
+             0o240000 | sym["sp5"],                 # dac sp5
+             JMP | sym["ml2"]]
+    out = {at + k: w for k, w in enumerate(words)}
+    return out | {mask: 0o7777, ships_end: sym["mtb"] + first, bad: JMP, sym["mot"] + 1: JMP | at}
 
 
 def main() -> int:
     frames = int(sys.argv[1]) if len(sys.argv) > 1 else 1500
+    poison = "poison" in sys.argv[2:] or "poison-all" in sys.argv[2:]
+    first_poisoned = 0 if "poison-all" in sys.argv[2:] else 2      # poison-all: the control, ships too
     prog = runs.program(runs.source())
     b = pdp1.Binding(prog)
-    display = corpus.display_words(built_listing())
+    sym = b.sym
+    image = ship.image_words()
+    outlines = ship.Outlines(sym, image)
+    full = sym["sr1"] + 6                                   # hlt: no space for new objects
+    display = {a: w for a, w in (corpus.display_words(built_listing()) | outlines.display).items() if a != full}
     rng = random.Random(0o1444)
     m = runs.Machine(prog)
-    cases = [a_frame(m, rng) for _ in range(frames)]
+    cases = [a_frame(m, rng, outlines) for _ in range(frames)]
     places = list(b.places(RECORDS))
-    halt = STUB + 3
-    want = simh.run_jda(pdp1.SIMH, pdp1.ORACLE, b.sym["ml0"], [Inputs(0, 0, 0, 0) for _ in cases],
-                        watch=[p[3] for p in places], op="jmp", display=display,
-                        deposits={b.sym["mq3"]: JMP | halt},
-                        each=[b.deposits(st, RECORDS) for st in cases])
-    differ, fired, hits = 0, {}, [0]
+    halt, halt_full = STUB + 3, STUB + 4
+    watch = [p[3] for p in places] + [sym["sr1"], "PF"]
+    each = [b.deposits(st, RECORDS + ["controls"]) | {sym["sr1"]: image[sym["sr1"]] & ~0o7777 | sym["mtb"] + st["launch"]["slot"].v}
+            for st, _ in cases]
+    want = simh.run_jda(pdp1.SIMH, pdp1.ORACLE, sym["ml0"],
+                        [Inputs(0, 0, 0, sense, st["console"]["test_word"].v) for st, sense in cases],
+                        watch=watch, op="jmp", display=display,
+                        deposits=outlines.code | {sym["mq3"]: JMP | halt, full: JMP | halt_full}
+                        | (poisoned(sym, first_poisoned) if poison else {}), each=each)
+    differ, fired, hits, halts = 0, {}, [0], 0
     plain_run = m.run
 
     def counted_run(name, args=()):
+        if name == "draw_outline":                          # presentation: the compiled outline
+            shape = outlines.shape_at(m.state["ships"]["outline"][args[0]].v)
+            m.state["display"] += outline.draw(outlines.tables[shape], m.state["pen"])
+            return
         before = list(m.state["objects"]["routine"])
         plain_run(name, args)
         if name == "collision" and m.state["objects"]["routine"] != before:
             hits[0] += 1
     m.run = counted_run
-    for k, (st, w) in enumerate(zip(cases, want)):
+    for k, ((st, _), w) in enumerate(zip(cases, want)):
         m.state.update(copy.deepcopy(st))
         m.state["display"] = []
         m.fired = []
         m.stop_before = {"expensive_planetarium"}
+        halted = False
         try:
             m.run("frame")
             raise runs.RunsError("the frame ended before the heavens")
         except runs.StopAt:
             pass
-        simh_records = b.read({p[3]: v for p, v in zip(places, w.watched)}, RECORDS)
+        except runs.Stop:
+            halted = True
+        halts += halted
+        values = dict(zip(watch, w.watched))
+        simh_records = b.read({p[3]: values[p[3]] for p in places}, RECORDS)
         get = lambda recs, rec, fld, s: recs[rec][fld] if s is None else recs[rec][fld][s]
         bad = [f"{rec}.{fld}{'' if s is None else f'[{s}]'} simh {b.encode(rec, fld, get(simh_records, rec, fld, s)):06o}"
                f" runs {b.encode(rec, fld, get(m.state, rec, fld, s)):06o}"
                for rec, fld, s, _ in places if get(simh_records, rec, fld, s) != get(m.state, rec, fld, s)]
+        rocket = b.read_flags(values["PF"], ("spaceship",))["spaceship"]["rocket"]
+        # SIMH's flags carry over from the frame before: compare when a ship set flag 6
+        if any(name == "steer" for name, _ in m.fired) and rocket != m.state["spaceship"]["rocket"]:
+            bad.append(f"spaceship.rocket simh {rocket.name} runs {m.state['spaceship']['rocket'].name}")
+        if (values[sym["sr1"]] & 0o7777) - sym["mtb"] != m.state["launch"]["slot"].v:
+            bad.append("launch.slot differs")
+        if (w.returned_past == halt_full - (CALL + 1)) != halted:
+            bad.append(f"halted: simh {w.returned_past == halt_full - (CALL + 1)}, runs {halted}")
         points = [pdp1.point(p) for p in w.plotted]
         if points != m.state["display"]:
             bad.append(f"plotted {len(points)} simh, {len(m.state['display'])} runs")
@@ -106,8 +189,8 @@ def main() -> int:
                 print(f"  frame {k}: " + "; ".join(bad)[:600])
         for name, _ in m.fired:
             fired[name] = fired.get(name, 0) + 1
-    print(f"frame: {len(cases)} frames, {len(cases) - differ} match, {differ} differ; "
-          f"{sum(len(w.plotted) for w in want)} points")
+    print(f"frame{' (sp5 poisoned past the ships)' if poison else ''}: {len(cases)} frames, {len(cases) - differ} match, {differ} differ; "
+          f"{sum(len(w.plotted) for w in want)} points, {halts} halted on a full table")
     print(f"  fired: {dict(sorted(fired.items()))}")
     print(f"  collisions that hit: {hits[0]}")
     return 1 if differ else 0

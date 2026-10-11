@@ -123,6 +123,7 @@ processor cosine_angle                                      # cos: cos a = sin(a
   set sine_call.angle = 062210 + cosine_call.angle
 
 network cosine                                              # cos
+  reads: cosine_call
   writes: sine_call, multiply_call
   run cosine_angle
   run sine
@@ -217,6 +218,7 @@ processor integer_divide_dividend                           # idv
   set divide_call.divisor = integer_divide_call.divisor
 
 network integer_divide                                      # idv
+  reads: integer_divide_call
   writes: divide_call
   run integer_divide_dividend
   run divide

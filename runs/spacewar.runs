@@ -64,11 +64,23 @@ record score
   second: word              # 2sc
   games_left: word          # gct: counting up; 0 when no match is on
 
+# A switch on the console.
+enum switch
+  off
+  on
+
 # What the operator and the players set at the console. It comes in.
 record console
   test_word: word           # the test word switches: the controls when started at 5, the
                             # match's setup, and whether to halt and show the scores
   control_boxes: word       # the control boxes' buttons
+  # The sense switches, each named for what it does when on. Switch 4 is the
+  # heavens', which are not ported.
+  angular_momentum: switch  # 1: the rotate buttons build up angular momentum
+  light_star: switch        # 2: the central star pulls less
+  single_shot: switch       # 3: a torpedo only for each new press of the fire button
+  star_kills: switch        # 5: a ship that falls into the star explodes
+  no_star: switch           # 6: no central star, and no gravity
 
 # Where each frame's control word comes from: the start address picks it.
 enum control_source
@@ -189,6 +201,48 @@ record sine_call
 record cosine_call
   angle: word = 0           # cos: jda leaves the angle here
 
+# The spaceship calc routine's own words, handed from one of its rules to the
+# next within one ship's turn.
+enum rocket
+  off
+  firing
+
+record spaceship
+  controls: word = 0        # scw: this ship's control word, its four bits at the top
+  rocket: rocket = off      # program flag 6: the rocket fires this frame
+  sine: word = 0            # sn: the sine of the heading
+  cosine: word = 0          # cs
+  gravity_x: word = 0       # bx: the star's pull this frame
+  gravity_y: word = 0       # by
+  operand: word = 0         # t1: a scaled coordinate, then the squared distance, then the
+                            #   distance cubed: the word after a call (jda imp / lac \t1)
+  x_squared: word = 0       # t2
+  torpedo_x: word = 0       # stx: where a torpedo starts, ahead of the ship's tip
+  torpedo_y: word = 0       # sty
+  flame: word = 0           # src: exhaust dots still to draw, counting up
+
+# Where a ship's outline is drawn from, and the steps it is drawn with. The
+# outline is presentation: the spaceship sets these and jumps into its
+# compiled outline (ships.outline), which plots the ship, leaves the pen at
+# the ship's tail, where the exhaust flame starts, and leaves the out steps
+# mirrored for the ship's other side. The steps are the heading scaled down
+# by 2^9, turned to each direction of a ship standing on its tail.
+record pen
+  x: word = 0               # sx1
+  y: word = 0               # sy1
+  down_x: word = 0          # ssn: added to x; also the count a ship in the star waits out
+  down_y: word = 0          # scn: subtracted from y
+  out_x: word = 0           # scm: added to x
+  out_y: word = 0           # ssm: added to y
+  out_down_x: word = 0      # ssc: added to x
+  out_down_y: word = 0      # csm: subtracted from y
+  in_down_x: word = 0       # csn: added to x
+  in_down_y: word = 0       # ssd: subtracted from y
+
+# A new torpedo's slot: the first free one of the object table.
+record launch
+  slot: word = 0            # sr1: kept in the search's cursor
+
 # Values the original hands from one rule to the next in AC and IO. Each is a
 # place only because a register carried it: into or out of a tunable the
 # original executes with xct, or into the diff macro.
@@ -212,3 +266,7 @@ record handoff
   breakout_time: word = 0   # AC out of hd2
   recharge_time: word = 0   # AC out of hd3
   control_word: word = 0    # IO out of the control word routine (jsp i \cwg)
+  capture_margin: word = 0  # AC: a ship's squared distance from the star, less the capture radius
+  distance_high: word = 0   # AC:IO: the distance from the star cubed, scaled down; a ship
+  distance_low: word = 0    #   feels gravity only when the high half is 0
+  torpedo_button: word = 0  # AC: the fire button, if it counts as pressed, in the sign bit

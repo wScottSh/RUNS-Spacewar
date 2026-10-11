@@ -1,0 +1,117 @@
+# The spaceship calc routine (ss1, ss2): a ship turns, thrusts and falls
+# toward the central star, is drawn by its compiled outline with an exhaust
+# flame behind it, fires torpedoes and jumps into hyperspace. The main loop
+# runs it once a frame for each flying ship. Each Network fires the
+# Processors of spaceship.runs-prim, the arithmetic, the macros and the
+# tunables in the original's order; the guards test what its skips test.
+
+# The control word holds four bits a ship: rotate counterclockwise, rotate
+# clockwise (both: hyperspace), the rocket and the torpedo button. The first
+# ship's are the high four, the second's the low four.
+network first_spaceship(slot)                               # ss1
+  requires: slot < 2
+  run control_word                                          # jsp i \cwg
+  run take_first_controls
+  run spaceship(slot)
+
+network second_spaceship(slot)                              # ss2
+  requires: slot < 2
+  run control_word
+  run take_second_controls
+  run spaceship(slot)
+
+# The ship turns and takes its heading's sine, then falls toward the star,
+# unless sense switch 6 has removed it: the pull is the position over the
+# cube of the distance. A ship closer than the capture radius falls in.
+network spaceship(slot)                                     # sr0
+  run steer(slot)
+  run sine                                                  # jda sin
+  run take_sine
+  if console.no_star == on:                                 # szs 60
+    run accelerate(slot)                                    # jmp bsg
+  else:
+    run square_x(slot)
+    run integer_multiply                                    # jda imp
+    run square_y(slot)
+    run integer_multiply
+    run measure_capture
+    if handoff.capture_margin <= 0:                         # sma i sza-skp
+      run spaceship_in_star(slot)                           # jmp pof
+    else:
+      run take_root
+      run square_root                                       # jda sqt
+      run cube_distance
+      run multiply                                          # jda mpy
+      run scale_distance
+      if handoff.distance_high != 0:                        # too far for gravity to tell
+        run accelerate(slot)                                # jmp bsg
+      else:
+        run aim_pull_x(slot)
+        run integer_divide                                  # jda idv
+        run aim_pull_y(slot)
+        run integer_divide
+        run take_pull_y
+        run accelerate(slot)
+
+# The rocket and gravity change the velocity, and the velocity the
+# position. Then the outline is drawn, from the tip back.
+network accelerate(slot)                                    # bsg
+  run check_fuel(slot)
+  run cosine                                                # jda cos
+  run aim_thrust_y
+  run spaceship_acceleration                                # xct sac
+  run push_y
+  run inertia_y(slot)                                       # diff \mdy, my1, (sar 3s
+  run aim_thrust_x
+  run spaceship_acceleration
+  run push_x
+  run inertia_x(slot)                                       # diff \mdx, mx1, (sar 3s
+  run aim_outline(slot)                                     # sp1
+  run mark_center
+  # The ship's compiled outline, ships.outline[slot], which the main loop
+  # loads into the jump as it reaches the ship's slot. It is presentation:
+  # it plots the ship from the pen and steps, and jumps back to sq6.
+  run draw_outline(slot)                                    # sp5, jmp .
+  run after_outline(slot)
+
+# The exhaust flame, the torpedo tube and the hyperfield generators.
+network after_outline(slot)                                 # sq6
+  run next_random                                           # ranct
+  run exhaust(slot)
+  run count_down(slot)                                      # count i ma1, sr5: the tube reloads
+  if objects.counter[slot] >= 0:
+    run trigger(slot)
+    if handoff.torpedo_button < 0:
+      run count_torpedo(slot)                               # count i \mtr, st1
+      if ships.torpedoes[slot] >= 0:
+        run out_of_torpedoes(slot)
+      else:
+        run launch_torpedo(slot)
+  run count_recharge(slot)                                  # count i \mh3, st3
+  if ships.recharge[slot] >= 0:
+    run recharged(slot)
+    # Both rotate buttons newly pressed, with jumps left.
+    if ships.jumps_left[slot] != 0 and (-spaceship.controls | ships.previous_control[slot]) & 0600000 == 0:
+      run enter_hyperspace(slot)
+      run time_before_breakout                              # xct hd1
+      run time_hyperspace(slot)
+
+# A new torpedo takes the first free slot of the object table. When there
+# is none, the machine halts, and it halts again each time it is continued.
+network launch_torpedo(slot)                                # st1
+  run first_slot                                            # init sr1, mtb
+  loop at most 030:                                         # sr1
+    if objects.routine[launch.slot] == none:
+      break
+    run next_slot                                           # index sr1, (lac mtb nob, sr1
+    if launch.slot == 030:
+      stop                                                  # hlt; jmp .-1
+  run place_torpedo(slot)                                   # sr2
+  run torpedo_velocity                                      # xct tvl
+  run take_torpedo_dx(slot)
+  run torpedo_velocity
+  run take_torpedo_dy(slot)
+  run torpedo_reload_time                                   # xct rlt
+  run reload_tube(slot)
+  run torpedo_life                                          # xct tlf
+  run arm_torpedo

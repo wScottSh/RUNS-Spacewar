@@ -49,6 +49,13 @@ FIELDS = {
     ("integer_multiply_call", "entry"): "imp",
     ("divide_call", "high"): "dvd", ("divide_call", "quotient"): "idv",
     ("sine_call", "x"): "sin", ("sine_call", "answer"): "cos",
+    ("spaceship", "controls"): "scw", ("spaceship", "sine"): "sn", ("spaceship", "cosine"): "cs",
+    ("spaceship", "gravity_x"): "bx", ("spaceship", "gravity_y"): "by",
+    ("spaceship", "operand"): "t1", ("spaceship", "x_squared"): "t2",
+    ("spaceship", "torpedo_x"): "stx", ("spaceship", "torpedo_y"): "sty", ("spaceship", "flame"): "src",
+    ("pen", "x"): "sx1", ("pen", "y"): "sy1", ("pen", "down_x"): "ssn", ("pen", "down_y"): "scn",
+    ("pen", "out_x"): "scm", ("pen", "out_y"): "ssm", ("pen", "out_down_x"): "ssc",
+    ("pen", "out_down_y"): "csm", ("pen", "in_down_x"): "csn", ("pen", "in_down_y"): "ssd",
 }
 
 # Fields the original keeps inside an instruction, not in a word of their
@@ -57,7 +64,8 @@ FIELDS = {
 # mst's scr 1s or scr 3s (dap msh); explosion_cloud.scatter is the count of
 # the scl the program writes whole at mi1. handoff has no place in core: its
 # fields are AC and IO between two instructions.
-INSTRUCTION_FIELDS = {("explosion_cloud", "spread"): "msh", ("explosion_cloud", "scatter"): "mi1"}
+INSTRUCTION_FIELDS = {("explosion_cloud", "spread"): "msh", ("explosion_cloud", "scatter"): "mi1",
+                      ("launch", "slot"): "sr1"}
 
 # calc_routine: the routine's entry, and the sign bit when it does not collide.
 ROUTINE_WORDS = {"none": None, "first_spaceship": "ss1", "second_spaceship": "ss2",
@@ -66,9 +74,9 @@ ROUTINE_WORDS = {"none": None, "first_spaceship": "ss1", "second_spaceship": "ss
 ENUM_WORDS = {"calc_routine": ROUTINE_WORDS,
               "control_source": {"test_word": "mg2", "control_boxes": "cwr"}}
 
-# Fields the PDP-1 keeps in its program flags (light: off, on); SIMH's PF
-# holds flag n as bit 1 << (6 - n).
-FLAGS = {("lights", "first_survived"): 1, ("lights", "second_survived"): 2}
+# Fields the PDP-1 keeps in its program flags, an enum's first member
+# clear and its second set; SIMH's PF holds flag n as bit 1 << (6 - n).
+FLAGS = {("lights", "first_survived"): 1, ("lights", "second_survived"): 2, ("spaceship", "rocket"): 6}
 
 DPY = 0o720007              # dpy, intensity in bits 6-8
 DPY_NOWAIT = 0o724007
@@ -101,24 +109,30 @@ class Binding:
             return runs.Member(typ, self.enum_of[typ][word])
         return runs.W(word)
 
-    @staticmethod
-    def flags_word(state: dict) -> int:
-        """The program flags that hold Record fields, as SIMH's PF."""
-        return sum(1 << (6 - n) for (rec, fld), n in FLAGS.items()
-                   if state[rec][fld] == runs.Member("light", "on"))
+    def flag_members(self, rec: str, fld: str) -> list[str]:
+        return self.prog.enums[self.prog.records[rec].fields[fld][0]]
 
-    @staticmethod
-    def read_flags(pf: int) -> dict:
+    def flags_word(self, state: dict) -> int:
+        """The program flags that hold fields of the given Records, as SIMH's PF."""
+        return sum(1 << (6 - n) for (rec, fld), n in FLAGS.items()
+                   if rec in state and state[rec][fld].name == self.flag_members(rec, fld)[1])
+
+    def read_flags(self, pf: int, records=("lights",)) -> dict:
         out: dict = {}
         for (rec, fld), n in FLAGS.items():
-            out.setdefault(rec, {})[fld] = runs.Member("light", "on" if pf >> (6 - n) & 1 else "off")
+            if rec in records:
+                enum = self.prog.records[rec].fields[fld][0]
+                out.setdefault(rec, {})[fld] = runs.Member(enum, self.prog.enums[enum][pf >> (6 - n) & 1])
         return out
 
     def places(self, records: list[str]):
-        """Every (record, field, slot, address) of the named Records."""
+        """Every (record, field, slot, address) of the named Records; fields
+        held in a program flag or an instruction are not words of their own."""
         for rec in records:
             r = self.prog.records[rec]
             for fld in r.fields:
+                if (rec, fld) in FLAGS or (rec, fld) in INSTRUCTION_FIELDS:
+                    continue
                 for slot in (range(r.count) if r.count else [None]):
                     yield rec, fld, slot, self.address(rec, fld, slot)
 
@@ -143,8 +157,8 @@ class Binding:
 def point(plotted: tuple[int, int, int]) -> tuple:
     """A plotted point as the display stream holds it: x, y, intensity."""
     insn, x, y = plotted
-    if insn == DPY_NOWAIT:
-        return (runs.W(x), runs.W(y), None)
+    if insn == DPY_NOWAIT:              # plots at intensity 0, and asks for a completion pulse
+        return (runs.W(x), runs.W(y), 0)
     if insn & ~0o700 != DPY:
         raise ValueError(f"{insn:06o} is not a display instruction")
     return (runs.W(x), runs.W(y), (insn >> 6) & 7)

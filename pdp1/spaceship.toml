@@ -1,0 +1,103 @@
+# The spaceship calc routine (source lines 1079-1333): ss1 and ss2, jsp
+# routines the main loop enters with its cursors on the ship's slot, and
+# the blocks they jump through. Every block that runs off its end leaves
+# through the shared exit, srt, which returns to the main loop.
+replaces = "lift/spaceship.c"
+include = ["object_table.h", "control_word.h"]
+registers = ["handoff"]
+pool = ["spaceship.controls", "spaceship.sine", "spaceship.cosine", "spaceship.gravity_x",
+        "spaceship.gravity_y", "spaceship.operand", "spaceship.x_squared", "spaceship.torpedo_x",
+        "spaceship.torpedo_y", "spaceship.flame",
+        "pen.x", "pen.y", "pen.down_x", "pen.down_y", "pen.out_x", "pen.out_y", "pen.out_down_x",
+        "pen.out_down_y", "pen.in_down_x", "pen.in_down_y"]
+
+# The pool words the lifted outline compiler and heavens use too.
+[names]
+"spaceship.gravity_x" = "star_vector_x"
+"spaceship.gravity_y" = "star_vector_y"
+"pen.x" = "ship_x"
+"pen.y" = "ship_y"
+"pen.down_x" = "down_step_x"
+"pen.down_y" = "down_step_y"
+"pen.out_x" = "out_step_x"
+"pen.out_y" = "out_step_y"
+"pen.out_down_x" = "out_down_step_x"
+"pen.out_down_y" = "out_down_step_y"
+"pen.in_down_x" = "in_down_step_x"
+"pen.in_down_y" = "in_down_step_y"
+
+[flags]
+"spaceship.rocket" = 6
+
+[spell.rocket]
+off = 0
+firing = 1
+
+# The sense switches: szs reads them.
+[devices]
+"console.angular_momentum" = { sense = 1 }
+"console.light_star" = { sense = 2 }
+"console.single_shot" = { sense = 3 }
+"console.star_kills" = { sense = 5 }
+"console.no_star" = { sense = 6 }
+
+[spell.switch]
+off = 0
+on = 1
+
+# Cursors homed in this unit: the first instruction that reads or writes
+# the field (mom, mth, mco).
+[walk]
+homes = ["ships.angular_momentum", "ships.angle", "ships.previous_control"]
+
+# The cursors on the new torpedo's slot: the search's cursor (sr1) for the
+# routine word, the rest set from it in the table's order.
+[cursors."launch.slot"]
+"objects.routine" = "free_slot"
+"objects.x" = "torpedo_x_slot"
+"objects.y" = "torpedo_y_slot"
+"objects.counter" = "torpedo_counter_slot"
+"objects.cycles" = "torpedo_cycles_slot"
+"objects.dx" = "torpedo_dx_slot"
+"objects.dy" = "torpedo_dy_slot"
+
+[[place]]
+routine = "first_spaceship"
+convention = "JSP"
+
+[[place]]
+routine = "second_spaceship"
+convention = "JSP"
+
+# The fuel is tested in IO: AC holds the turn (lio i \mfu).
+[[place]]
+routine = "spaceship"
+convention = "BLOCK"
+io = ["controls"]
+io_reads = ["ships.fuel"]
+
+# The block the compiled outline jumps back to; the lifted outline compiler
+# names it.
+[[place]]
+routine = "after_outline"
+name = "outline_drawn"
+convention = "BLOCK"
+io = ["controls"]
+
+[[place]]
+exit = "spaceship_done"
+
+[[place]]
+routine = "spaceship_in_star"
+convention = "BLOCK"
+
+# The compiled outline: entered by a jump through sp5, where the main loop
+# carries ships.outline (pdp1/main_loop.toml); it jumps back to
+# after_outline. It waits for the display's completion pulse before its
+# first dot and leaves its last dot's pending, so the dot plotted just
+# before it asks for one and the block it returns to waits for it (ioh).
+[[extern]]
+routine = "draw_outline"
+convention = "BLOCK"
+back = "after_outline"
+pulse = true

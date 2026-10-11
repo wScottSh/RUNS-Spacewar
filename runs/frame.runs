@@ -21,9 +21,13 @@ network start_with_control_boxes                            # a40: started at 4
   run use_control_boxes
   run new_match
 
+# The ships' outlines are presentation: each spaceship hands its compiled
+# outline the pen, and the outline hands back the pen at the ship's tail.
+# Which device the control word comes from is the operator's choice of
+# start address, made before the first frame.
 network frame                                               # ml0
-  reads: console, score, outline_space
-  writes: display, scoreboard, lights
+  reads: console, score, outline_space, controls, pen
+  writes: display, scoreboard, lights, pen
   run begin_frame
   # The restart checks: while both ships fly on their own calc routines and
   # one still has torpedoes, the restart delay is held; otherwise it counts
@@ -131,10 +135,11 @@ network new_game                                            # a2
   run hyperspace_shots                                      # xct mhs
   run give_jumps
 
-# The control word, from the device the start picked (jsp i \cwg). The
-# spaceship reads it each frame; until it is ported, nothing fires this.
+# The control word, from the device the start picked (jsp i \cwg). Each
+# spaceship reads it, once a frame.
 network control_word
   reads: controls, console
+  writes: handoff
   match controls.source:
     test_word: run read_test_word
     control_boxes: run read_control_boxes
