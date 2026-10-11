@@ -24,7 +24,9 @@ A `[[place]]` with `fields` lays out those Record fields as data words, with the
 - `io`: locals and fields that live in IO. The rest live in AC or in a word of their own. A local set from a value already in IO is that value, with no move.
 - `cells`: other fields that live in the routine's entry word.
 - `skips`: a field and a member: the routine returns one word further when the field holds the member.
-- `block`: the routine's body is a block that other routines of the unit jump into. The routine's own entry stores its entry word and jumps there too. A run of the routine as the last thing another routine of the unit does is that jump.
+- `block`: the routine's body is a block that other routines of the unit jump into. The routine's own entry stores its entry word and jumps there too. A run of the routine as the last thing another routine of the unit does is that jump: the jumper stores the entry word, as jda would have.
+- `block_takes_entry`: the block is entered with the entry word already in AC (`sin` loads it; `cos` jumps in past the load).
+- `loops = "exit first"`: each loop of the routine is laid out with its first exit falling through into the code after the loop, and the rest of its body after the routine's last return, jumping back to the top. When the loop's body ends with the statement that an `if` just before the loop runs, that statement is the loop's top, and the loop is entered there or one statement past it. It changes the order of the code, not what runs.
 
 A Network bound as one routine runs its Processors inline. A `run` of another bound routine is a call: the sets of that routine's parameter fields just before the run are its arguments, and its result fields are read from the returned AC:IO pair.
 
@@ -32,7 +34,7 @@ A field with no data word of its own (an entry word, a register) has no value on
 
 ## Names the lifted C still uses
 
-Lifted units call the ported routines by their C names. `runsc` names each C function after its RUNS routine, and the lifted names are the same: `square_root`, `multiply`, `integer_multiply` and `integer_divide` (`lift/spaceship.c`). No binding renames one. These names stop mattering when the last lifted unit that calls them is ported.
+Lifted units call the ported routines by their C names. `runsc` names each C function after its RUNS routine, and the lifted names are the same: `square_root`, `multiply`, `integer_multiply`, `integer_divide`, `sine` and `cosine` (`lift/spaceship.c`). No binding renames one. These names stop mattering when the last lifted unit that calls them is ported.
 
 ## What a binding may not say
 

@@ -500,7 +500,7 @@ class Function:
         if op == "if":
             _, arms, other, _ = s
             if self.b.loops == "exit first" and nxt and nxt[0] == "loop" and len(arms) == 1 and not other \
-                    and len(arms[0][1]) == 1 and nxt[2] and nxt[2][-1] == arms[0][1][0]:
+                    and len(arms[0][1]) == 1 and nxt[2] and nxt[2][-1][:-1] == arms[0][1][0][:-1]:
                 head = self.label("loop")
                 self.merged_head = (nxt, head)
                 self.emit(depth, f"if ({self.cond(arms[0][0])})")

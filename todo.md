@@ -24,4 +24,5 @@
 ## Round 3 (autonomous): compile multiply, divide, sincos from RUNS
 - [x] multiply: RUNS mpy + imp Network, check_multiply vs SIMH, pdp1/multiply.toml, runsc networks/calls/byname/dword, MATCH, gate
 - [x] divide: RUNS dvd + idv Network, division enum for the skip, check_divide vs SIMH, block/skips/io_param/cells in the binding, MATCH, gate
-- [ ] sincos
+- [x] sincos: RUNS sin/cos Networks over mpy, check_sincos vs SIMH on all 2^18 words, exit-first loop layout + block_takes_entry, MATCH, gate
+- [ ] Open: sincos saturation branch is unreachable for every input word; only the image gate covers it
