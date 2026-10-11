@@ -372,6 +372,17 @@ def check_schema(path: Path, spec: dict):
             keys(p, kind, f"[[{section}]] {p.get(kind if kind in p else 'routine', '')}")
 
 
+def routine_locals(r: runs.Routine) -> set[str]:
+    """A routine's parameters, and every name its lets and counted loops bind."""
+    out = set(r.params)
+    for s in walk(r.body):
+        if s[0] == "let":
+            out |= {t[1] for t in (s[1][1] if s[1][0] == "tuple" else [s[1]]) if t[0] == "name"}
+        elif s[0] == "for":
+            out.add(s[1])
+    return out
+
+
 def own_routines(prog: runs.Program, name: str, bound: set[str]):
     """A bound routine and the routines it compiles inline."""
     yield name
@@ -575,16 +586,7 @@ class Bindings:
     def locals_of(self, name: str, bound: set[str]) -> set[str]:
         """The locals of a bound routine's RUNS: its parameters, and every
         name a let or a counted loop of the routines it compiles binds."""
-        out: set[str] = set()
-        for r in own_routines(self.prog, name, bound):
-            routine = self.prog.routines[r]
-            out |= set(routine.params)
-            for s in walk(routine.body):
-                if s[0] == "let":
-                    out |= {t[1] for t in (s[1][1] if s[1][0] == "tuple" else [s[1]]) if t[0] == "name"}
-                elif s[0] == "for":
-                    out.add(s[1])
-        return out
+        return set().union(*(routine_locals(self.prog.routines[r]) for r in own_routines(self.prog, name, bound)))
 
     def check_field(self, path: Path, dotted: str):
         rec, fld = dotted.split(".")
@@ -989,7 +991,7 @@ class Unit:
         bound routine. A run's arguments stand for the routine's parameters:
         the slot the cursors point at, or a slot by number."""
         names = names or {}
-        local_names = self.binds.locals_of(r.name, set())
+        local_names = routine_locals(r)
         body = typed(self.prog, substitute(list(r.body), names), local_names, r.name)
         if r.kind == "processor":
             if (cleared := self.clears_table(body)) is not None:
@@ -1245,6 +1247,12 @@ class Unit:
             return ["AT(0) RESERVE word break_ac;", "RESERVE resume_point *break_pc;", "RESERVE word break_io;",
                     "BLOCK void sequence_break(void)", "{", "    return flush_sequence_break();", "}"]
         if p.get("machine") == "sequence break flush":
+            # PDP-1 back-end runtime, not RUNS: the flush (sbf) clears the
+            # typewriter's flag (tyi), restores IO and AC from words 2 and 0,
+            # leaves sequence break mode (lsm) and resumes at word 1. Play
+            # cannot reach it: the tape never executes esm (no 720055 in
+            # oracle.lst), so a break happens only on a machine another
+            # program left in sequence break mode, before the game ran.
             return ["BLOCK void flush_sequence_break(void)", "{", "    tyi();", "    register word io = break_io;",
                     "    word ac = break_ac;", "    lsm();", "    return break_pc(ac, io);", "}"]
         if "jsp_slot" in p:
