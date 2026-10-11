@@ -2,7 +2,6 @@
 # hp1 and hp3, jsp routines the main loop enters with its cursors on the
 # current object. The random and diff macros are laid out at each use.
 replaces = "lift/objects.c"
-registers = ["handoff"]
 pool = ["explosion_cloud.particles"]
 
 # Fields held in a shift instruction: spread as the address field of the
@@ -28,10 +27,6 @@ second_spaceship = { routine = "second_spaceship" }
 display = "dpy"
 
 [[inline]]
-routine = "next_random"
-result = ["random.number"]
-
-[[inline]]
 routine = "inertia_x"
 ac_param = "handoff.acceleration"
 result = ["handoff.position"]
@@ -46,7 +41,6 @@ shifts = "xct"
 [[place]]
 routine = "explosion"
 convention = "JSP"
-io = ["handoff.particle_low"]
 
 [[place]]
 shifts = "explosion_cloud.spread"

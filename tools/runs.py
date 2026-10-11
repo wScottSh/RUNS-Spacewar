@@ -549,7 +549,6 @@ def load(paths: list[Path]) -> Program:
                     else:
                         body.append(c)
                 r.body = block(body)
-                shape(r.body, r, in_loop=False)
                 if r.name in prog.routines:
                     raise RunsError(f"{where}: {r.name} defined twice")
                 prog.routines[r.name] = r
@@ -621,6 +620,9 @@ class Unknown:
 
     def __repr__(self) -> str:
         return "unknown"
+
+    def __deepcopy__(self, memo):
+        return self                     # one unknown: a copied state still holds UNKNOWN
 
 
 UNKNOWN = Unknown()
@@ -1133,7 +1135,177 @@ def check_contracts(prog: Program) -> None:
             check_inputs(prog, n, inside)
 
 
-def program(root: Path) -> Program:
-    prog = load(sorted(root.glob("*.runs")) + sorted(root.glob("*.runs-prim")))
+def check_scope(prog: Program, r: Routine) -> None:
+    """Every name a routine's text uses means something where it stands,
+    checked before anything runs: a local is let before it is read or set
+    on every path that reaches it, a field is a field of its Record, a run
+    names a routine with its arguments, and a Processor touches only the
+    Records it declares."""
+    where = r.name
+
+    def fail(at: str, what: str):
+        raise RunsError(f"{at}: {what}")
+
+    def place(e, at: str, defined: set[str], write: bool):
+        """A Record field, or a slot of one, as an expression or a target."""
+        base = e[1] if e[0] == "index" else e
+        if not (base[0] == "field" and base[1][0] == "name" and base[1][1] in prog.records):
+            fail(at, f"not a Record field: {e!r}")
+        rec = prog.records[base[1][1]]
+        if base[2] not in rec.fields:
+            fail(at, f"{rec.name} has no field {base[2]}")
+        if (e[0] == "index") != (rec.count is not None) or rec.stream:
+            fail(at, f"{rec.name}.{base[2]} is {'a collection' if rec.count else 'one word'}")
+        if e[0] == "index":
+            expr(e[2], at, defined)
+        if r.kind == "processor" and rec.name not in r.writes and (write or rec.name not in r.reads):
+            fail(at, f"{r.name} does not declare {'writes' if write else 'reads'}: {rec.name}")
+
+    def expr(e, at: str, defined: set[str]):
+        op = e[0]
+        if op in ("num", "bool"):
+            return
+        if op == "name":
+            n = e[1]
+            if n not in defined and prog.member(n) is None and not (n in prog.instructions and OPERANDS[n] is None):
+                fail(at, f"unknown name {n}" + (" (a Record is read by its fields)" if n in prog.records else ""))
+        elif op in ("field", "index"):
+            place(e, at, defined, write=False)
+        elif op == "call" and instruction_call(e[1], e[2]):
+            x = e[2][0] if e[2] else None
+            kind = OPERANDS[e[1]]
+            if kind == "number" and x[0] != "num":
+                fail(at, f"{e[1]} takes a number")
+            elif kind == "target" and x[0] == "name" and x[1] in prog.routines:
+                pass
+            elif kind in ("place", "target"):
+                base = x[1] if x[0] == "index" else x
+                if not (base[0] == "field" and base[1][0] == "name" and base[1][1] in prog.records
+                        and base[2] in prog.records[base[1][1]].fields):
+                    fail(at, f"{e[1]} names a word of a Record{' or a routine' if kind == 'target' else ''}")
+                if x[0] == "index":
+                    expr(x[2], at, defined)
+        elif op == "call":
+            for a in e[2]:
+                expr(a, at, defined)
+        elif op in ("neg", "not"):
+            expr(e[1], at, defined)
+        elif op == "bin":
+            expr(e[2], at, defined)
+            expr(e[3], at, defined)
+        elif op == "tuple":
+            for x in e[1]:
+                expr(x, at, defined)
+        else:
+            fail(at, f"cannot read {e!r}")
+
+    def target(t, at: str, defined: set[str], new: bool) -> set[str]:
+        if t[0] == "tuple":
+            out: set[str] = set()
+            for x in t[1]:
+                out |= target(x, at, defined, new)
+            return out
+        if t[0] == "name":
+            if not new and t[1] not in defined:
+                fail(at, f"set {t[1]} before let")
+            return {t[1]}
+        if new:
+            fail(at, "let binds a local name")
+        place(t, at, defined, write=True)
+        return set()
+
+    def block(stmts: list, defined: set[str]) -> set[str] | None:
+        """The names defined after the block, or None when control cannot
+        run past it."""
+        for s in stmts:
+            defined = statement(s, defined)
+            if defined is None:
+                return None
+        return defined
+
+    def joined(outs: list) -> set[str] | None:
+        live = [d for d in outs if d is not None]
+        return set.intersection(*live) if live else None
+
+    def statement(s, defined: set[str]) -> set[str] | None:
+        op, at = s[0], s[-1]
+        if op in ("let", "set"):
+            expr(s[2], at, defined)
+            return defined | target(s[1], at, defined, new=op == "let")
+        if op == "if":
+            outs = []
+            for c, body in s[1]:
+                expr(c, at, defined)
+                outs.append(block(body, set(defined)))
+            outs.append(block(s[2], set(defined)))
+            return joined(outs)
+        if op == "loop":
+            expr(s[1], at, defined)
+            block(s[2], set(defined))
+            return defined
+        if op == "for":
+            expr(s[2], at, defined)
+            expr(s[3], at, defined)
+            block(s[4], defined | {s[1]})
+            return defined
+        if op in ("break", "continue", "stop", "unreachable"):
+            return None
+        if op == "return":
+            if s[1] is not None:
+                expr(s[1], at, defined)
+            return None
+        if op == "wait":
+            return defined
+        if op == "emit":
+            rec = prog.records.get(s[1])
+            if rec is None or not rec.stream:
+                fail(at, f"{s[1]} is no stream")
+            if len(s[2]) != len(rec.fields):
+                fail(at, f"{s[1]} takes {len(rec.fields)} values")
+            if r.kind == "processor" and s[1] not in r.writes:
+                fail(at, f"{r.name} does not declare writes: {s[1]}")
+            for a in s[2]:
+                expr(a, at, defined)
+            return defined
+        if op == "run":
+            callee = prog.routines.get(s[1])
+            if callee is None:
+                fail(at, f"{s[1]} is no routine")
+            if len(s[2]) != len(callee.params):
+                fail(at, f"{s[1]} takes {len(callee.params)} arguments")
+            for a in s[2]:
+                expr(a, at, defined)
+            return defined
+        if op == "match":
+            expr(s[1], at, defined)
+            enums = {prog.member(m) for m in s[2]}
+            if len(enums) != 1 or None in enums:
+                fail(at, f"a match's arms are members of one enum: {sorted(s[2])}")
+            return joined([block(body, set(defined)) for body in s[2].values()])
+        if op == "jump":
+            if s[1][0] != "index":
+                fail(at, "code is a slot of a collection")
+            place(s[1], at, defined, write=False)
+            expr(s[2], at, defined)
+            return defined
+        fail(at, f"unknown statement {op}")
+
+    for c in r.requires:
+        expr(c, where, set(r.params))
+    block(r.body, set(r.params))
+
+
+def check(prog: Program) -> Program:
+    """Everything the evaluator checks before anything runs: what each kind
+    may say, the names each routine uses, and the contracts."""
+    declared_instructions.clear()
+    declared_instructions.update(prog.instructions)
+    for r in prog.routines.values():
+        shape(r.body, r, in_loop=False)
+        check_scope(prog, r)
     check_contracts(prog)
     return prog
+
+
+def program(root: Path) -> Program:
+    return check(load(sorted(root.glob("*.runs")) + sorted(root.glob("*.runs-prim"))))

@@ -160,6 +160,70 @@ def falls_off(stmts: list) -> bool:
     return not (s[0] == "return" or s[0] == "loop" and not breaks(s[2]))
 
 
+def field_type(prog: runs.Program, e) -> str | None:
+    """The type a field expression's word holds, or None."""
+    d = dotted_of(e[1] if e[0] == "index" else e) if e[0] in ("field", "index") else None
+    if d is None or d.split(".")[0] not in prog.records:
+        return None
+    rec, fld = d.split(".")
+    return prog.records[rec].fields.get(fld, (None,))[0]
+
+
+def resolve(prog: runs.Program, name: str, enum: str | None, where: str) -> str:
+    """The enum a member's name means: the enum of the field it is stored
+    in or compared with, as the evaluator types it; else the one enum that
+    has the name."""
+    if enum in prog.enums:
+        if name not in prog.enums[enum]:
+            raise BindError(f"{where}: {name} is no member of {enum}")
+        return enum
+    owners = [e for e, ms in prog.enums.items() if name in ms]
+    if len(owners) != 1:
+        raise BindError(f"{where}: {name} is a member of {owners}: say which by the field it is stored in or "
+                        f"compared with")
+    return owners[0]
+
+
+def typed(prog: runs.Program, tree, local_names: set[str], where: str = ""):
+    """tree with each member's name ("name", m) as ("member", enum, m),
+    the enum the evaluator gives it where it stands (resolve). A local's
+    enum is the one every member set into it shares."""
+    locals_enum: dict[str, set[str]] = {}
+    for s in walk(tree if isinstance(tree, list) else []):
+        if s[0] in ("let", "set") and s[1][0] == "name" and s[2][0] == "name" and s[2][1] not in local_names:
+            have = {e for e, ms in prog.enums.items() if s[2][1] in ms}
+            locals_enum[s[1][1]] = locals_enum.get(s[1][1], have) & have
+
+    def enum_of(e) -> str | None:
+        if e[0] == "name" and e[1] in local_names:
+            have = locals_enum.get(e[1], set())
+            return next(iter(have)) if len(have) == 1 else None
+        typ = field_type(prog, e)
+        return typ if typ in prog.enums else None
+
+    def is_member(e) -> bool:
+        return isinstance(e, tuple) and len(e) == 2 and e[0] == "name" and isinstance(e[1], str) \
+            and e[1] not in local_names and any(e[1] in ms for ms in prog.enums.values())
+
+    def go(x, context: str | None, at: str):
+        if is_member(x):
+            return ("member", resolve(prog, x[1], context, at), x[1])
+        if isinstance(x, list):
+            return [go(y, None, at) for y in x]
+        if not isinstance(x, tuple) or not x:
+            return x
+        at = x[-1] if isinstance(x[-1], str) and x[0] in ("let", "set", "if", "loop", "for", "run", "emit",
+                                                          "match", "return", "jump") else at
+        if x[0] in ("let", "set"):
+            return (x[0], go(x[1], None, at), go(x[2], enum_of(x[1]), at), x[3])
+        if x[0] == "bin" and x[1] in ("==", "!="):
+            return ("bin", x[1], go(x[2], enum_of(x[3]), at), go(x[3], enum_of(x[2]), at))
+        if x[0] == "match":
+            return ("match", go(x[1], None, at), {m: go(b, None, at) for m, b in x[2].items()}, x[3])
+        return tuple(go(y, None, at) if isinstance(y, (tuple, list)) else y for y in x)
+    return go(tree, None, where)
+
+
 def table_cases(s):
     """An if-chain with no else whose every guard tests one value for
     `== n`, or an `or` of such tests, the numbers 0 to some n, each once:
@@ -255,6 +319,64 @@ class Bound:
         return f"{conv}{skips} {ret}{'' if ret.endswith('*') else ' '}{self.block if block else self.name}({params})"
 
 
+# The keys a binding may hold, by where they stand.
+SCHEMA = {
+    "unit": {"replaces", "registers", "pool", "repeat", "moves", "place", "inline", "code", "share", "devices",
+             "into", "spell", "flags", "homes", "addresses", "table", "cursors", "walk", "streams"},
+    "walk": {"set_after", "index", "homes", "home_in", "carry", "stray", "other"},
+    "stray": {"after", "cursor"},
+    "table": {"at", "records", "clear"},
+    "routine": {"routine", "convention", "entry", "ac_param", "io_param", "byname", "result", "io", "cells",
+                "skips", "block", "block_takes_entry", "loops", "shifts", "pool", "spill", "inline", "io_reads",
+                "args_done", "data", "flags", "homes", "into", "arms", "exit_after", "pulse"},
+    "inline": {"routine", "ac_param", "result", "shifts"},
+    "code": {"routine", "pulse"},
+    "fields": {"fields"},
+    "slots": {"slots", "range", "reserve", "at"},
+    "machine": {"machine", "reserve"},
+    "jump": {"jump", "start"},
+    "jsp_slot": {"jsp_slot", "at", "returns", "jump", "reserve"},
+    "exit": {"exit"},
+    "table place": {"table"},
+    "shifts": {"shifts"},
+}
+VALUES = {"convention": {"JDA", "JSP", "XCT", "BLOCK"}, "loops": {"exit first"}, "shifts": {"xct"},
+          "arms": {"apart"}, "moves": {"swap"}, "returns": {"io", "ac"},
+          "machine": {"constants", "variables", "patch space", "sequence break", "sequence break flush"}}
+
+
+def check_schema(path: Path, spec: dict):
+    """Each key of a binding is one runsc knows where it stands, and each
+    value of a closed kind one it knows."""
+    def keys(d: dict, kind: str, where: str):
+        if unknown := set(d) - SCHEMA[kind]:
+            raise BindError(f"{path.name}: {where}: unknown keys {sorted(unknown)}")
+        for k, v in d.items():
+            if k in VALUES and not (k == "shifts" and kind == "shifts") and v not in VALUES[k]:
+                raise BindError(f"{path.name}: {where}: {k} = {v!r} is none of {sorted(VALUES[k])}")
+    keys(spec, "unit", "the unit")
+    keys(spec.get("walk", {}), "walk", "[walk]")
+    if "stray" in spec.get("walk", {}):
+        keys(spec["walk"]["stray"], "stray", "[walk] stray")
+    keys(spec.get("table", {}), "table", "[table]")
+    for section in ("place", "inline", "code"):
+        for p in spec.get(section, []):
+            kind = section if section != "place" else next(
+                (k for k in ("routine", "fields", "slots", "machine", "jsp_slot", "jump", "exit") if k in p),
+                "table place" if "table" in p else "shifts" if "shifts" in p else None)
+            if kind is None:
+                raise BindError(f"{path.name}: a place is a routine, fields, slots or a machine word: {p}")
+            keys(p, kind, f"[[{section}]] {p.get(kind if kind in p else 'routine', '')}")
+
+
+def own_routines(prog: runs.Program, name: str, bound: set[str]):
+    """A bound routine and the routines it compiles inline."""
+    yield name
+    for inner in sorted(runs.runs_of(prog.routines[name].body) - bound):
+        if inner in prog.routines:
+            yield from own_routines(prog, inner, bound)
+
+
 class Bindings:
     """Every binding in pdp1/: the routines they bind and where fields live."""
 
@@ -285,6 +407,7 @@ class Bindings:
         self.insns = {f"{r}.{f}" for r, rec in prog.records.items() for f, (typ, _) in rec.fields.items()
                       if typ == "insn"}
         for path, spec in self.specs.items():
+            check_schema(path, spec)
             for f, target in spec.get("into", {}).items():
                 self.check_field(path, f)
                 self.check_field(path, target)
@@ -318,9 +441,6 @@ class Bindings:
             for f, n in spec.get("flags", {}).items():
                 self.check_field(path, f)
                 self.flags[f] = n
-            for f in spec.get("pointers", []):
-                self.check_field(path, f)
-                self.pointers.add(f)
             for f, where in spec.get("addresses", {}).items():
                 self.check_field(path, f)
                 self.addresses[f] = where
@@ -340,6 +460,94 @@ class Bindings:
                     lo, hi = p["range"]
                     self.pieces.setdefault(p["slots"], []).append((lo, hi, f"{self.c_name(p['slots'])}_{octal(lo)}"))
                     self.placed[p["slots"]] = path
+        self.check_names()
+
+    def check_names(self):
+        """Every value of a binding that names a field, a routine, a member
+        or a local names one the RUNS text has."""
+        bound = set(self.bound)
+        for path, spec in self.specs.items():
+            def routine(name: str, what: str):
+                if name not in self.prog.routines:
+                    raise BindError(f"{path.name}: {what} {name!r} is no routine")
+            for r in spec.get("registers", []):
+                if r not in self.prog.records:
+                    raise BindError(f"{path.name}: registers {r!r} is no Record")
+            if "repeat" in spec:
+                routine(spec["repeat"], "repeat")
+            for enum, members in spec.get("spell", {}).items():
+                if enum not in self.prog.enums:
+                    raise BindError(f"{path.name}: spell.{enum}: no enum {enum}")
+                for m, how in members.items():
+                    if m not in self.prog.enums[enum]:
+                        raise BindError(f"{path.name}: spell.{enum}: {m!r} is no member of {enum}")
+                    if isinstance(how, dict):
+                        if set(how) - {"routine", "sign", "literal"} or "routine" not in how:
+                            raise BindError(f"{path.name}: spell.{enum}.{m}: a routine, sign, literal")
+                        if how["routine"] not in self.prog.routines and how["routine"] not in self.jsp_slots:
+                            raise BindError(f"{path.name}: spell.{enum}.{m}: {how['routine']!r} is no routine")
+                    elif not isinstance(how, int):
+                        raise BindError(f"{path.name}: spell.{enum}.{m}: a number or a routine")
+            for stream in spec.get("streams", {}):
+                if stream not in self.prog.records or not self.prog.records[stream].stream:
+                    raise BindError(f"{path.name}: streams: {stream!r} is no stream")
+            walk = spec.get("walk", {})
+            if "set_after" in walk:
+                routine(walk["set_after"], "walk.set_after")
+            for proc in walk.get("home_in", {}).values():
+                routine(proc, "walk.home_in")
+            for f in [walk.get("index")] + walk.get("homes", []) + list(walk.get("home_in", {})) \
+                    + list(walk.get("other", {})) + ([walk["stray"]["after"]] if "stray" in walk else []):
+                if f:
+                    self.check_field(path, f)
+            for r in spec.get("table", {}).get("records", []):
+                if r not in self.prog.records:
+                    raise BindError(f"{path.name}: table.records {r!r} is no Record")
+            for p in spec.get("place", []) + spec.get("inline", []) + spec.get("code", []):
+                if "jump" in p and "jsp_slot" not in p:
+                    routine(p["jump"], "jump")
+                if "jsp_slot" in p:
+                    routine(p["jump"], "jsp_slot jump")
+                if "shifts" in p and "routine" not in p and self.homes.get(p["shifts"]) != "table":
+                    raise BindError(f"{path.name}: shifts {p['shifts']!r} is no field held in a table of shifts")
+                if "routine" not in p:
+                    continue
+                b = self.bound[p["routine"]]
+                own = self.locals_of(b.name, bound)
+                for key in ("io", "pool", "spill", "data"):
+                    for name in p.get(key, []):
+                        if "." in name:
+                            self.check_field(path, name)
+                        elif name not in own:
+                            raise BindError(f"{path.name}: {b.name} {key}: {name!r} is no local of its RUNS")
+                for key in ("flags", "homes", "into"):
+                    for name in p.get(key, {}):
+                        if name not in own:
+                            raise BindError(f"{path.name}: {b.name} {key}: {name!r} is no local of its RUNS")
+                for f in b.io_reads:
+                    self.check_field(path, f)
+                if b.skips:
+                    enum = self.prog.records[b.skips[0].split(".")[0]].fields[leaf(b.skips[0])][0]
+                    if b.skips[1] not in self.prog.enums.get(enum, []):
+                        raise BindError(f"{path.name}: {b.name} skips: {b.skips[1]!r} is no member of {enum}")
+                runs_here = set(own_routines(self.prog, b.name, bound))
+                for key in ("args_done", "exit_after"):
+                    if key in p and p[key] not in runs_here:
+                        raise BindError(f"{path.name}: {b.name} {key}: {p[key]!r} is no routine it runs")
+
+    def locals_of(self, name: str, bound: set[str]) -> set[str]:
+        """The locals of a bound routine's RUNS: its parameters, and every
+        name a let or a counted loop of the routines it compiles binds."""
+        out: set[str] = set()
+        for r in own_routines(self.prog, name, bound):
+            routine = self.prog.routines[r]
+            out |= set(routine.params)
+            for s in walk(routine.body):
+                if s[0] == "let":
+                    out |= {t[1] for t in (s[1][1] if s[1][0] == "tuple" else [s[1]]) if t[0] == "name"}
+                elif s[0] == "for":
+                    out.add(s[1])
+        return out
 
     def check_field(self, path: Path, dotted: str):
         rec, fld = dotted.split(".")
@@ -612,7 +820,7 @@ class Unit:
             rec, fld = f.split(".")
             e = self.prog.records[rec].fields[fld][1]
             if not (e == ("num", 0) or e[0] == "name" and self.binds.spelled.get(
-                    self.prog.member(e[1]), {}).get(e[1]) == 0):
+                    resolve(self.prog, e[1], self.prog.records[rec].fields[fld][0], f), {}).get(e[1]) == 0):
                 raise BindError(f"{self.path.name}: {f} is not on the tape, so it starts at its zero word")
         return f"RESERVE word {self.binds.table['at']}[{octal(self.binds.table_size())}];"
 
@@ -674,12 +882,13 @@ class Unit:
         bound routine. A run's arguments stand for the routine's parameters:
         the slot the cursors point at, or a slot by number."""
         names = names or {}
+        local_names = self.binds.locals_of(r.name, set())
+        body = typed(self.prog, substitute(list(r.body), names), local_names, r.name)
         if r.kind == "processor":
-            body = substitute(list(r.body), names)
             if (cleared := self.clears_table(body)) is not None:
                 return [cleared]
             return body
-        return self.flat_body(substitute(r.body, names), r)
+        return self.flat_body(body, r)
 
     def label(self, what: str) -> str:
         self.labels += 1
@@ -832,9 +1041,8 @@ class Unit:
         """A match over a field whose members are spelled as the routines its
         arms run: a jump through the field's word."""
         _, e, arms, where = s
-        enum = None
         for member, body in arms.items():
-            enum = self.prog.member(member)
+            enum = resolve(self.prog, member, field_type(self.prog, e), where)
             how = self.binds.spelled.get(enum, {}).get(member)
             if body and body[0][0] == "unreachable" and how == 0:
                 continue
@@ -868,8 +1076,7 @@ class Unit:
     def zero(self, e) -> bool:
         if e == ("num", 0):
             return True
-        enum = self.prog.member(e[1]) if e[0] == "name" else None
-        return enum is not None and self.binds.spelled.get(enum, {}).get(e[1]) == 0
+        return e[0] == "member" and self.binds.spelled.get(e[1], {}).get(e[2]) == 0
 
     def arguments(self, stmts: list) -> list:
         """The sets of a callee's parameter fields just before its call are
@@ -1237,11 +1444,8 @@ class Function:
             return True
         return False
 
-    def member(self, name: str) -> str | None:
+    def member(self, enum: str, name: str) -> str:
         """An enum member as the word that spells it."""
-        enum = self.unit.prog.member(name)
-        if enum is None or self.declared(name) or name in self.alias:
-            return None
         how = self.binds.spelled.get(enum, {}).get(name)
         if how is None:
             raise BindError(f"{self.b.name}: the binding spells no word for {enum} {name}")
@@ -1256,9 +1460,10 @@ class Function:
         op = e[0]
         if op == "num":
             return octal(e[1]), 99
+        if op == "member":
+            word = self.member(e[1], e[2])
+            return word, 3 if "|" in word else 99
         if op == "name":
-            if (word := self.member(e[1])) is not None:
-                return word, 3 if "|" in word else 99
             if e[1] in self.unit.prog.instructions and not self.declared(e[1]) and e[1] not in self.alias:
                 return INSTRUCTIONS[e[1]], 99
             return self.alias.get(e[1], e[1]), 99
@@ -1364,7 +1569,7 @@ class Function:
     def switch_test(self, e, negate: bool = False) -> str | None:
         """`field == m` for a field held in a sense switch or a program
         flag: the machine's test of it, `sense(n)` or `flag(n)`."""
-        if e[0] != "bin" or e[1] not in ("==", "!=") or e[3][0] != "name":
+        if e[0] != "bin" or e[1] not in ("==", "!=") or e[3][0] != "member":
             return None
         if e[2][0] == "name" and e[2][1] in self.b.flags:
             d, test = None, f"flag({self.b.flags[e[2][1]]})"
@@ -1376,11 +1581,16 @@ class Function:
             test = f"flag({self.binds.flags[d]})"
         else:
             return None
-        how = self.binds.spelled.get(self.unit.prog.member(e[3][1]), {}).get(e[3][1])
-        if how not in (0, 1):
-            raise BindError(f"{self.b.name}: {d} holds a member spelled 0 or 1")
+        how = self.flag_word(e[3], d or e[2][1])
         holds = ((how == 1) == (e[1] == "==")) != negate
         return test if holds else f"!{test}"
+
+    def flag_word(self, e, held: str) -> int:
+        """The bit a member held in a sense switch or a program flag is."""
+        how = self.binds.spelled.get(e[1], {}).get(e[2]) if e[0] == "member" else None
+        if how not in (0, 1):
+            raise BindError(f"{self.b.name}: {held} holds a member spelled 0 or 1, not {e!r}")
+        return how
 
     def cond(self, e, negate: bool = False) -> str:
         if (text := self.switch_test(e, negate)) is not None:
@@ -1539,7 +1749,7 @@ class Function:
             self.declare_top(f"word {name};")
             self.scopes[0].add(name)
             flag = self.binds.flags[dotted_of(s[1])]
-            how = self.binds.spelled.get(self.unit.prog.member(s[2][1]), {}).get(s[2][1])
+            how = self.flag_word(s[2], dotted_of(s[1]))
             return f"{'stf' if how else 'clf'}({flag}), {name} = 0;"
         if not (nxt and s[0] == nxt[0] == "set" and s[1][0] == "name" and s[2] == ("neg", s[1])
                 and nxt[2] == ("num", 0) and nxt[1][0] != "tuple"):
@@ -1562,7 +1772,7 @@ class Function:
         self.declare_top(f"word {ac};")
         self.declare_top(f"register word {io};")
         self.scopes[0] |= {ac, io}
-        how = self.binds.spelled.get(self.unit.prog.member(s[2][1]), {}).get(s[2][1])
+        how = self.flag_word(s[2], s[1][1])
         self.emit(depth, f"{ac} = 0, {io} = 0, {'stf' if how else 'clf'}({self.b.flags[s[1][1]]});")
         return 3
 
@@ -2021,15 +2231,13 @@ class Function:
         place = terms[0][2] if terms[0][0] == "bin" else None
         enum = None
         for t in terms:
-            if t[0] != "bin" or t[1] not in ("==", "!=") or t[2] != place or t[3][0] != "name":
+            if t[0] != "bin" or t[1] not in ("==", "!=") or t[2] != place or t[3][0] != "member":
                 return None
-            enum = self.unit.prog.member(t[3][1])
-            if enum is None or self.declared(t[3][1]):
-                return None
+            enum = t[3][1]
         spelled = self.binds.spelled.get(enum, {})
         zero = {m for m, how in spelled.items() if how == 0}
         sign = {m for m, how in spelled.items() if isinstance(how, dict) and how.get("sign")}
-        members = {t[3][1] for t in terms}
+        members = {t[3][2] for t in terms}
         if len(terms) == 1 and terms[0][1] == "==":
             return (place, "== 0") if members == zero else None
         if any(t[1] != "!=" for t in terms):
@@ -2040,12 +2248,11 @@ class Function:
     def xor_test(self, c):
         """`field == m` or `!=` for a member spelled as an address: (the
         field, the member's word, the C test of their xor against 0)."""
-        if c[0] != "bin" or c[1] not in ("==", "!=") or c[3][0] != "name" or self.switch_test(c) is not None:
+        if c[0] != "bin" or c[1] not in ("==", "!=") or c[3][0] != "member" or self.switch_test(c) is not None:
             return None
-        enum = self.unit.prog.member(c[3][1])
-        if enum is None or self.declared(c[3][1]) or self.enum_test(c) is not None:
+        if self.enum_test(c) is not None:
             return None
-        return c[2], self.member(c[3][1]), f"{c[1]} 0"
+        return c[2], self.member(c[3][1], c[3][2]), f"{c[1]} 0"
 
     def guard(self, c, body: list, depth: int, head: list[str]) -> str:
         """The C condition of a guard. A guard that tests an enum field by
@@ -2380,10 +2587,7 @@ class Function:
 
     def flag(self, held: str, e, depth: int) -> int:
         """A field or a local held in a program flag: the member spelled 1 sets it."""
-        enum = self.unit.prog.member(e[1]) if e[0] == "name" else None
-        how = self.binds.spelled.get(enum, {}).get(e[1]) if enum else None
-        if how not in (0, 1):
-            raise BindError(f"{self.b.name}: {held} is a program flag, set to a member spelled 0 or 1")
+        how = self.flag_word(e, held)
         n = self.b.flags[held] if held in self.b.flags else self.binds.flags[held]
         self.emit(depth, f"{'stf' if how else 'clf'}({n});")
         return 1
@@ -2420,9 +2624,9 @@ class Function:
         if self.binds.homes.get(dotted) in ("table", "built"):
             return self.home(dotted, e, depth)
         if dotted and self.b.skips and dotted == self.b.skips[0]:
-            if e[0] != "name":
+            if e[0] != "member":
                 raise BindError(f"{where}: {dotted} takes a member")
-            if e[1] == self.b.skips[1]:
+            if e[2] == self.b.skips[1]:
                 self.emit(depth, "skip_return();")
             return 1
         if e[0] == "call" and e[1] in IO_ROTATE and e[2][0] == target and self.expr(target) in self.io_resident():
@@ -2689,7 +2893,12 @@ def write_tree(prog: runs.Program, out: Path) -> Path:
 
 def build(prog: runs.Program, out: Path = OUT) -> int:
     """Compile and assemble; pdp1cc prints the hash and, on a mismatch, the
-    first word that differs. 0 when the image is the original's."""
+    first word that differs. 0 when the image is the original's. RUNS the
+    evaluator rejects before anything runs is not compiled."""
+    try:
+        runs.check(prog)
+    except runs.RunsError as e:
+        raise BindError(f"the evaluator rejects the RUNS: {e}") from e
     toml = write_tree(prog, out)
     with contextlib.redirect_stdout(io.StringIO()) as said:
         code = program.build(toml)

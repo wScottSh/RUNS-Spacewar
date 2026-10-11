@@ -10,7 +10,6 @@ entry = "integer_divide_call.dividend"
 io_param = "integer_divide_call.low"
 byname = "integer_divide_call.divisor"
 cells = ["divide_call.quotient"]
-io = ["low"]
 result = ["divide_call.result", "divide_call.high"]
 skips = ["divide_call.outcome", "fits"]
 
