@@ -70,7 +70,7 @@ The keys that hold for a whole unit:
 - `[addresses]` with a collection's field: the collection lies at an address the layout fixes, not at a place of its own. `"after table"`: the first word after the object table (`outline_code`, nnn).
 - `[[place]]` with `slots`, `range` and `reserve`: the slots `range` of a collection's field laid out as data words with their RUNS initial values, then `reserve` words of room no rule reads (the five spare words after each outline, for an operator to make it longer).
 - `at` on a `[[place]]` with `slots`: the words lie from that address (`6077/`, the star catalog, right after the free core `outline_code` takes).
-- `[share]`: a field that lives in another field's word (`central_star.slope_x` in `spaceship.gravity_x`'s, `\bx`). Each Record's rules must set the word before they read it.
+- `[share]`: a field that lives in another field's word (`central_star.slope_x` in `spaceship.gravity_x`'s, `\bx`). `runsc` refuses it unless, in every firing of a top Network and on every path, each field is set before it is read with no write of the other between (the shared words check, below).
 - `data`: fields laid out as data words inside the routine's code, at its first point control cannot reach (`ocm`, `ocn` after `oc`'s return).
 - `args_done`: the Processor after which the routine steps its return address past the words after its call (`idx ocx`). Where it does so is a choice of code layout; pdp1cc needs AC dead there.
 - `pulse = true` on a routine: its points ask the display for a completion pulse (`dpy-4000`, at intensity 0). Each point waits for the one before it (`ioh`), and a routine that runs it waits for its last after the run. It is the display's handshake (`bpt`, the central star's line).
@@ -135,7 +135,16 @@ A C function is named after its RUNS routine, and a field's word `record_field`.
 
 ## What a binding may not say
 
-No game logic. A binding has no expressions, no statements and no number that the game computes with. Every word of the image that the game's rules decide comes from the RUNS text. `tools/check_compiled.py` enforces this: it changes each number in each routine and field a binding compiles, and requires the image to change. A loop's bound is RUNS's own check; it compiles to nothing, and the tool lists it apart.
+No game logic. A binding has no expressions, no statements and no number that the game computes with. Every word of the image that the game's rules decide comes from the RUNS text, and every RUNS reference is compiled as the field it names.
+
+`runsc` enforces the parts of this it can decide before it writes C:
+
+- It compiles only RUNS the evaluator accepts: `runs.check` (what each kind may say, the contracts, and a static scope check of names, fields, runs and declared Records).
+- Every key of a binding is one it knows, and every value names a field, routine, member or local of the RUNS text. A member's name means the member of the enum of the field it is stored in or compared with, as in the evaluator.
+- Shared words. Several RUNS names can live in one word: an entry word and its `cells`, a `[share]`, and names `runsc` compiles to one C name (a local kept in the register a field arrived in, the halves of a pair, a call's result). `runsc` follows, through every routine and across the runs between them, which names each such word holds: the last one written and those copied from it since. A top Network starts with none. A read of a name its word does not hold is a BindError, unless a bit-level pass proves the Processor's effects use no bit of the value read (`draw_jump` and `plot_particle` shift IO's old value out).
+- `carry` goes through the field the RUNS jump names, and only where the walk loads it for every slot that jumps (`[walk]` above). A skip return is set on every path, the skip member last.
+
+`tools/check_compiled.py` checks the rest by mutation. It changes each number, each field reference to every other field of its Record of the same type, each operator and enum member, and deletes each statement and swaps each adjacent pair, in every routine and field a binding compiles. It also deletes each key line of each binding, which must then change the image or be refused, so no key is dead. Each mutant must change the image, be refused with a BindError or rejected by the evaluator, or be shown the same game: the evaluator fires the mutated routine, and failing that each bound routine that compiles it, on 200 seeded Record states, and the mutant passes only if every firing leaves the same Records, points and errors, with at least 50 running clean. A mutant inside a loop's bound is RUNS's own check; it compiles to nothing, and the tool lists it apart. It does not mutate a `match`'s arms or insert statements.
 
 Where play observes the layout, the RUNS text states the layout, and the binding follows it (`INTENT.md`, "Exactness, glitches, and the machine").
 

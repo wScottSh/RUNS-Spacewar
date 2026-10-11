@@ -3,11 +3,13 @@ image once (it must match the oracle), then mutates the RUNS of every
 routine and field the bindings compile, one change at a time:
 
 - each number, and each field's initial value, one up;
-- each field reference to another field of its Record of the same type
-  (at most two others a reference, picked by a seeded draw);
+- each field reference to each other field of its Record of the same type;
 - each operator to another (+ and -, < and >=, & and |, and and or, ...);
 - each enum member to another of its enum;
-- each statement deleted, and each pair of adjacent statements swapped.
+- each statement deleted, and each pair of adjacent statements swapped;
+
+and deletes each key line of each binding, which must then build another
+image or be refused: a key that changes nothing is dead.
 
 Each mutant is classified. It changes the image; or the evaluator rejects
 the text before anything runs (runs.check); or runsc refuses it with a
@@ -30,6 +32,7 @@ import copy
 import dataclasses
 import multiprocessing
 import random
+import shutil
 import sys
 import tempfile
 import tomllib
@@ -45,7 +48,6 @@ OPERATORS = {"+": "-", "-": "+", "&": "|", "|": "&", "^": "|", "<<": ">>", ">>":
              "<": ">=", ">=": "<", ">": "<=", "<=": ">", "==": "!=", "!=": "==", "and": "or", "or": "and"}
 STATEMENTS = {"let", "set", "if", "loop", "for", "break", "continue", "stop", "unreachable", "wait",
               "return", "jump", "emit", "run", "match"}
-FIELD_SWAPS = 2             # other fields tried a field reference
 TRIALS = 200                # seeded Record states a silent mutant is fired on
 CLEAN = TRIALS // 4         # firings that must run without error
 
@@ -125,9 +127,7 @@ def routine_sites(prog: runs.Program, proc: str):
                 and node[1][1] in prog.records:
             rec = prog.records[node[1][1]]
             typ = rec.fields[node[2]][0]
-            others = [f for f, (t, _) in rec.fields.items() if f != node[2] and t == typ]
-            rng = random.Random(zlib.crc32(f"{proc} {path}".encode()))
-            for f in sorted(rng.sample(others, min(FIELD_SWAPS, len(others)))):
+            for f in [f for f, (t, _) in rec.fields.items() if f != node[2] and t == typ]:
                 yield Mutant(f"{proc} field {rec.name}.{node[2]} -> {f} {path}", "field", proc, path,
                              ("field", node[1], f))
         elif isinstance(node, tuple) and node and node[0] == "bin" and node[1] in OPERATORS:
@@ -299,6 +299,43 @@ def equivalent(prog: runs.Program, mutated: runs.Program, m: Mutant) -> tuple[bo
     return False, "; ".join(why)
 
 
+# ---------------------------------------------------------------- the binding
+
+def key_lines() -> list[tuple[str, int]]:
+    """(binding file, line) of each whole key = value line."""
+    out = []
+    for b in sorted(runsc.BINDINGS.glob("*.toml")):
+        for n, text in enumerate(b.read_text().splitlines()):
+            s = text.strip()
+            if s and not s.startswith(("#", "[")) and "=" in s and s.count("[") == s.count("]") \
+                    and s.count("{") == s.count("}"):
+                out.append((b.name, n))
+    return out
+
+
+def without_key(where: tuple[str, int]) -> tuple[str, str]:
+    """A binding with one key line deleted must build another image or be
+    refused: a key that changes nothing is dead."""
+    name, n = where
+    prog = runs.program(runs.source())
+    home = runsc.BINDINGS
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp = Path(tmp)
+        shutil.copytree(home, tmp / "pdp1")
+        lines = (tmp / "pdp1" / name).read_text().splitlines()
+        del lines[n]
+        (tmp / "pdp1" / name).write_text("\n".join(lines) + "\n")
+        runsc.BINDINGS = tmp / "pdp1"
+        try:
+            return ("changed" if runsc.build(prog, tmp / "out") else "dead"), ""
+        except (runsc.BindError, tomllib.TOMLDecodeError) as e:
+            return "refused", str(e)
+        except Exception as e:      # noqa: BLE001 - a crash is a finding of the gate
+            return "crash", f"{type(e).__name__}: {e}"
+        finally:
+            runsc.BINDINGS = home
+
+
 # ---------------------------------------------------------------- the gate
 
 def verdict(m: Mutant) -> tuple[str, str]:
@@ -338,8 +375,14 @@ def main() -> int:
         n = int(sys.argv[sys.argv.index("--sample") + 1])
         random.Random(1962).shuffle(built)
         built = built[:n]
+    keys = key_lines()
     with ProcessPoolExecutor(mp_context=multiprocessing.get_context("fork")) as pool:
         results = list(pool.map(verdict, built, chunksize=4))
+        kept = list(pool.map(without_key, keys))
+    dead = [f"{name}:{n + 1} {what.upper()} {how}" for (name, n), (what, how) in zip(keys, kept)
+            if what in ("dead", "crash")]
+    for where in dead:
+        print(f"  binding key {where}")
     for m in bounds:
         print(f"  loop bound, RUNS's check only: {m.label}")
     by = Counter()
@@ -353,11 +396,12 @@ def main() -> int:
                                          ("changed", "refused", "rejected", "equivalent", "silent", "crash")
                                          if by[(kind, w)]))
     total = Counter(w for w, _ in results)
-    failed = total["silent"] + total["crash"]
+    failed = total["silent"] + total["crash"] + len(dead)
     print(f"check_compiled: image matches; {len(built)} mutants{' (sampled)' if '--sample' in sys.argv else ''}: "
           f"{total['changed']} change the image, {total['refused']} refused by runsc, "
           f"{total['rejected']} rejected by the evaluator, {total['equivalent']} silent and the same game, "
-          f"{total['silent']} silent and not shown the same, {total['crash']} crash; {len(bounds)} loop bounds")
+          f"{total['silent']} silent and not shown the same, {total['crash']} crash; {len(bounds)} loop bounds; "
+          f"{len(keys) - len(dead)}/{len(keys)} binding keys live")
     return 1 if failed else 0
 
 

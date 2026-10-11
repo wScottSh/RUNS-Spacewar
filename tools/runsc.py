@@ -342,6 +342,10 @@ SCHEMA = {
     "table place": {"table"},
     "shifts": {"shifts"},
 }
+# The keys each must hold.
+REQUIRED = {"unit": {"replaces", "place"}, "routine": {"convention"}, "inline": {"routine"}, "code": {"routine"},
+            "slots": {"range"}, "jsp_slot": {"at", "returns", "jump"}, "table": {"at", "records"},
+            "stray": {"after", "cursor"}}
 VALUES = {"convention": {"JDA", "JSP", "XCT", "BLOCK"}, "loops": {"exit first"}, "shifts": {"xct"},
           "arms": {"apart"}, "moves": {"swap"}, "returns": {"io", "ac"},
           "machine": {"constants", "variables", "patch space", "sequence break", "sequence break flush",
@@ -354,6 +358,8 @@ def check_schema(path: Path, spec: dict):
     def keys(d: dict, kind: str, where: str):
         if unknown := set(d) - SCHEMA[kind]:
             raise BindError(f"{path.name}: {where}: unknown keys {sorted(unknown)}")
+        if missing := REQUIRED.get(kind, set()) - set(d):
+            raise BindError(f"{path.name}: {where}: missing {sorted(missing)}")
         for k, v in d.items():
             if k in VALUES and not (k == "shifts" and kind == "shifts") and v not in VALUES[k]:
                 raise BindError(f"{path.name}: {where}: {k} = {v!r} is none of {sorted(VALUES[k])}")
@@ -361,7 +367,8 @@ def check_schema(path: Path, spec: dict):
     keys(spec.get("walk", {}), "walk", "[walk]")
     if "stray" in spec.get("walk", {}):
         keys(spec["walk"]["stray"], "stray", "[walk] stray")
-    keys(spec.get("table", {}), "table", "[table]")
+    if "table" in spec:
+        keys(spec["table"], "table", "[table]")
     for section in ("place", "inline", "code"):
         for p in spec.get(section, []):
             kind = section if section != "place" else next(
@@ -494,7 +501,8 @@ class Bindings:
             self.flags[f] = n
         fired = set().union(set(), *(runs.runs_of(r.body) for r in self.prog.routines.values()))
         for v in spec.get("start", []):
-            if set(v) - SCHEMA["start"] or v.get("network") not in self.prog.routines or v["network"] in fired:
+            if set(v) - SCHEMA["start"] or "at" not in v or v.get("network") not in self.prog.routines \
+                    or v["network"] in fired:
                 raise BindError(f"{path.name}: a start is an address and a top Network: {v}")
             self.starts.append(v)
         if self.starts and sum(bool(v.get("tape")) for v in self.starts) != 1:
@@ -535,6 +543,11 @@ class Bindings:
                 routine(walk["set_after"], "walk.set_after")
             for proc in walk.get("home_in", {}).values():
                 routine(proc, "walk.home_in")
+            for f in walk.get("homes", []) + list(walk.get("home_in", {})):
+                if f not in self.cursors:
+                    raise BindError(f"{path.name}: [walk] homes {f}, which has no cursor ([cursors])")
+            if "set_after" in walk and "index" not in walk:
+                raise BindError(f"{path.name}: [walk] names the field whose cursor ends the walk (index)")
             for f in [walk.get("index")] + walk.get("homes", []) + list(walk.get("home_in", {})) \
                     + list(walk.get("other", {})) + ([walk["stray"]["after"]] if "stray" in walk else []):
                 if f:
@@ -598,6 +611,8 @@ class Bindings:
         name = p["routine"]
         if name not in self.prog.routines:
             raise BindError(f"{path.name}: {name} is no routine")
+        if p.get("convention") == "JDA" and "entry" not in p:
+            raise BindError(f"{path.name}: {name} is JDA: name its entry word (entry)")
         if p.get("code") and [x[0] for x in self.prog.routines[name].body] != ["jump"]:
             raise BindError(f"{path.name}: {name} is code a Record holds only if its body is one jump")
         b = Bound(name, path, p["convention"], p.get("entry"), p.get("ac_param"), p.get("io_param"),
@@ -1239,6 +1254,8 @@ class Unit:
             return ["CONSTANTS();"]
         if p.get("machine") == "variables":
             return ["VARIABLES();"]
+        if p.get("machine") == "patch space" and "reserve" not in p:
+            raise BindError(f"{self.path.name}: the patch space is reserve words long")
         if p.get("machine") == "patch space":
             return [f"RESERVE word patch_space[{octal(p['reserve'])}];"]
         if p.get("machine") == "sequence break":
@@ -1566,6 +1583,8 @@ class Function:
         cursors = self.binds.slot_cursors[held]
         order = self.table_order(cursors)
         done = self.chained.setdefault(held, [order[0]])
+        if upto and upto not in order:
+            raise BindError(f"{self.b.name}: no cursor for {upto} on the slot {held} holds ([cursors.\"{held}\"])")
         last = order.index(upto) if upto else len(order) - 1
         for n in range(len(done), last + 1):
             count = octal(self.unit.prog.records[order[n - 1].split(".")[0]].count)
@@ -1889,6 +1908,9 @@ class Function:
             return f"return {self.unit.exit}();"
         if self.b.convention == "BLOCK":
             # a firing ends here: the machine runs the frame again
+            if "repeat" not in self.unit.spec:
+                raise BindError(f"{self.b.name}: a block that runs off its end ends the firing: the unit names "
+                                f"the Network the PDP-1 runs again (repeat), or its shared exit")
             return f"return {self.unit.spec['repeat']}();"
         res = [self.place(f) for f in self.b.result]
         if not res:
@@ -2416,6 +2438,8 @@ class Function:
 
     def clear(self, depth: int):
         """Every word of the table set to 0, by a cursor homed in the dzm."""
+        if "clear" not in self.binds.table:
+            raise BindError(f"{self.b.name}: the clearing loop's cursor is [table] clear")
         c, table = self.binds.table["clear"], self.binds.table["at"]
         top = self.label("clear")
         self.unit.cleared = c
