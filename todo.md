@@ -123,3 +123,14 @@ Predicate: runsc MATCH 8744e9c9; reviewer C's harnesses (hC_gen, hC_gen2, hC_dec
 - [x] Audit (subagent) of every runsc peephole: two more holes fixed (a block's run in tail position; the jump-back run's arguments); loop bounds kept as RUNS's check, judged by firing
 - [ ] Open: the audit's rules judged unchecked but guarded by the image in practice (held guards, shared xor, spill, preinc, shift-table `known`, jump-table range, pending results, slot chain) have no mutant that builds MATCH; no rule makes them sound by construction
 - [ ] Open: no independent reviewer has re-read this round's runs.check type and declaration rules (BLOCKED: independent review in this subagent)
+
+## Round 11 (fix wave): close reviewer D's holes
+- [x] 1. runsc dispatch: an arm's run passes the scrutinee's slot; gate kind `argument`; audit (subagent) of every pattern match: match coverage, word operator arity, statements after a jump out, now runs.check errors
+- [x] 2. Unused parameters and locals rejected; place_torpedo's slot gone; sine_answer's dropped half is `_`
+- [x] 3. Static checks: ordering compares, 18-bit numbers, constant slots, break/continue placement, constant compares, return without a value
+- [x] 4. outline_code's count reserved after the table; the star catalog follows it (no `at`)
+- [x] 5. INTENT: bounds are RUNS's checks, not proofs; the twelve bounds listed
+- [x] 6. Every initial value mutated; a silent one judged by 60 games from power-on
+- [x] Evaluator: a bound that fails to evaluate stops the firing at the bound
+- [ ] Open: runs-spec's check_examples fails two examples under the stricter checks (DIGS #8 now rejected for its ordering compare; NETWORK_TOPOLOGY's size_cloud never reads its slot); runs-spec is outside this round
+- [ ] Open: audit's latent miscompiles (with_operand vs rotated_operand; held guards) have no MATCH mutant; no rule makes them sound by construction
