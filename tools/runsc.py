@@ -405,7 +405,7 @@ SCHEMA = {
     "inline": {"routine": _name, "ac_param": _field, "result": _list(_field), "shifts": _one_of("xct")},
     "code": {"routine": _name, "pulse": _BOOL},
     "fields": {"fields": _list(_field)},
-    "slots": {"slots": _field, "range": _list(_int, 2), "reserve": _int, "at": _int},
+    "slots": {"slots": _field, "range": _list(_int, 2), "reserve": _int},
     "machine": {"machine": _one_of("constants", "variables", "patch space", "sequence break",
                                    "sequence break flush", "start vectors"), "reserve": _int},
     "jsp_slot": {"jsp_slot": _name, "at": _int, "returns": _one_of("io", "ac"), "jump": _name, "reserve": _int},
@@ -785,7 +785,7 @@ class Bindings:
             if lo <= slot <= hi:        # a slot, else the place just past a piece's last
                 return (name if slot == lo else f"{name} + {octal(slot - lo)}"), name
         if self.addresses.get(dotted) == "after table":
-            return f"{self.table['at']} + {octal(self.table_size() + slot)}", None
+            return f"{self.c_name(dotted)} + {octal(slot)}", None
         raise BindError(f"{dotted}[{slot:o}] has no address in the binding")
 
     def table_fields(self) -> list[str]:
@@ -896,9 +896,12 @@ class Unit:
         for c in sorted(self.binds.all_cursors() - own):
             if re.search(rf"\b{c}\b", text):
                 out.append(f"extern HOMED word *{c};" if c in self.binds.homed_cursors() else f"POOL word *{c};")
-        table = self.binds.table.get("at")
-        if table and re.search(rf"\b{table}\b", text) and not any(p.get("table") for p in self.spec["place"]):
-            out.append(f"extern word {table}[];")
+        if any(p.get("table") for p in self.spec["place"]):
+            return out
+        after = [self.binds.c_name(d) for d, where in self.binds.addresses.items() if where == "after table"]
+        for name in [self.binds.table.get("at")] + after:
+            if name and re.search(rf"\b{name}\b", text):
+                out.append(f"extern word {name}[];")
         return out
 
     def copy_words(self) -> list[str]:
@@ -970,8 +973,7 @@ class Unit:
         e = self.prog.records[rec].fields[fld][1]
         values = e[1][lo:hi + 1] if e is not None and e[0] == "slots" else [e] * (hi - lo + 1)
         name = f"{self.binds.c_name(p['slots'])}_{octal(lo)}"
-        at = f"AT({octal(p['at'])}) " if "at" in p else ""
-        out = [f"{at}word {name}[{octal(hi - lo + 1)}] = {{ {', '.join(Function.constant(v) for v in values)} }};"]
+        out = [f"word {name}[{octal(hi - lo + 1)}] = {{ {', '.join(Function.constant(v) for v in values)} }};"]
         if p.get("reserve"):
             out.append(f"RESERVE word {name}_spare[{octal(p['reserve'])}];")
         return out
@@ -986,7 +988,9 @@ class Unit:
             if not (e == ("num", 0) or e[0] == "name" and self.binds.spelled.get(
                     resolve(self.prog, e[1], self.prog.records[rec].fields[fld][0], f), {}).get(e[1]) == 0):
                 raise BindError(f"{self.path.name}: {f} is not on the tape, so it starts at its zero word")
-        return f"RESERVE word {self.binds.table['at']}[{octal(self.binds.table_size())}];"
+        after = [f"RESERVE word {self.binds.c_name(d)}[{octal(self.prog.records[d.split('.')[0]].count)}];"
+                 for d, where in self.binds.addresses.items() if where == "after table"]
+        return "\n".join([f"RESERVE word {self.binds.table['at']}[{octal(self.binds.table_size())}];"] + after)
 
     def check_unstored(self):
         """A field with no data word cannot carry an initial value onto the
@@ -1599,7 +1603,7 @@ class Function:
         if dotted in self.binds.addresses:
             if self.binds.addresses[dotted] != "after table":
                 raise BindError(f"{dotted}: no address {self.binds.addresses[dotted]!r}")
-            return f"{self.binds.table['at']} + {octal(self.binds.table_size())}"
+            return self.binds.c_name(dotted)
         if self.pending and self.pending[0] == dotted and self.pending[2] == self.nested:
             self.consumed, self.pending = self.pending, None
             return self.consumed[1]
