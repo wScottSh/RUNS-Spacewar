@@ -1,0 +1,359 @@
+# Spacewar! 3.1: the game's state.
+#
+# Every word of core the game carries from one routine to another, or from
+# one frame to the next, is a field of a Record here. So is every value that
+# passes between two Processors. Scratch words a Processor sets before it
+# reads them, and never hands on, are locals of the Processor.
+
+type word
+  bits: 18
+  complement: ones          # -0 exists; add and subtract are the PDP-1's (end-around carry, never yield -0)
+  compare: sign             # word < 0 tests the sign bit; == compares all 18 bits
+
+# A word of code: a PDP-1 instruction, as the outline compiler writes it and
+# a spaceship runs it (`jump`). Each is built by its instruction's name and
+# its operand: lac(pen.x) is `lac \sx1`, jmp(after_outline) is `jmp sq6`,
+# stf(5) is `stf 5`, rcl(9) is `rcl 9s`, cma is `cma`. An operand names a
+# word of a Record or code, a routine, or a number; the word is read only
+# when the instruction runs. The machine runs code by its own rules. These
+# are the instructions the game reaches:
+type insn
+  instructions: lac lio dac dio add sub jmp stf clf szf cma ioh dpy rcl
+  display: display          # dpy-4000 plots AC, IO at intensity 0, and asks for the pulse ioh waits for
+
+# The routine word (the ml1 property): which calc routine runs the object.
+# Each value also fixes whether the object collides; core keeps that in the
+# word's sign bit.
+enum calc_routine
+  none                      # a free slot
+  first_spaceship           # ss1
+  second_spaceship          # ss2
+  torpedo                   # tcr
+  explosion                 # mex: does not collide
+  in_hyperspace             # hp1: does not collide
+  breakout                  # hp3
+
+# The object table (mtb): two spaceships, then 22 torpedoes.
+record objects[030]
+  routine: calc_routine = none
+  x: word = 0               # nx1: position
+  y: word = 0               # ny1
+  counter: word = 0         # na1: frames left of a torpedo's life, an explosion, a stay in hyperspace
+  cycles: word = 0          # nb1: instructions the calc routine takes; an explosion's size
+  dx: word = 0              # ndx: velocity
+  dy: word = 0              # ndy
+
+# Spaceship-only properties, slot for slot with objects[0] and objects[1].
+record ships[2]
+  angular_momentum: word = 0    # nom
+  angle: word = 0               # nth: heading
+  fuel: word = 0                # nfu: counting up, out at 0
+  torpedoes: word = 0           # ntr: torpedoes left, counting up
+  outline: word = 0             # not: the ship's compiled outline
+  previous_control: word = 0    # nco: last frame's control word
+  saved_routine: calc_routine = none   # nh1: the ship's own calc routine, kept during hyperspace
+  jumps_left: word = 0          # nh2: hyperspace jumps left, counting up
+  recharge: word = 0            # nh3: hyperfield generator recharge, counting up
+  uncertainty: word = 0         # nh4: hyperspatial uncertainty
+
+record random
+  number: word = 0          # ran
+
+record frame
+  spare_time: word = 0      # mtc: the frame's instruction budget, counting up
+  restart_delay: word = 0   # ntd: frames until the next game, counting up. The tape does not
+                            # load it, but every game sets it before it counts it down.
+  objects_seen: word = 0    # moc: counted, never read. The tape does not load it, so on the
+                            # PDP-1 it counts up from core's power-on contents (reach_oracle).
+
+# The scores, and the games left in the match. The tape does not load these
+# words, and the first game reads them before it sets them, so the first
+# match starts from whatever core held at power-on. They come in at the
+# boundary: no initial value.
+record score
+  first: word               # 1sc
+  second: word              # 2sc
+  games_left: word          # gct: counting up; 0 when no match is on
+
+# A switch on the console.
+enum switch
+  off
+  on
+
+# What the operator and the players set at the console. It comes in.
+record console
+  test_word: word           # the test word switches: the controls when started at 5, the
+                            # match's setup, and whether to halt and show the scores
+  control_boxes: word       # the control boxes' buttons
+  # The sense switches, each named for what it does when on.
+  angular_momentum: switch  # 1: the rotate buttons build up angular momentum
+  light_star: switch        # 2: the central star pulls less
+  single_shot: switch       # 3: a torpedo only for each new press of the fire button
+  no_planetarium: switch    # 4: no Expensive Planetarium
+  star_kills: switch        # 5: a ship that falls into the star explodes
+  no_star: switch           # 6: no central star, and no gravity
+
+# Where each frame's control word comes from: the start address picks it.
+enum control_source
+  test_word                 # mg2
+  control_boxes             # cwr, the control word routine: the boxes, or the operator's own
+
+record controls
+  source: control_source    # cwg: set at the start, before any frame reads it
+
+# Program flags 1 and 2 light on the console for the ship that survived a
+# game. Flag 2 goes out again at once, and nothing reads them.
+enum light
+  off
+  on
+
+record lights
+  first_survived: light     # program flag 1
+  second_survived: light    # program flag 2
+
+# The scores, shown on the console lights while the machine waits between
+# games. They leave the game; the top Networks' contracts declare them.
+stream scoreboard
+  first: word               # AC
+  second: word              # IO
+
+# The ship outlines are presentation, ported as the original runs them: at
+# each new game the outline compiler (oc) lays each one out as code, and
+# each frame a spaceship runs its own (draw_outline). ships.outline keeps
+# where each ship's code starts.
+
+# The ships' outlines (ot1, ot2), what the compiler reads. Each word holds
+# six 3-bit direction codes, read from the left, that trace one side of a
+# ship from its nose down to its tail, as it stands on its tail:
+#   0, 1 down   2 out   3 out and down   4 in   5 in and down
+#   6 store the pen's position, and at the next 6 restore it
+#   7 the end: draw the other side, then go back to the spaceship
+record outlines[020]
+  codes: word =
+    0111131                 # ot1: the needle, the first ship's
+    0111111
+    0111111
+    0111163
+    0311111
+    0146111
+    0111114
+    0700000
+    0013113                 # ot2: the wedge, the second ship's, and the first's when they share
+    0113111
+    0116313
+    0131111
+    0161151
+    0111633
+    0365114
+    0700000
+
+# The compiled outlines (nnn): the free core after the object table, up to
+# the star catalog. The tape does not load these words, and a new game
+# compiles the outlines into them before anything runs them.
+record outline_code[02105]
+  insn: insn
+
+record outline_call
+  code: word = 0            # oc's entry word: where in outline_code the next word goes; at
+                            #   the end, the word after the outline
+  table: word = 0           # the word after the call: where in outlines the outline starts
+
+# What the next 6 code of an outline compiles.
+enum six_code
+  store
+  restore
+
+# The outline compiler's own words.
+record outline_compiler
+  table: word = 0           # ocg: the outline word it reads, a place in outlines
+  codes_left: word = 0      # occ: codes still to read in that word, counting up
+  codes_rest: word = 0      # oci: the word, rotated past the codes read
+  six: six_code = store     # program flag 6
+  start_over: insn = jmp(outline_compiler.start_over)        # ocm: where the second side starts
+  to_other_side: insn = jmp(outline_compiler.to_other_side)  # ocn: past the end, on the first side
+
+# The central star's line: how far each dot moves along x and along y.
+# Each is the sign and the three bits just below a display coordinate, so a
+# dot moves less than one point.
+record central_star
+  slope_x: word = 0         # bx
+  slope_y: word = 0         # by
+
+# Which half of the central star's line is drawn (program flag 6).
+enum half
+  first
+  mirrored
+
+# The Expensive Planetarium's own words: it draws every other frame, and
+# moves its window one step left every 16 of those.
+record planetarium
+  alternate_frames: word = 0    # bcc: counting up
+  window_steps: word = 0        # bkc: counting up
+  right_margin: word = 010000   # fpr: the sky's x at the right edge of the screen
+
+# Where each magnitude's next scan starts: a place in star_catalog.words.
+record magnitudes[4]
+  cursor: word =            # flo
+    0                       # the first magnitude's first star (1j)
+    022                     # the second's (2j)
+    044                     # the third's (3j)
+    0306                    # the fourth's (4j)
+
+# Whether a scan of the stars has plotted one yet (program flag 5).
+enum scan
+  looking
+  plotted
+
+# The "interesting and often changed constants" at the head of the tape.
+# The ones the original keeps as instructions to execute are Processors in
+# tunables.runs-prim; these are the ones it keeps as numbers.
+record tunables
+  fuel_supply: word = -020000               # foo
+  angular_acceleration: word = 010          # maa: spaceship angular acceleration
+  star_capture_radius: word = 1             # str
+  collision_radius: word = 06000            # me1
+  collision_radius_half: word = 03000       # me2
+  separate_outlines: word = -0              # ddd: -0 compiles an outline for each ship; 0 shares one
+  hyperspatial_uncertainty: word = 040000   # hur
+
+# What the scope shows: each point in the order it is plotted. It leaves the
+# game; the frame Network's contract declares it.
+stream display
+  x: word
+  y: word
+  intensity: int
+
+# The explosion's cloud, carried from one dot to the next.
+record explosion_cloud
+  particles: word = 0       # mxc: dots left to plot, counting up
+  spread: word = 0          # msh: which of mst's shifts spreads the dots, scr 1s or scr 3s
+  scatter: word = 0         # mi1: places the scl built from a random number shifts this dot
+
+# The integer square root's own words.
+record square_root_call
+  entry: word = 0           # sqt: jda leaves the argument here; it doubles as the remainder
+  passes_left: word = 0     # sq1
+  root: word = 0            # sq2: the result
+
+# The multiply subroutines' own words (mpy, imp). The second factor is the
+# word after the call (`jda mpy / lac b`); no caller names a word the
+# routine writes, so reading it once or each time gives the same value.
+record multiply_call
+  entry: word = 0           # mpy: jda leaves the first factor here
+  factor: word = 0          # the second factor
+  partial: word = 0         # mp2: |factor|, then the product's high half, AC at return
+  low: word = 0             # IO at return: the product's low half
+
+record integer_multiply_call
+  entry: word = 0           # imp: jda leaves the first factor here
+  factor: word = 0          # the second factor
+  product: word = 0         # AC at return: the product's low 17 bits and its sign
+
+# Whether a quotient fits a word. The caller sees it as a skip: dvd and idv
+# return past one more word when it fits.
+enum division
+  fits
+  overflows                 # |high dividend| >= |divisor|
+
+# The divide subroutines' own words (dvd, idv). The divisor is the word after
+# the call, like multiply's second factor.
+record divide_call
+  high: word = 0            # dvd: jda leaves the dividend's high half here; the remainder at return
+  low: word = 0             # IO: the dividend's low half
+  divisor: word = 0
+  quotient: word = 0        # idv: |divisor|, then the quotient's magnitude
+  result: word = 0          # AC at return: the quotient, or |divisor| signed like one on overflow
+  outcome: division = overflows
+
+record integer_divide_call
+  dividend: word = 0        # idv: jda leaves the dividend here
+  low: word = 0             # IO on entry: its sign lands in the low half's lowest bit
+  divisor: word = 0
+
+# The sine-cosine subroutine's own words (sin, cos). The series keeps its
+# working values in the two entry words.
+record sine_call
+  angle: word = 0           # sin: jda leaves the angle here, binary point right of bit 3
+  x: word = 0               # sin, later: the angle reduced to [0, pi/2], times 2/pi
+  x_squared: word = 0       # cos, later
+  answer: word = 0          # cos, last: the series' answer
+  result: word = 0          # AC at return, binary point right of bit 0
+
+record cosine_call
+  angle: word = 0           # cos: jda leaves the angle here
+
+# The spaceship calc routine's own words, handed from one of its rules to the
+# next within one ship's turn.
+enum rocket
+  off
+  firing
+
+record spaceship
+  controls: word = 0        # scw: this ship's control word, its four bits at the top
+  rocket: rocket = off      # program flag 6: the rocket fires this frame
+  sine: word = 0            # sn: the sine of the heading
+  cosine: word = 0          # cs
+  gravity_x: word = 0       # bx: the star's pull this frame
+  gravity_y: word = 0       # by
+  operand: word = 0         # t1: a scaled coordinate, then the squared distance, then the
+                            #   distance cubed: the word after a call (jda imp / lac \t1)
+  x_squared: word = 0       # t2
+  torpedo_x: word = 0       # stx: where a torpedo starts, ahead of the ship's tip
+  torpedo_y: word = 0       # sty
+  flame: word = 0           # src: exhaust dots still to draw, counting up
+
+# Where a ship's outline is drawn from, and the steps it is drawn with. The
+# outline is presentation: the spaceship sets these and jumps into its
+# compiled outline (ships.outline), which plots the ship, leaves the pen at
+# the ship's tail, where the exhaust flame starts, and leaves the out steps
+# mirrored for the ship's other side. The steps are the heading scaled down
+# by 2^9, turned to each direction of a ship standing on its tail.
+record pen
+  x: word = 0               # sx1
+  y: word = 0               # sy1
+  down_x: word = 0          # ssn: added to x; also the count a ship in the star waits out
+  down_y: word = 0          # scn: subtracted from y
+  out_x: word = 0           # scm: added to x
+  out_y: word = 0           # ssm: added to y
+  out_down_x: word = 0      # ssc: added to x
+  out_down_y: word = 0      # csm: subtracted from y
+  in_down_x: word = 0       # csn: added to x
+  in_down_y: word = 0       # ssd: subtracted from y
+  saved_x: word = 0         # ssa: where a 6 code stores the pen, and the next restores it
+  saved_y: word = 0         # ssi
+
+# A new torpedo's slot: the first free one of the object table.
+record launch
+  slot: word = 0            # sr1: kept in the search's cursor
+
+# Values the original hands from one rule to the next in AC and IO. Each is a
+# place only because a register carried it: into or out of a tunable the
+# original executes with xct, or into the diff macro.
+record handoff
+  coordinate: word = 0      # AC into `the`: a torpedo's coordinate, sar 9s
+  acceleration: word = 0    # AC into diff: from `the`, or 0 (cla)
+  position: word = 0        # AC out of diff: the new position
+  particle_low: word = 0    # IO through the explosion's dots: cleared (cli), then each dot's y
+  jump_high: word = 0       # AC: hyperspace's random draw into and out of hr1, hr2;
+  jump_low: word = 0        # IO:   one 36-bit value, scaled as one. IO holds what the main
+                            #   loop left there when hyperspace begins; the draw pushes it out
+  torpedo_direction: word = 0   # AC into tvl: the sine or cosine of the ship's heading
+  torpedo_velocity: word = 0    # AC out of tvl
+  thrust_direction: word = 0    # AC into sac: the sine or cosine of the heading, sar 9s
+  thrust: word = 0              # AC out of sac
+  torpedo_supply: word = 0  # AC out of tno
+  reload_time: word = 0     # AC out of rlt
+  torpedo_life: word = 0    # AC out of tlf
+  hyperspace_shots: word = 0    # AC out of mhs
+  hyperspace_time: word = 0     # AC out of hd1
+  breakout_time: word = 0   # AC out of hd2
+  recharge_time: word = 0   # AC out of hd3
+  control_word: word = 0    # IO out of the control word routine (jsp i \cwg)
+  capture_margin: word = 0  # AC: a ship's squared distance from the star, less the capture radius
+  distance_high: word = 0   # AC:IO: the distance from the star cubed, scaled down; a ship
+  distance_low: word = 0    #   feels gravity only when the high half is 0
+  torpedo_button: word = 0  # AC: the fire button, if it counts as pressed, in the sign bit
+  codes: word = 0           # IO through the outline compiler: the outline word, rotated
+  direction: word = 0       # AC: the next direction code, which the compiler dispatches on
+  swap: insn = 0            # IO into ocs: rcl 9s, half of the swap the compiler lays out twice
+  pending: insn = 0         # AC: the next word the compiler lays out

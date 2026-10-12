@@ -19,3 +19,6 @@ package-lock.json
 # The Sandcastle harness scripts/prompts ARE tracked. Its runtime state —
 # secrets (.env), logs, and per-issue git worktrees — is ignored by
 # .sandcastle/.gitignore, not here.
+
+# The RUNS port
+__pycache__/

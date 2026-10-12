@@ -1,0 +1,9 @@
+# The star catalog (source lines 1371-1866): the last part of the tape,
+# loaded high in core, right after the free core the compiled outlines use
+# (outline_code: 03772 + 02105 = 06077).
+replaces = "lift/star_catalog.c"
+
+[[place]]
+slots = "star_catalog.words"
+range = [0, 0o1651]
+at = 0o6077

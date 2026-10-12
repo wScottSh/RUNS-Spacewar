@@ -1,0 +1,245 @@
+# The arithmetic subroutines and the macros. Each is a Processor over the
+# Records it hands its values through.
+
+# BBN integer square root (sqt), over its own words. Binary point right of
+# bit 17 in square_root_call.entry, between bits 8 and 9 in .root. Two bits
+# of input per pass, 18 passes.
+processor square_root                                       # sqt
+  writes: square_root_call
+  set square_root_call.passes_left = -023
+  set square_root_call.root = 0
+  let input_bits = square_root_call.entry
+  set square_root_call.entry = 0
+  loop at most 023:
+    set square_root_call.passes_left = square_root_call.passes_left + 1
+    if square_root_call.passes_left >= 0:
+      return
+    set square_root_call.root = square_root_call.root << 1
+    let next = square_root_call.entry
+    set (next, input_bits) = rcl(next, input_bits, 2)
+    if next == 0:
+      continue
+    set square_root_call.entry = next
+    set next = (square_root_call.root << 1) + 1 - square_root_call.entry
+    if next > 0:
+      continue
+    if next < 0:
+      set next = -next
+    set square_root_call.entry = next
+    set square_root_call.root = square_root_call.root + 1
+
+# Sine and cosine, Adams Associates (sin, cos). The angle is within +-2 pi;
+# 062210 is pi/2 and 0311040 is 2 pi. The angle is folded into [0, pi/2],
+# scaled by 2/pi to x, and the answer is the odd series
+# x (C1 + x^2 (C3 + x^2 (C5 + x^2 C7))), each product the high half of a
+# multiply, shifted up by 3 at the end.
+processor sine_reduce                                       # sin .. si3, mult (242763
+  reads: sine_call
+  writes: multiply_call
+  let a = sine_call.angle
+  if a < 0:
+    set a = a + 0311040                                     # si1
+  loop at most 2:                                           # two passes reduce every word (all 2^18 run)
+    set a = a - 062210
+    if a < 0:
+      set a = a + 062210
+      break
+    set a = -a + 062210                                     # si2: fold past pi/2 back
+    if a >= 0:
+      break
+    set a = a + 062210
+    if a >= 0:
+      set a = a - 062210
+      break
+    set a = a - 062210
+    set a = a + 0311040                                     # jmp si1
+  set multiply_call.entry = ral(a, 2)                       # si3
+  set multiply_call.factor = 0242763                        # 2/pi
+
+processor sine_x                                            # dac sin, mult sin
+  writes: sine_call, multiply_call
+  set sine_call.x = multiply_call.partial
+  set multiply_call.entry = sine_call.x
+  set multiply_call.factor = sine_call.x
+
+processor sine_x_squared                                    # dac cos, mult (756103
+  writes: sine_call, multiply_call
+  set sine_call.x_squared = multiply_call.partial
+  set multiply_call.entry = sine_call.x_squared
+  set multiply_call.factor = -021674                        # C7
+
+processor sine_term_5                                       # add (121312, mult cos
+  reads: sine_call
+  writes: multiply_call
+  set multiply_call.entry = multiply_call.partial + 0121312 # C5
+  set multiply_call.factor = sine_call.x_squared
+
+processor sine_term_3                                       # add (532511, mult cos
+  reads: sine_call
+  writes: multiply_call
+  set multiply_call.entry = multiply_call.partial + -0245266  # C3
+  set multiply_call.factor = sine_call.x_squared
+
+processor sine_term_1                                       # add (144417, mult sin
+  reads: sine_call
+  writes: multiply_call
+  set multiply_call.entry = multiply_call.partial + 0144417 # C1
+  set multiply_call.factor = sine_call.x
+
+processor sine_answer                                       # scl 3s .. csx
+  reads: multiply_call
+  writes: sine_call
+  let (high, low) = scl(multiply_call.partial, multiply_call.low, 3)
+  set sine_call.answer = high
+  if (sine_call.answer ^ sine_call.x) < 0:                  # the series overshot +-1: saturate
+    set sine_call.result = 0377777
+    let sign = sine_call.x
+    if sign < 0:
+      set sine_call.result = -sine_call.result
+    return
+  set sine_call.result = sine_call.answer
+
+network sine                                                # sin
+  writes: sine_call, multiply_call
+  run sine_reduce
+  run multiply
+  run sine_x
+  run multiply
+  run sine_x_squared
+  run multiply
+  run sine_term_5
+  run multiply
+  run sine_term_3
+  run multiply
+  run sine_term_1
+  run multiply
+  run sine_answer
+
+processor cosine_angle                                      # cos: cos a = sin(a + pi/2)
+  reads: cosine_call
+  writes: sine_call
+  set sine_call.angle = 062210 + cosine_call.angle
+
+network cosine                                              # cos
+  reads: cosine_call
+  writes: sine_call, multiply_call
+  run cosine_angle
+  run sine
+
+# BBN multiply (mpy). The product of the two factors: 34 bits and two signs,
+# the high half in multiply_call.partial, the low in multiply_call.low.
+processor multiply                                          # mpy
+  writes: multiply_call
+  let magnitude = multiply_call.entry
+  if magnitude < 0:
+    set magnitude = -magnitude
+  set multiply_call.low = magnitude                         # the multiplier, shifted out as the product shifts in
+  set magnitude = multiply_call.factor
+  if magnitude < 0:
+    set magnitude = -magnitude
+  set multiply_call.partial = magnitude
+  let high = 0
+  for step in 1 .. 021:
+    set (high, multiply_call.low) = mus(high, multiply_call.low, multiply_call.partial)
+  set multiply_call.partial = high
+  if (multiply_call.factor ^ multiply_call.entry) < 0:      # the signs differ: negate the 36 bits
+    set high = -multiply_call.partial
+    set (high, multiply_call.low) = rcr(high, multiply_call.low, 18)
+    set high = -high
+    set (high, multiply_call.low) = rcr(high, multiply_call.low, 18)
+    set multiply_call.partial = high
+
+# BBN integer multiply (imp): mpy with the factors swapped, keeping the low
+# half's 17 bits and sign.
+processor integer_multiply_factors                          # imp: xct, jda mpy, lac imp
+  reads: integer_multiply_call
+  writes: multiply_call
+  set multiply_call.entry = integer_multiply_call.factor
+  set multiply_call.factor = integer_multiply_call.entry
+
+processor integer_multiply_product                          # rir 1s: the low half's sign, bit 17, back to bit 0
+  reads: multiply_call
+  writes: integer_multiply_call
+  set integer_multiply_call.product = rar(multiply_call.low, 1)
+
+network integer_multiply                                    # imp
+  writes: integer_multiply_call, multiply_call
+  run integer_multiply_factors
+  run multiply
+  run integer_multiply_product
+
+# BBN divide (dvd). The 36-bit dividend over the divisor: the quotient, and
+# the remainder with the dividend's sign. When the quotient would not fit,
+# |divisor| comes back signed like a quotient and the dividend's high half
+# stays.
+processor divide                                            # dvd
+  writes: divide_call
+  set divide_call.outcome = overflows
+  let magnitude = divide_call.divisor                       # dv1
+  if magnitude < 0:
+    set magnitude = -magnitude
+  set divide_call.quotient = magnitude
+  let high = divide_call.high
+  if high < 0:                                              # negate the 36 bits
+    set high = -high
+    set (high, divide_call.low) = rcr(high, divide_call.low, 18)
+    set high = -high
+    set (high, divide_call.low) = rcr(high, divide_call.low, 18)
+  set high = high - divide_call.quotient                    # dv2
+  if high < 0:
+    for step in 1 .. 022:
+      set (high, divide_call.low) = dis(high, divide_call.low, divide_call.quotient)
+    set high = high + divide_call.quotient                  # restore the last step's remainder
+    set divide_call.quotient = divide_call.low
+    set divide_call.low = 0
+    set (high, divide_call.low) = rcr(high, divide_call.low, 1)
+    set divide_call.low = divide_call.high
+    if divide_call.low < 0:                                 # the remainder takes the dividend's sign
+      set high = -high
+    set divide_call.high = high
+    set divide_call.low = divide_call.divisor ^ divide_call.high  # negative when the quotient is
+    set divide_call.outcome = fits
+  set divide_call.result = divide_call.quotient             # dve
+  if divide_call.low < 0:
+    set divide_call.result = -divide_call.result
+
+# BBN integer divide (idv): the dividend is one word, shifted right 17 into
+# the 36-bit pair. IO's sign on entry lands in the low half's lowest bit.
+processor integer_divide_dividend                           # idv
+  reads: integer_divide_call
+  writes: divide_call
+  let high = integer_divide_call.dividend
+  let low = integer_divide_call.low
+  set (high, low) = scr(high, low, 17)
+  set divide_call.high = high
+  set divide_call.low = low
+  set divide_call.divisor = integer_divide_call.divisor
+
+network integer_divide                                      # idv
+  reads: integer_divide_call
+  writes: divide_call
+  run integer_divide_dividend
+  run divide
+
+# The `random` macro: the generator's next value.
+processor next_random
+  writes: random
+  set random.number = (rar(random.number, 1) ^ 0355670) + 0355670
+
+# The `diff` macro, inertia: the acceleration joins the velocity, and an
+# eighth of the velocity the position. The original passes the axis as the
+# macro's arguments; here each axis is its own Processor. The new position
+# is left in AC, where the torpedo takes it up.
+processor inertia_x(slot)                                   # diff \mdx, mx1, (sar 3s
+  writes: objects, handoff
+  let velocity = handoff.acceleration + objects.dx[slot]
+  set objects.dx[slot] = velocity
+  set handoff.position = (velocity >> 3) + objects.x[slot]
+  set objects.x[slot] = handoff.position
+
+processor inertia_y(slot)                                   # diff \mdy, my1, (sar 3s
+  writes: objects, handoff
+  let velocity = handoff.acceleration + objects.dy[slot]
+  set objects.dy[slot] = velocity
+  set handoff.position = (velocity >> 3) + objects.y[slot]
+  set objects.y[slot] = handoff.position

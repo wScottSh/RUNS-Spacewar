@@ -1,0 +1,24 @@
+# idv and dvd: jda subroutines entered with the dividend in AC and IO and the
+# divisor by name after the call. dvd's steps are a block that idv jumps
+# into. Both return one word further when the quotient fits.
+replaces = "lift/divide.c"
+
+[[place]]
+routine = "integer_divide"
+convention = "JDA"
+entry = "integer_divide_call.dividend"
+io_param = "integer_divide_call.low"
+byname = "integer_divide_call.divisor"
+cells = ["divide_call.quotient"]
+result = ["divide_call.result", "divide_call.high"]
+skips = ["divide_call.outcome", "fits"]
+
+[[place]]
+routine = "divide"
+convention = "JDA"
+entry = "divide_call.high"
+io_param = "divide_call.low"
+byname = "divide_call.divisor"
+block = "divide_steps"
+result = ["divide_call.result", "divide_call.high"]
+skips = ["divide_call.outcome", "fits"]

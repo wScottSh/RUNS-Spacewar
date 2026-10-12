@@ -1,0 +1,152 @@
+# The Processors the calc routines of objects.runs fire.
+
+# Every calc routine counts its object's frames up toward 0.
+processor count_down(slot)                                  # count i ma1
+  writes: objects
+  set objects.counter[slot] = objects.counter[slot] + 1
+
+# The explosion.
+
+processor coast                                             # cla: no force
+  writes: handoff
+  set handoff.acceleration = 0
+
+processor size_explosion(slot)
+  reads: objects
+  writes: explosion_cloud, handoff
+  set explosion_cloud.spread = 1                            # law mst; dap msh: scr 1s
+  let size = objects.cycles[slot]                           # lac i mb1
+  set size = -size                                          # cma cli: one instruction
+  set handoff.particle_low = 0
+  set explosion_cloud.particles = size >> 3
+  # Meant to give a big explosion the wider spread, but particles is
+  # negative here for any real size, so the test never passes.
+  if explosion_cloud.particles - 0140 >= 0:
+    set explosion_cloud.spread = 3                          # idx msh: scr 3s
+
+# The original builds an scl from the random number's low 9 bits; it
+# shifts one place per bit set.
+processor scatter_particle
+  reads: random
+  writes: explosion_cloud
+  set explosion_cloud.scatter = popcount(random.number & 0777)
+
+# The dot is presentation. The random numbers drawn for it, and the count of
+# dots left, are the game: hyperspace draws from the same generator.
+processor plot_particle(slot)
+  reads: random, objects
+  writes: explosion_cloud, display, handoff
+  let high = random.number
+  # scr 9s; sir 9s pushes all of IO's old value, the last dot's y, out.
+  set (high, handoff.particle_low) = scr(high, handoff.particle_low, 9)
+  set handoff.particle_low = handoff.particle_low >> 9
+  set (high, handoff.particle_low) = scr(high, handoff.particle_low, explosion_cloud.spread)
+  set (high, handoff.particle_low) = scl(high, handoff.particle_low, explosion_cloud.scatter)
+  set high = high + objects.y[slot]
+  set (high, handoff.particle_low) = rcl(high, handoff.particle_low, 18)   # swap
+  set high = high + objects.x[slot]
+  emit display: high, handoff.particle_low, 3
+  set explosion_cloud.particles = explosion_cloud.particles + 1
+
+processor free_slot(slot)                                   # dzm i ml1
+  writes: objects
+  set objects.routine[slot] = none
+
+# The torpedo.
+
+processor explode_torpedo(slot)
+  writes: objects
+  set objects.routine[slot] = explosion
+  set objects.counter[slot] = -2
+
+processor warp_from_x(slot)                                 # lac i mx1; sar 9s
+  reads: objects
+  writes: handoff
+  set handoff.coordinate = objects.x[slot] >> 9
+
+processor warp_from_y                                      # diff leaves y in AC; sar 9s
+  writes: handoff
+  set handoff.coordinate = handoff.position >> 9
+
+processor plot_torpedo(slot)                                # diff leaves x in AC; dispt i, i my1, 1
+  reads: objects, handoff
+  writes: display
+  emit display: handoff.position, objects.y[slot], 1
+
+# Hyperspace.
+
+processor begin_breakout(slot)
+  writes: objects
+  set objects.routine[slot] = breakout
+  set objects.cycles[slot] = 7
+
+# scr 9s; sir 9s: the random number's high and low halves, each with its
+# sign, for hr1 or hr2 to scale. The original shifts it into IO, which
+# holds whatever came before; the shifts push all of that out.
+processor draw_jump
+  reads: random
+  writes: handoff
+  set handoff.jump_high = random.number
+  set (handoff.jump_high, handoff.jump_low) = scr(handoff.jump_high, handoff.jump_low, 9)
+  set handoff.jump_low = handoff.jump_low >> 9
+
+processor jump(slot)                                        # add i mx1; dac i mx1; swap; add i my1; dac i my1
+  reads: handoff
+  writes: objects
+  let high = handoff.jump_high + objects.x[slot]
+  set objects.x[slot] = high
+  let low = handoff.jump_low
+  set (high, low) = rcl(high, low, 18)
+  set high = high + objects.y[slot]
+  set objects.y[slot] = high
+
+processor head_out(slot)
+  requires: slot < 2
+  reads: handoff, random
+  writes: objects, ships
+  set objects.dy[slot] = handoff.jump_high
+  set objects.dx[slot] = handoff.jump_low
+  let angle_steps = -3
+  set ships.angle[slot] = random.number
+  loop at most 3:                   # bring the new heading within a turn
+    let heading = ships.angle[slot]
+    if heading >= 0:
+      set heading = heading - 0311040
+    if heading < 0:
+      set heading = heading + 0311040
+    set ships.angle[slot] = heading
+    set angle_steps = angle_steps + 1
+    if angle_steps >= 0:
+      break
+
+processor time_breakout(slot)                               # dac i ma1
+  reads: handoff
+  writes: objects
+  set objects.counter[slot] = handoff.breakout_time
+
+processor show_breakout(slot)                               # dispt i, i my1, 2
+  reads: objects
+  writes: display
+  emit display: objects.x[slot], objects.y[slot], 2
+
+processor end_breakout(slot)
+  requires: slot < 2
+  writes: objects, ships
+  set objects.routine[slot] = ships.saved_routine[slot]
+  set objects.cycles[slot] = 02000
+  set ships.jumps_left[slot] = ships.jumps_left[slot] + 1
+  if ships.jumps_left[slot] >= 0:
+    set ships.jumps_left[slot] = 0
+
+processor recharge_hyperfield(slot)
+  requires: slot < 2
+  reads: handoff, tunables
+  writes: ships
+  set ships.recharge[slot] = handoff.recharge_time
+  set ships.uncertainty[slot] = ships.uncertainty[slot] + tunables.hyperspatial_uncertainty
+
+processor lost_in_hyperspace(slot)
+  writes: objects
+  set objects.routine[slot] = explosion
+  set objects.counter[slot] = -010
+  set objects.cycles[slot] = 02000
