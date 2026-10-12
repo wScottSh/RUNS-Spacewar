@@ -245,7 +245,7 @@ processor next_slot
   writes: launch
   set launch.slot = launch.slot + 1
 
-processor place_torpedo(slot)                               # sr2
+processor place_torpedo                                     # sr2
   reads: launch, spaceship
   writes: objects, handoff
   set objects.routine[launch.slot] = torpedo

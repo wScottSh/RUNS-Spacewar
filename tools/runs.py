@@ -1212,7 +1212,7 @@ def check_scope(prog: Program, r: Routine) -> None:
         if t[0] == "name":
             if not new and t[1] not in defined:
                 fail(at, f"set {t[1]} before let")
-            return {t[1]}
+            return {t[1]} - {"_"}               # a dropped value: nothing reads it
         if new:
             fail(at, "let binds a local name")
         place(t, at, defined, write=True)
@@ -1297,6 +1297,47 @@ def check_scope(prog: Program, r: Routine) -> None:
     for c in r.requires:
         expr(c, where, set(r.params))
     block(r.body, set(r.params))
+
+
+def names_read(tree) -> set[str]:
+    """Every name a routine's text reads: each name but the locals a let or
+    set binds."""
+    if isinstance(tree, tuple) and tree[:1] in (("let",), ("set",)) and isinstance(tree[-1], str):
+        targets = tree[1][1] if tree[1][0] == "tuple" else [tree[1]]
+        return names_read([t for t in targets if t[0] != "name"]) | names_read(tree[2])
+    if isinstance(tree, tuple) and len(tree) == 2 and tree[0] == "name" and isinstance(tree[1], str):
+        return {tree[1]}
+    items = tree.values() if isinstance(tree, dict) else tree if isinstance(tree, (list, tuple)) else ()
+    return set().union(*map(names_read, items))
+
+
+def check_unread(r: Routine) -> None:
+    """A parameter or a local the routine never reads says nothing: every
+    edit of what it is passed or set to is the same game. The half of a pair
+    a routine drops is named _, which nothing reads."""
+    read = names_read(r.body) | names_read(r.requires)
+    for p in r.params:
+        if p not in read:
+            raise RunsError(f"{r.name}: its parameter {p} is never read")
+    for s in walk_statements(r.body):
+        if s[0] == "let":
+            for t in s[1][1] if s[1][0] == "tuple" else [s[1]]:
+                if t[0] == "name" and t[1] != "_" and t[1] not in read:
+                    raise RunsError(f"{s[-1]}: the local {t[1]} is never read")
+
+
+def walk_statements(stmts: list):
+    for s in stmts:
+        yield s
+        if s[0] == "if":
+            for _, body in s[1]:
+                yield from walk_statements(body)
+            yield from walk_statements(s[2])
+        elif s[0] in ("loop", "for"):
+            yield from walk_statements(s[-2])
+        elif s[0] == "match":
+            for body in s[2].values():
+                yield from walk_statements(body)
 
 
 def expr_touches(e, prog: Program, read: set[str]) -> None:
@@ -1621,6 +1662,7 @@ def check(prog: Program) -> Program:
     for r in prog.routines.values():
         shape(r.body, r, in_loop=False)
         check_scope(prog, r)
+        check_unread(r)
         if r.kind == "processor":
             check_declarations(prog, r)
         if any(r.name in fires(prog, t, set()) for t in runs_of(r.body)):
