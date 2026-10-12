@@ -1,6 +1,6 @@
 # The oracle is a characterization suite, not a reimplementation
 
-Status: accepted
+Status: amended by ADR-0017 (the checks are the suite; the RUNS text, not a Realization, is what they check). Previously: accepted
 
 We verify the RUNS realization against an **Oracle**: a suite of tests whose expected
 values are *observed* from the original PDP-1 assembly (`source/spacewar3.1_complete.txt`)

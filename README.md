@@ -2,7 +2,7 @@
 
 Spacewar! 3.1 (MIT, 1962) written in RUNS, verbatim: the exact game over every sequence of inputs from power-on, glitches included. RUNS is specified in [runs-spec](https://github.com/enduring-game-standard/runs-spec).
 
-`INTENT.md` says what RUNS is for and what this port settled. `docs/decisions.tsv` logs each decision with its evidence. `docs/adr/` holds the architecture decisions, including the earlier verification method's; ADR-0017 says which still hold. `CONTEXT.md` is that method's glossary.
+`INTENT.md` says what RUNS is for and what this port settled. `docs/decisions.tsv` logs each decision with its evidence. `docs/adr/` holds the architecture decisions, including the earlier verification method's; ADR-0017 says which still hold. `CONTEXT.md` is the glossary.
 
 ## Layout
 

@@ -1,6 +1,6 @@
 # Assembly faithfulness witness is the listing ↔ core cross-check
 
-Status: amended by ADR-0017. Previously: accepted (supersedes the byte-for-byte clause of ADR-0003)
+Status: amended by ADR-0017 (the witness is the image hash). Previously: accepted (supersedes the byte-for-byte clause of ADR-0003)
 
 There is no published Spacewar 3.1 paper-tape image that corresponds to our reconstructed source.
 The surviving public binaries are *other* versions (`spacewar_2b_m_2016`, `spacewar2015`) or the

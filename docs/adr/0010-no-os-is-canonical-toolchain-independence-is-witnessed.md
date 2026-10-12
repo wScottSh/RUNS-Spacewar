@@ -1,6 +1,6 @@
 # No OS is canonical; toolchain platform-independence is a witnessed property
 
-Status: accepted (applies the project's confluence principle — agreement across independent
+Status: amended by ADR-0017 (one Linux build, no second environment witnesses it; the witness is the image hash). Previously: accepted (applies the project's confluence principle — agreement across independent
 paths is the witness — to the toolchain; builds on ADR-0006)
 
 The Assembler (`macro1.c`) and Substrate (SIMH) are portable C; only their *build

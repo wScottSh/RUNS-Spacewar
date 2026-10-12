@@ -1,6 +1,6 @@
 # Coverage is exhaustive where the input domain is enumerable, branch-complete elsewhere
 
-Status: accepted (the region→strength mapping *under* ADR-0012; ADR-0012 is the coverage
+Status: amended by ADR-0017 (the exhaustive math vectors stand; the branch-complete bar went with ADR-0012). Previously: accepted (the region→strength mapping *under* ADR-0012; ADR-0012 is the coverage
 spine and the definition of "done", this ADR records how that bar is met per region)
 
 ADR-0012 fixes the bar — every reachable branch of Ground Truth, observed both ways, measured

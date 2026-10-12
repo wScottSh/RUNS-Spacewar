@@ -1,6 +1,6 @@
 # Substrate is SIMH + macro1.c, chosen for accuracy and instrumentation
 
-Status: accepted (supersedes the provisional lean toward Gerasimov's JS emulator;
+Status: amended by ADR-0017 (built in spacewar-c; the assembly witness is the image hash). Previously: accepted (supersedes the provisional lean toward Gerasimov's JS emulator;
 byte-for-byte-against-published-image clause superseded by ADR-0006)
 
 To observe Vectors we must execute Ground Truth. The Substrate is **SIMH** (the reference

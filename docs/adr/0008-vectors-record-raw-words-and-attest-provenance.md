@@ -1,6 +1,6 @@
 # Vectors record raw machine words and attest their own provenance
 
-Status: accepted
+Status: amended by ADR-0017 (the vectors stay raw words; only `sqt` keeps a provenance file, the other manifests are at 9d24f9c^). Previously: accepted
 
 A Vector record asserts **raw 18-bit machine words**, never an interpreted value. For
 `sqt` each record is three octal words:
