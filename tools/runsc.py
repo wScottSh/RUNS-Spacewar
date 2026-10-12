@@ -1281,8 +1281,11 @@ class Unit:
 
     def dispatch(self, s) -> tuple:
         """A match over a field whose members are spelled as the routines its
-        arms run: a jump through the field's word."""
+        arms run: a jump through the field's word. The jump passes the
+        scrutinee's slot (the cursors point at it), so each arm's run passes
+        exactly that."""
         _, e, arms, where = s
+        passed = [e[2]] if e[0] == "index" else []
         for member, body in arms.items():
             enum = resolve(self.prog, member, field_type(self.prog, e), where)
             how = self.binds.spelled.get(enum, {}).get(member)
@@ -1293,6 +1296,9 @@ class Unit:
                 named = self.binds.jsp_slots[named]["jump"] if body and body[0][1] != named else named
             if not (len(body) == 1 and body[0][0] == "run" and named == body[0][1]):
                 raise BindError(f"{where}: {member} runs {body}, not the routine its word names")
+            if body[0][2] != passed:
+                raise BindError(f"{where}: {member} runs {body[0][1]} with {body[0][2]}; "
+                                f"the jump through the word passes {passed}")
         return ("dispatch", e, where, [body[0][1] for body in arms.values() if body[0][0] == "run"])
 
     def clears_table(self, body: list):

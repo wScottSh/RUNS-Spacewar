@@ -7,7 +7,9 @@ routine and field the bindings compile, one change at a time:
   of another type), and to the field of the same name in another Record;
 - each operator to another (+ and -, < and >=, & and |, and and or, ...);
 - each enum member to another of its enum;
-- each run of a routine to each other routine of its kind and arity;
+- each run of a routine to each other routine of its kind and arity, and
+  each of its arguments to 0, to 1, to itself plus 1, to its negation and
+  to each other name in scope;
 - each guard negated; an if's arm swapped with its else, and its first two
   arms with each other; each two arms of a match swapped;
 - each statement deleted, duplicated, swapped with the next, and moved to
@@ -212,6 +214,15 @@ def statement_sites(prog: runs.Program, proc: str, path, s):
         for name, r in sorted(prog.routines.items()):
             if name != s[1] and r.kind == callee.kind and len(r.params) == len(callee.params):
                 yield Mutant(f"{proc} run {s[1]} -> {name} @{line(s)}", "run", proc, path, ("run", name, *s[2:]))
+        scope = prog.routines[proc].params + [x[1] for _, x in nodes(prog.routines[proc].body)
+                                              if is_statement(x) and x[0] == "for"]
+        for k, a in enumerate(s[2]):
+            others = [("num", 0), ("num", 1), ("bin", "+", a, ("num", 1)), ("neg", a)]
+            candidates = others + [("name", n) for n in scope]
+            for j, new in enumerate(candidates):
+                if new != a and new not in candidates[:j]:
+                    yield Mutant(f"{proc} run {s[1]} argument {k} -> {new} @{line(s)}", "argument", proc, path,
+                                 ("run", s[1], replaced(s[2], (k,), new), *s[3:]))
     elif s[0] == "if":
         arms, other = s[1], s[2]
         for k, (c, body) in enumerate(arms):
