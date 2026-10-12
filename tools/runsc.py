@@ -788,6 +788,11 @@ class Bindings:
             return f"{self.c_name(dotted)} + {octal(slot)}", None
         raise BindError(f"{dotted}[{slot:o}] has no address in the binding")
 
+    def after_table(self) -> list[str]:
+        """The collections laid out from the word after the table, each its
+        RUNS count of words."""
+        return [d for d, where in self.addresses.items() if where == "after table"]
+
     def table_fields(self) -> list[str]:
         """The fields laid out in the table, in its order."""
         return [f"{r}.{f}" for r in self.table.get("records", []) for f in self.prog.records[r].fields]
@@ -898,8 +903,7 @@ class Unit:
                 out.append(f"extern HOMED word *{c};" if c in self.binds.homed_cursors() else f"POOL word *{c};")
         if any(p.get("table") for p in self.spec["place"]):
             return out
-        after = [self.binds.c_name(d) for d, where in self.binds.addresses.items() if where == "after table"]
-        for name in [self.binds.table.get("at")] + after:
+        for name in [self.binds.table.get("at")] + [self.binds.c_name(d) for d in self.binds.after_table()]:
             if name and re.search(rf"\b{name}\b", text):
                 out.append(f"extern word {name}[];")
         return out
@@ -981,7 +985,8 @@ class Unit:
     def table_words(self) -> str:
         """The object table's words. The tape does not load them, and a new
         game clears them before anything reads them: each field's RUNS
-        initial value is its zero word."""
+        initial value is its zero word. Then the room of each collection
+        that lies after the table."""
         for f in self.binds.table_fields():
             rec, fld = f.split(".")
             e = self.prog.records[rec].fields[fld][1]
@@ -989,7 +994,7 @@ class Unit:
                     resolve(self.prog, e[1], self.prog.records[rec].fields[fld][0], f), {}).get(e[1]) == 0):
                 raise BindError(f"{self.path.name}: {f} is not on the tape, so it starts at its zero word")
         after = [f"RESERVE word {self.binds.c_name(d)}[{octal(self.prog.records[d.split('.')[0]].count)}];"
-                 for d, where in self.binds.addresses.items() if where == "after table"]
+                 for d in self.binds.after_table()]
         return "\n".join([f"RESERVE word {self.binds.table['at']}[{octal(self.binds.table_size())}];"] + after)
 
     def check_unstored(self):
