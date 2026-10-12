@@ -252,12 +252,12 @@ A swarm stress-tested this draft against Super Mario Bros., DOOM, Ocarina of Tim
 
 ## Verified
 
-`tools/check_all.sh` runs every check in the first list on each change, in about twenty minutes on 32 cores; the counts are its own. The checks against SIMH run the RUNS source in the evaluator and SIMH running the oracle image on the same Records. The second list was run by hand, with larger counts.
+`tools/check_all.sh` runs every check in the first list on each change, in about ten minutes on 32 cores; the counts are its own. The checks against SIMH run the RUNS source in the evaluator and SIMH running the oracle image on the same Records. The second list was run by hand, with larger counts.
 
 What `check_all.sh` runs:
 
 - The image. `tools/runsc.py` compiles the RUNS text and `pdp1/` to the original tape image (sha256 `8744e9c9...`), and refuses RUNS the evaluator rejects, a binding key it does not know, a member, field or routine the RUNS text does not have, a read of a shared word that holds another name, and a `carry` the RUNS jump does not agree with (`pdp1/README.md`, "What a binding may not say").
-- The binding holds no game logic (`tools/check_compiled.py --sample 8000`: a seeded sample of the full gate below). Of the 8,000: 3,725 change the image, 2,785 are refused by `runsc`, 1,408 are rejected by the evaluator, 75 are shown the same game, 2 deleted `requires:` and 5 loop bounds pass as RUNS's own checks; none is silent, dead or a crash.
+- The binding holds no game logic (`tools/check_compiled.py --sample 8000`: a seeded sample of the full gate below). Of the 8,000: 3,663 change the image, 2,832 are refused by `runsc`, 1,412 are rejected by the evaluator, 90 are shown the same game, 2 deleted `requires:` and 1 loop bound pass as RUNS's own checks; none is silent, dead or a crash.
 - `square_root`: all 65,536 inputs match RUNS-Spacewar's observed vectors (`tools/check_square_root.py`). This one is not against SIMH.
 - `multiply` and the Network `integer_multiply`: 101,453 calls each, all match on AC, IO, `mpy`, `mp2` and `imp` (`tools/check_multiply.py`, against SIMH: every pair of 38 edge values, RUNS-Spacewar's nine observed pairs, and 100,000 seeded pairs).
 - `divide` and the Network `integer_divide`: 107,224 and 107,227 calls, all match on AC, IO, `dvd`, `idv` and the skip (`tools/check_divide.py`, against SIMH: every pair of 38 edge values with five low halves, RUNS-Spacewar's observed inputs, and 100,000 seeded triples; 53,875 and 382 of them overflow).
