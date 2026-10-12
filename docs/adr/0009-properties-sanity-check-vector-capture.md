@@ -1,6 +1,6 @@
 # Cheap independent properties sanity-check an exhaustive Vector capture
 
-Status: accepted (amended — demoted from "the acceptance gate" to a capture-wiring sanity
+Status: superseded by ADR-0017 (no sanity properties are checked now). Previously: accepted (amended — demoted from "the acceptance gate" to a capture-wiring sanity
 check; the convention-reveal calibration is dropped, see below)
 
 An exhaustive Vector set is captured by **observing the Substrate** — enumerate every input,

@@ -1,6 +1,6 @@
 # Substrate is built headless — no Type 30 display
 
-Status: accepted
+Status: amended by ADR-0017 (built headless with gcc on Linux in spacewar-c, not MSVC on Windows). Previously: accepted
 
 The SIMH `pdp1` Substrate is compiled from source (open-simh, MSVC `cl` on this Windows host)
 **without display support** (`USE_DISPLAY` undefined): no Type 30 CRT, no SDL. The Oracle observes

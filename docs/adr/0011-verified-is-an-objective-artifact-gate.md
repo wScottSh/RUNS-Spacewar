@@ -1,6 +1,6 @@
 # "Verified" is an objective artifact gate, not an agent's assertion
 
-Status: accepted
+Status: amended by ADR-0017 (the gate is `tools/check_all.sh`). Previously: accepted
 
 What makes a unit of work "done" must be checkable without trusting the doer. The agent
 harness certified its own work green by *saying so* — and re-asserted "all tests green"
