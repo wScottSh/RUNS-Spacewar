@@ -571,8 +571,10 @@ def shape(stmts: list, r: Routine, in_loop: bool):
     """What each kind may say, checked over the whole body before anything runs.
     A network writes nothing: it has no let, set, emit or return. Its loop is
     bounded and leaves only through an `if` on Records that breaks."""
-    for s in stmts:
+    for k, s in enumerate(stmts):
         op, where = s[0], s[-1]
+        if op in ("break", "continue", "return", "stop", "unreachable") and k + 1 < len(stmts):
+            raise RunsError(f"{stmts[k + 1][-1]}: nothing after {op} runs")
         if r.kind == "network":
             if op not in NETWORK_OPS:
                 raise RunsError(f"{where}: a network only fires and chooses ({op})")
@@ -1202,6 +1204,8 @@ def check_scope(prog: Program, r: Routine) -> None:
                     slot_of(prog.records[base[1][1]], x[2], at)
                     expr(x[2], at, defined)
         elif op == "call":
+            if e[1] in BUILTINS and len(e[2]) != (n := BUILTINS[e[1]].__code__.co_argcount):
+                fail(at, f"{e[1]} takes {n} values, not {len(e[2])}")
             for a in e[2]:
                 expr(a, at, defined)
         elif op in ("neg", "not"):
@@ -1296,6 +1300,8 @@ def check_scope(prog: Program, r: Routine) -> None:
             enums = {prog.member(m) for m in s[2]}
             if len(enums) != 1 or None in enums:
                 fail(at, f"a match's arms are members of one enum: {sorted(s[2])}")
+            if not any(set(ms) == set(s[2]) for ms in prog.enums.values()):
+                fail(at, f"a match has an arm for each member of its enum: {sorted(s[2])}")
             return joined([block(body, set(defined)) for body in s[2].values()])
         if op == "jump":
             if s[1][0] != "index":
