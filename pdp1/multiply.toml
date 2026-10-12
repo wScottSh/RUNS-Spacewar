@@ -1,0 +1,21 @@
+# imp and mpy: jda subroutines. The second factor is the word after the
+# call, executed by name each time it is read. mp2 lies between them.
+replaces = "lift/multiply.c"
+
+[[place]]
+routine = "integer_multiply"
+convention = "JDA"
+entry = "integer_multiply_call.entry"
+byname = "integer_multiply_call.factor"
+result = ["integer_multiply_call.product"]
+
+[[place]]
+fields = ["multiply_call.partial"]
+
+[[place]]
+routine = "multiply"
+convention = "JDA"
+entry = "multiply_call.entry"
+byname = "multiply_call.factor"
+io = ["multiply_call.low"]
+result = ["multiply_call.partial", "multiply_call.low"]

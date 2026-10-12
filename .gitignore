@@ -1,21 +1,2 @@
-# Built binaries (produced by tools/build-*.cmd)
-tools/macro1/macro1.exe
-tools/macro1/macro1
-tools/pdp1
-tools/pdp1.exe
-tools/pdp1
-*.obj
-
-# External SIMH source — large nested repo, fetched via tools/fetch-simh.cmd
-tools/simh/
-
-# Assembly + simulator build artifacts (regenerate via tools/assemble.cmd)
 build/
-
-# Sandcastle host harness (npm deps for .sandcastle/main.ts)
-node_modules/
-package-lock.json
-
-# The Sandcastle harness scripts/prompts ARE tracked. Its runtime state —
-# secrets (.env), logs, and per-issue git worktrees — is ignored by
-# .sandcastle/.gitignore, not here.
+__pycache__/

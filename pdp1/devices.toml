@@ -1,0 +1,34 @@
+# The PDP-1's devices: the presentation side of the game's boundary. Play
+# sees the value of each input and output field, never the device: which
+# sense switch holds a console field, which program flag lights for a ship,
+# and where the operator starts the machine. A binding for another machine
+# maps the same fields to its own controls and lights. runsc and the checks
+# read this file; no other file says which device a field is.
+
+# The console. lat reads the test word switches into AC; iot 11 ors the
+# control boxes into IO, so IO is cleared first; szs tests sense switch n.
+[console]
+"console.test_word" = "lat"
+"console.control_boxes" = { read = "control_boxes", or_into_io = true }
+"console.angular_momentum" = { sense = 1 }
+"console.light_star" = { sense = 2 }
+"console.single_shot" = { sense = 3 }
+"console.no_planetarium" = { sense = 4 }
+"console.star_kills" = { sense = 5 }
+"console.no_star" = { sense = 6 }
+
+# The lights: program flags 1 and 2, for the ship that survived a game.
+[lights]
+"lights.first_survived" = 1
+"lights.second_survived" = 2
+
+# The start addresses: where the operator starts the machine, and the top
+# Network each start fires. The tape's own start is the first.
+[[start]]
+at = 0o4
+network = "start_with_control_boxes"
+tape = true
+
+[[start]]
+at = 0o5
+network = "start_with_test_word"

@@ -1,0 +1,13 @@
+# The outlines of the spaceships (source lines 1336-1356): each outline's
+# words, then five words of room to make it longer, which no rule reads.
+replaces = "lift/outlines.c"
+
+[[place]]
+slots = "outlines.codes"
+range = [0, 0o7]
+reserve = 5
+
+[[place]]
+slots = "outlines.codes"
+range = [0o10, 0o17]
+reserve = 5

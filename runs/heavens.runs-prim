@@ -1,0 +1,114 @@
+# The Processors of heavens.runs.
+
+# The slope of the star's line, from the random number: two of its bits
+# rotated to just below a display coordinate's sign, with the sign.
+processor star_slope
+  reads: random
+  writes: central_star
+  let slope = rar(random.number, 9) & 0400340              # and (add 340
+  if slope < 0:
+    set slope = slope ^ 0377777                             # a ones' complement negative number
+  set central_star.slope_x = slope
+  set slope = ral(random.number, 4) & 0400340
+  if slope < 0:
+    set slope = slope ^ 0377777
+  set central_star.slope_y = slope
+
+# The line, 9 to 16 dots long from the center, then the same line mirrored
+# through the center. The original jumps into its run of 16 dots (bds) past
+# as many as the random number says (bjm), and runs the same run again for
+# the mirror. Only AC adds, so a dot exchanges y into AC to step it, and
+# back (swap).
+processor draw_star
+  reads: random, central_star
+  writes: display
+  let skipped = random.number >> 14                         # sar 9s; sar 5s: -7..7
+  if skipped < 0:
+    set skipped = -skipped
+  let half = first                                          # clf 6
+  let x = 0                                                 # cla cli: the center
+  let y = 0
+  emit display: x, y, 0
+  loop at most 2:
+    for dot in skipped .. 017:                              # bds: repeat 20, starp
+      set x = x + central_star.slope_x
+      set (x, y) = rcl(x, y, 18)                            # swap
+      set x = x + central_star.slope_y
+      set (x, y) = rcl(x, y, 18)                            # swap
+      emit display: x, y, 0
+    if half == mirrored:                                    # szf 6
+      break
+    set half = mirrored                                     # stf 6: mirror the end of the line
+    set x = -x                                              #   through the center
+    set (x, y) = rcl(x, y, 18)
+    set x = -x
+    set (x, y) = rcl(x, y, 18)
+
+processor count_frames
+  writes: planetarium
+  set planetarium.alternate_frames = planetarium.alternate_frames + 1
+
+processor skip_a_frame
+  writes: planetarium
+  set planetarium.alternate_frames = -2
+
+# The stars of one magnitude (dislis J, Q, B): magnitude m, the stars from
+# slot first up to past in the catalog, plotted at intensity (3 is the
+# brightest).
+#
+# The sky is 020000 wide and wraps around; the catalog runs right to left.
+# The window is the screen's width, 02000, left of the right margin. A scan
+# starts at the magnitude's cursor and plots each star in the window. It
+# stops at the first star outside the window once it has plotted one, or
+# when it has gone all the way round. A star outside the window before any
+# is plotted moves the cursor past it, so later scans skip it. star_x and
+# star_y are where the star's x and y lie (fin, fyn).
+processor show_magnitude(m, first, past, intensity)
+  reads: star_catalog, planetarium
+  writes: magnitudes, display
+  let scan = looking                                        # clf 5
+  let scan_start = magnitudes.cursor[m]                     # lac flo; dap fpo
+  let star_x = magnitudes.cursor[m]                         # dap fin
+  let star_y = magnitudes.cursor[m]                         # dap fyn
+  set star_y = star_y + 1                                   # idx fyn
+  loop at most (past - first) >> 1:                         # fin: each star looked at, once at most
+    let x = star_catalog.words[star_x] - planetarium.right_margin
+    if x >= 0:                                              # fgr: round the sky, then test again
+      set x = x + (02000 - 020000)
+    else:
+      set x = x + 02000                                     # from the window's left edge
+    if x <= 0:                                              # fuu: outside the window
+      if scan == plotted:
+        break                                               # past the window's stars
+      set magnitudes.cursor[m] = magnitudes.cursor[m] + 1   # idx flo, idx flo: the next scan
+      set magnitudes.cursor[m] = magnitudes.cursor[m] + 1   #   starts after this star
+      if magnitudes.cursor[m] == past:
+        set magnitudes.cursor[m] = first
+    else:
+      set x = (x - 01000) << 8                              # to a display coordinate
+      emit display: x, star_catalog.words[star_y], intensity
+      set scan = plotted                                    # stf 5
+    set star_y = star_y + 1                                 # fid: the next star
+    if star_y == past:                                      # flp: past the last star, the first
+      if first == scan_start:
+        break                                               # all the way round
+      set star_x = first
+      set star_y = first + 1
+    elif star_y == scan_start:
+      break                                                 # all the way round
+    else:
+      set star_x = star_y
+      set star_y = star_y + 1
+
+processor count_steps
+  writes: planetarium
+  set planetarium.window_steps = planetarium.window_steps + 1
+
+# The window moves one step left, round the sky.
+processor move_window
+  writes: planetarium
+  set planetarium.window_steps = -020
+  let margin = -1 + planetarium.right_margin
+  if margin < 0:
+    set margin = margin + 020000
+  set planetarium.right_margin = margin

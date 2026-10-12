@@ -1,0 +1,52 @@
+# The tunables the original keeps as instructions (each is executed with
+# `xct`), so an operator could patch the rule, not just the number. Each
+# takes and leaves its values in handoff, where the original's AC and IO
+# carry them. In the original's order.
+
+processor torpedo_supply                                    # tno: number of torpedoes + 1
+  writes: handoff
+  set handoff.torpedo_supply = -041
+
+processor torpedo_velocity                                  # tvl
+  writes: handoff
+  set handoff.torpedo_velocity = handoff.torpedo_direction >> 4
+
+processor torpedo_reload_time                               # rlt
+  writes: handoff
+  set handoff.reload_time = -020
+
+processor torpedo_life                                      # tlf
+  writes: handoff
+  set handoff.torpedo_life = -0140
+
+processor spaceship_acceleration                            # sac
+  writes: handoff
+  set handoff.thrust = handoff.thrust_direction >> 4
+
+processor torpedo_space_warpage                             # the
+  writes: handoff
+  set handoff.acceleration = handoff.coordinate >> 9
+
+processor hyperspace_shots                                  # mhs: number of hyperspace jumps
+  writes: handoff
+  set handoff.hyperspace_shots = -010
+
+processor time_before_breakout                              # hd1: time in hyperspace before breakout
+  writes: handoff
+  set handoff.hyperspace_time = -040
+
+processor breakout_time                                     # hd2: time in hyperspace breakout
+  writes: handoff
+  set handoff.breakout_time = -0100
+
+processor hyperfield_recharge_time                          # hd3: time to recharge the hyperfield generators
+  writes: handoff
+  set handoff.recharge_time = -0200
+
+processor hyperspatial_displacement                         # hr1: scale on the hyperspatial displacement
+  writes: handoff
+  set (handoff.jump_high, handoff.jump_low) = scl(handoff.jump_high, handoff.jump_low, 9)
+
+processor hyperspatial_velocity                             # hr2: scale on the hyperspatially induced velocity
+  writes: handoff
+  set (handoff.jump_high, handoff.jump_low) = scl(handoff.jump_high, handoff.jump_low, 4)
