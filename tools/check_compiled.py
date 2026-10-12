@@ -2,12 +2,15 @@
 image once (it must match the oracle), then mutates the RUNS of every
 routine and field the bindings compile, one change at a time:
 
-- each number, and each field's initial value, one up;
+- each number one up; each field's initial value: a number one up, a
+  member to each other member, an instruction to cma;
 - each field reference to each other field of its Record (of its type, and
   of another type), and to the field of the same name in another Record;
 - each operator to another (+ and -, < and >=, & and |, and and or, ...);
 - each enum member to another of its enum;
-- each run of a routine to each other routine of its kind and arity;
+- each run of a routine to each other routine of its kind and arity, and
+  each of its arguments to 0, to 1, to itself plus 1, to its negation and
+  to each other name in scope;
 - each guard negated; an if's arm swapped with its else, and its first two
   arms with each other; each two arms of a match swapped;
 - each statement deleted, duplicated, swapped with the next, and moved to
@@ -35,7 +38,10 @@ original image is silent, and passes only when the evaluator shows it is
 the same game: the mutated routine, and failing that each bound routine
 that compiles it, fired on seeded random Records before and after the
 mutation must leave the same Records, the same points and the same error,
-with at least a quarter of the firings running clean. A requires: is a
+with at least a quarter of the firings running clean. A silent initial
+value passes when 60 games of 30 frames from power-on, played before and
+after, put out the same at every firing and end with the same Records but
+for the field itself. A requires: is a
 precondition, not code: its deletion passes when every firing it lets run
 leaves the same, and it stops some firing (else it is dead). Any other
 silent mutant, and any crash of runsc, fails the gate. A loop's bound is
@@ -75,6 +81,7 @@ TRIALS = 200                # seeded Record states a silent mutant is fired on
 CLEAN = TRIALS // 4         # firings that must run without error and reach the mutated routine
 PLAYS = 60                  # Records as play leaves them, kept before a routine's firings
 EDGES = [0, runs.MASK, 1, runs.MASK ^ 1, 0o377777, 0o400000, 0o777, 0o400777]   # 0, -0, 1, -1, the extremes
+AT_BOUND = re.compile(r"ran past (its bound of )?\d+|the bound is no count")   # a firing a bound stops
 BOUNDED = ("number", "field", "field type", "field record", "operator", "member")   # kinds a loop's bound holds
 
 
@@ -212,6 +219,15 @@ def statement_sites(prog: runs.Program, proc: str, path, s):
         for name, r in sorted(prog.routines.items()):
             if name != s[1] and r.kind == callee.kind and len(r.params) == len(callee.params):
                 yield Mutant(f"{proc} run {s[1]} -> {name} @{line(s)}", "run", proc, path, ("run", name, *s[2:]))
+        scope = prog.routines[proc].params + [x[1] for _, x in nodes(prog.routines[proc].body)
+                                              if is_statement(x) and x[0] == "for"]
+        for k, a in enumerate(s[2]):
+            others = [("num", 0), ("num", 1), ("bin", "+", a, ("num", 1)), ("neg", a)]
+            candidates = others + [("name", n) for n in scope]
+            for j, new in enumerate(candidates):
+                if new != a and new not in candidates[:j]:
+                    yield Mutant(f"{proc} run {s[1]} argument {k} -> {new} @{line(s)}", "argument", proc, path,
+                                 ("run", s[1], replaced(s[2], (k,), new), *s[3:]))
     elif s[0] == "if":
         arms, other = s[1], s[2]
         for k, (c, body) in enumerate(arms):
@@ -277,29 +293,32 @@ def routine_sites(prog: runs.Program, proc: str):
 
 
 def sites(prog: runs.Program) -> list[Mutant]:
-    """Every mutant of the routines the bindings compile, and of the initial
-    value of each field they place or hand a routine."""
-    specs, places, bound = bound_places(prog)
-    table = {k: v for spec in specs for k, v in spec.get("table", {}).items()}
+    """Every mutant of the routines the bindings compile, and of every
+    field's initial value."""
     out: list[Mutant] = []
     for proc in owners(prog):
         out += routine_sites(prog, proc)
-    fields = []
-    for place in places:
-        if place.get("table"):
-            fields += [f"{r}.{f}" for r in table["records"] for f in prog.records[r].fields]
-        if place.get("routine"):
-            fields += [place.get(k) for k in ("entry", "ac_param", "io_param", "byname")]
-            fields += place.get("result", []) + place.get("cells", []) + place.get("data", [])
-        fields += place.get("fields", []) + ([place["slots"]] if "slots" in place else [])
-    fields += [f for spec in specs for f in spec.get("pool", []) + list(spec.get("homes", {}))]
-    for dotted in dict.fromkeys(f for f in fields if f and "." in f):     # a local has no initial value
-        rec, fld = dotted.split(".")
-        for path, node in nodes(prog.records[rec].fields[fld][1] or ()):
-            if isinstance(node, tuple) and node and node[0] == "num":
-                out.append(Mutant(f"{dotted} = {node[1]:o} {path}", "initial", None, (rec, fld, path),
-                                  ("num", node[1] + 1)))
+    for rec, r in prog.records.items():
+        for fld, (typ, init) in r.fields.items():
+            for path, node in nodes(init or ()):
+                for new in initial_mutants(prog, typ, node):
+                    out.append(Mutant(f"{rec}.{fld} = {node} -> {new} {path}", "initial", None, (rec, fld, path),
+                                      new))
     return out
+
+
+def initial_mutants(prog: runs.Program, typ: str, node) -> list:
+    """A number one up; a member to each other member of its field's enum; an
+    instruction to cma."""
+    if not isinstance(node, tuple) or not node:
+        return []
+    if node[0] == "num":
+        return [("num", node[1] + 1)]
+    if node[0] == "name" and typ in prog.enums:
+        return [("name", m) for m in prog.enums[typ] if m != node[1]]
+    if typ == runs.INSN and (node[0] == "call" or node[0] == "name") and node != ("name", "cma"):
+        return [("name", "cma")]
+    return []
 
 
 def is_bound(prog: runs.Program, m: Mutant) -> bool:
@@ -431,7 +450,6 @@ def played(prog: runs.Program) -> dict[str, list]:
     (the outline compiler, the spaceship) clean to its end; these do."""
     if PLAYED:
         return PLAYED
-    rng = random.Random(1962)
     kept: dict[str, list] = {}
 
     class Recorder(runs.Machine):
@@ -439,22 +457,51 @@ def played(prog: runs.Program) -> dict[str, list]:
             if len(kept.setdefault(name, [])) < PLAYS:
                 kept[name].append((list(args), copied(self.state)))
             return super().run(name, args)
+    for _ in games(prog, Recorder, random.Random(1962)):
+        pass
+    PLAYED.update(kept)
+    return PLAYED
+
+
+def games(prog: runs.Program, machine, rng: random.Random):
+    """60 games of 30 frames from power-on: the tape's words, random
+    power-on words and console settings, the control boxes drawn anew each
+    frame. Yields what leaves the game at each firing (the streams and the
+    lights), and the Records at the game's end, or the error it stops with."""
+    streams = [r.name for r in prog.records.values() if r.stream]
     for game in range(60):
-        m = Recorder(prog)
+        m = machine(prog)
         world = random_state(prog, rng)
         for rec in ("console", "score"):            # what comes in: the switches, the power-on words
             m.state[rec] = world[rec]
         try:
             m.run(["start_with_control_boxes", "start_with_test_word"][game % 2])
             for _ in range(30):
+                yield {r: m.state[r] for r in streams + ["lights"]}
                 m.state["console"]["control_boxes"] = runs.W(rng.randrange(1 << 18))
-                for stream in (r.name for r in prog.records.values() if r.stream):
+                for stream in streams:
                     m.state[stream] = []
                 m.run("frame")
-        except (runs.RunsError, runs.Stop):
-            pass
-    PLAYED.update(kept)
-    return PLAYED
+            yield copied(m.state)
+        except (runs.RunsError, runs.Stop) as e:
+            yield f"{type(e).__name__}: {e}"
+
+
+def from_power_on(prog: runs.Program, mutated: runs.Program, rec: str, fld: str) -> tuple[bool, str]:
+    """An initial value changed: the games from power-on, played before and
+    after on the same inputs, put out the same at every firing and leave the
+    same Records at their end, but for the changed field itself, which no
+    firing then has read to any effect."""
+    def end(x):
+        if isinstance(x, dict) and rec in x and isinstance(x[rec], dict):
+            return {**x, rec: {**x[rec], fld: None}}
+        return x
+    k = 0
+    for k, (a, b) in enumerate(zip(games(prog, runs.Machine, random.Random(1962)),
+                                    games(mutated, runs.Machine, random.Random(1962)))):
+        if end(a) != end(b):
+            return False, f"firing {k} from power-on differs"
+    return True, f"{k + 1} firings from power-on, all the same"
 
 
 def same_game(prog: runs.Program, mutated: runs.Program, name: str, seed: str,
@@ -481,8 +528,8 @@ def same_game(prog: runs.Program, mutated: runs.Program, name: str, seed: str,
 def equivalent(prog: runs.Program, mutated: runs.Program, m: Mutant) -> tuple[bool, str]:
     """The mutated routine, then each bound routine that compiles it, fired
     before and after on the same seeded Records."""
-    if m.routine is None:
-        return False, "an initial value"
+    if m.kind == "initial":
+        return from_power_on(prog, mutated, *m.path[:2])
     if unplaced(mutated.routines[m.routine].body) == unplaced(prog.routines[m.routine].body) \
             and m.kind not in ("declaration", "requires"):
         return True, "the same text (identical statements swapped)"
@@ -530,7 +577,7 @@ def bounded(prog: runs.Program, mutated: runs.Program, m: Mutant) -> tuple[bool,
         state = random_state(prog, rng)
         args = arguments(prog, m.routine, calls, rng)
         (a, _), (b, _) = fire(prog, m.routine, args, state), fire(mutated, m.routine, args, state)
-        if a != b and not any(re.search(r"ran past (its bound of )?\d+", str(x[0])) for x in (a, b)):
+        if a != b and not any(AT_BOUND.search(str(x[0])) for x in (a, b)):
             return False, f"{m.routine}{tuple(args)} trial {k}: {str(a[0])[:80]} / {str(b[0])[:80]}"
         stopped += a != b
     return True, f"{m.routine}: {TRIALS} firings, {stopped} stopped at a bound, the rest the same"

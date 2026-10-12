@@ -103,7 +103,7 @@ network launch_torpedo(slot)                                # st1
     run next_slot                                           # index sr1, (lac mtb nob, sr1
     if launch.slot == 030:
       stop                                                  # hlt; jmp .-1
-  run place_torpedo(slot)                                   # sr2
+  run place_torpedo                                         # sr2
   run torpedo_velocity                                      # xct tvl
   run take_torpedo_dx(slot)
   run torpedo_velocity

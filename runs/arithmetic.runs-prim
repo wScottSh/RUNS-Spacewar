@@ -89,7 +89,7 @@ processor sine_term_1                                       # add (144417, mult 
 processor sine_answer                                       # scl 3s .. csx
   reads: multiply_call
   writes: sine_call
-  let (high, low) = scl(multiply_call.partial, multiply_call.low, 3)
+  let (high, _) = scl(multiply_call.partial, multiply_call.low, 3)
   set sine_call.answer = high
   if (sine_call.answer ^ sine_call.x) < 0:                  # the series overshot +-1: saturate
     set sine_call.result = 0377777

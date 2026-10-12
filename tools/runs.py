@@ -403,10 +403,10 @@ def statement(line: Line):
         dots = t.index("..")
         return ("for", t[1], whole(t[3:dots], where), whole(t[dots + 1:-1], where),
                 block(line.children), where)
-    if head in ("break", "continue", "stop", "unreachable", "wait"):
+    if head in ("break", "continue", "stop", "unreachable", "wait", "return"):
+        if len(t) > 1:
+            raise RunsError(f"{where}: {head} takes nothing after it")
         return (head, where)
-    if head == "return":
-        return ("return", whole(t[1:], where) if len(t) > 1 else None, where)
     if head == "jump":
         if t[-3:-1] != ["at", "most"]:
             raise RunsError(f"{where}: jump <word of code> at most N")
@@ -571,17 +571,19 @@ def shape(stmts: list, r: Routine, in_loop: bool):
     """What each kind may say, checked over the whole body before anything runs.
     A network writes nothing: it has no let, set, emit or return. Its loop is
     bounded and leaves only through an `if` on Records that breaks."""
-    for s in stmts:
+    for k, s in enumerate(stmts):
         op, where = s[0], s[-1]
+        if op in ("break", "continue", "return", "stop", "unreachable") and k + 1 < len(stmts):
+            raise RunsError(f"{stmts[k + 1][-1]}: nothing after {op} runs")
         if r.kind == "network":
             if op not in NETWORK_OPS:
                 raise RunsError(f"{where}: a network only fires and chooses ({op})")
-            if op == "break" and not in_loop:
-                raise RunsError(f"{where}: break outside a loop")
             if op == "loop" and not any(guarded_exit(x) for x in s[2]):
                 raise RunsError(f"{where}: a network loop needs an exit: an if with an arm that ends in break")
         elif op in FIRING_OPS:
             raise RunsError(f"{where}: {op} belongs to a network")
+        if op in ("break", "continue") and not in_loop:
+            raise RunsError(f"{where}: {op} outside a loop")
         if op == "if":
             for _, body in s[1]:
                 shape(body, r, in_loop)
@@ -600,9 +602,7 @@ class Continue(Exception): pass
 class Stop(Exception): pass
 
 
-class Return(Exception):
-    def __init__(self, value):
-        self.value = value
+class Return(Exception): pass
 
 
 class NotPorted(RunsError):
@@ -711,7 +711,7 @@ class Machine:
             self.bind(target, self.eval(e, scope), scope, where, new=False)
         elif op == "loop":
             _, bound, body, where = s
-            n = bound[1] if bound[0] == "num" else as_count(self.eval(bound, scope))
+            n = self.bound(bound, scope, where)
             for _ in range(n):
                 try:
                     self.block(body, scope)
@@ -730,7 +730,7 @@ class Machine:
         elif op == "continue":
             raise Continue()
         elif op == "return":
-            raise Return(self.eval(s[1], scope) if s[1] is not None else None)
+            raise Return()
         elif op == "emit":
             _, name, args, _ = s
             scope.check(name, write=True)
@@ -758,9 +758,17 @@ class Machine:
             rec, fld, at = self.place(target, scope, where)
             if at is None:
                 raise RunsError(f"{where}: code is a slot of a collection")
-            self.jumped_to = self.execute(Place(rec, fld, at), as_count(self.eval(bound, scope)), scope, where)
+            self.jumped_to = self.execute(Place(rec, fld, at), self.bound(bound, scope, where), scope, where)
         elif op == "unreachable":
             raise RunsError(f"{s[1]}: reached unreachable")
+
+    def bound(self, e, scope: "Scope", where: str) -> int:
+        if e[0] == "num":
+            return e[1]                         # a count, though it may not fit a word's sign (0400001)
+        try:
+            return as_count(self.eval(e, scope))
+        except RunsError as x:
+            raise RunsError(f"{where}: the bound is no count: {x}") from None
 
     def truth(self, v) -> bool:
         if not isinstance(v, bool):
@@ -1161,12 +1169,19 @@ def check_scope(prog: Program, r: Routine) -> None:
         if (e[0] == "index") != (rec.count is not None) or rec.stream:
             fail(at, f"{rec.name}.{base[2]} is {'a collection' if rec.count else 'one word'}")
         if e[0] == "index":
+            slot_of(rec, e[2], at)
             expr(e[2], at, defined)
         if r.kind == "processor" and rec.name not in r.writes and (write or rec.name not in r.reads):
             fail(at, f"{r.name} does not declare {'writes' if write else 'reads'}: {rec.name}")
 
+    def slot_of(rec: Record, e, at: str):
+        if e[0] == "num" and e[1] >= rec.count:
+            fail(at, f"{rec.name} has {rec.count} slots, not slot {e[1]:o}")
+
     def expr(e, at: str, defined: set[str]):
         op = e[0]
+        if op == "num" and e[1] > MASK:
+            fail(at, f"{e[1]:o} does not fit a word")
         if op in ("num", "bool"):
             return
         if op == "name":
@@ -1188,13 +1203,19 @@ def check_scope(prog: Program, r: Routine) -> None:
                         and base[2] in prog.records[base[1][1]].fields):
                     fail(at, f"{e[1]} names a word of a Record{' or a routine' if kind == 'target' else ''}")
                 if x[0] == "index":
+                    slot_of(prog.records[base[1][1]], x[2], at)
                     expr(x[2], at, defined)
         elif op == "call":
+            if e[1] in BUILTINS and len(e[2]) != (n := BUILTINS[e[1]].__code__.co_argcount):
+                fail(at, f"{e[1]} takes {n} values, not {len(e[2])}")
             for a in e[2]:
                 expr(a, at, defined)
         elif op in ("neg", "not"):
             expr(e[1], at, defined)
         elif op == "bin":
+            if e[1] in ("<", "<=", ">", ">=") and e[3] != ("num", 0) \
+                    and not (e[2][0] == "name" and e[2][1] in counts):
+                fail(at, f"{e[1]} compares a word with 0 only, or a slot or count with a number")
             expr(e[2], at, defined)
             expr(e[3], at, defined)
         elif op == "tuple":
@@ -1212,7 +1233,7 @@ def check_scope(prog: Program, r: Routine) -> None:
         if t[0] == "name":
             if not new and t[1] not in defined:
                 fail(at, f"set {t[1]} before let")
-            return {t[1]}
+            return {t[1]} - {"_"}               # a dropped value: nothing reads it
         if new:
             fail(at, "let binds a local name")
         place(t, at, defined, write=True)
@@ -1252,11 +1273,7 @@ def check_scope(prog: Program, r: Routine) -> None:
             expr(s[3], at, defined)
             block(s[4], defined | {s[1]})
             return defined
-        if op in ("break", "continue", "stop", "unreachable"):
-            return None
-        if op == "return":
-            if s[1] is not None:
-                expr(s[1], at, defined)
+        if op in ("break", "continue", "stop", "unreachable", "return"):
             return None
         if op == "wait":
             return defined
@@ -1285,6 +1302,8 @@ def check_scope(prog: Program, r: Routine) -> None:
             enums = {prog.member(m) for m in s[2]}
             if len(enums) != 1 or None in enums:
                 fail(at, f"a match's arms are members of one enum: {sorted(s[2])}")
+            if not any(set(ms) == set(s[2]) for ms in prog.enums.values()):
+                fail(at, f"a match has an arm for each member of its enum: {sorted(s[2])}")
             return joined([block(body, set(defined)) for body in s[2].values()])
         if op == "jump":
             if s[1][0] != "index":
@@ -1294,9 +1313,51 @@ def check_scope(prog: Program, r: Routine) -> None:
             return defined
         fail(at, f"unknown statement {op}")
 
+    counts = set(r.params) | {s[1] for s in walk_statements(r.body) if s[0] == "for"}
     for c in r.requires:
         expr(c, where, set(r.params))
     block(r.body, set(r.params))
+
+
+def names_read(tree) -> set[str]:
+    """Every name a routine's text reads: each name but the locals a let or
+    set binds."""
+    if isinstance(tree, tuple) and tree[:1] in (("let",), ("set",)) and isinstance(tree[-1], str):
+        targets = tree[1][1] if tree[1][0] == "tuple" else [tree[1]]
+        return names_read([t for t in targets if t[0] != "name"]) | names_read(tree[2])
+    if isinstance(tree, tuple) and len(tree) == 2 and tree[0] == "name" and isinstance(tree[1], str):
+        return {tree[1]}
+    items = tree.values() if isinstance(tree, dict) else tree if isinstance(tree, (list, tuple)) else ()
+    return set().union(*map(names_read, items))
+
+
+def check_unread(r: Routine) -> None:
+    """A parameter or a local the routine never reads says nothing: every
+    edit of what it is passed or set to is the same game. The half of a pair
+    a routine drops is named _, which nothing reads."""
+    read = names_read(r.body) | names_read(r.requires)
+    for p in r.params:
+        if p not in read:
+            raise RunsError(f"{r.name}: its parameter {p} is never read")
+    for s in walk_statements(r.body):
+        if s[0] == "let":
+            for t in s[1][1] if s[1][0] == "tuple" else [s[1]]:
+                if t[0] == "name" and t[1] != "_" and t[1] not in read:
+                    raise RunsError(f"{s[-1]}: the local {t[1]} is never read")
+
+
+def walk_statements(stmts: list):
+    for s in stmts:
+        yield s
+        if s[0] == "if":
+            for _, body in s[1]:
+                yield from walk_statements(body)
+            yield from walk_statements(s[2])
+        elif s[0] in ("loop", "for"):
+            yield from walk_statements(s[-2])
+        elif s[0] == "match":
+            for body in s[2].values():
+                yield from walk_statements(body)
 
 
 def expr_touches(e, prog: Program, read: set[str]) -> None:
@@ -1379,8 +1440,6 @@ def touches(prog: Program, r: Routine) -> tuple[set[str], set[str]]:
                 expr_touches(s[2], prog, read)
                 expr_touches(s[3], prog, read)
                 block(s[4])
-            elif op == "return" and s[1] is not None:
-                expr_touches(s[1], prog, read)
             elif op == "emit":
                 written.add(s[1])
                 for a in s[2]:
@@ -1497,6 +1556,9 @@ def check_types(prog: Program) -> None:
             if left is None:
                 expr(b, at)
                 return BOOL if o in ("==", "!=", "<", "<=", ">", ">=") else NUMBER
+            if o in ("==", "!=", "<", "<=", ">", ">=") and all(
+                    x[0] == "num" or x[0] == "name" and x[1] not in local for x in (a, b)):
+                fail(at, f"{o} of two constants is constant: {e!r}")
             if o in ("==", "!=") and isinstance(left, frozenset):
                 want(at, left, b, o)
                 return BOOL
@@ -1543,8 +1605,6 @@ def check_types(prog: Program) -> None:
                     want(at, NUMBER, s[3], "a counted loop")
                     local[s[1]] = NUMBER
                     block(s[4])
-                elif op == "return" and s[1] is not None:
-                    expr(s[1], at)
                 elif op == "emit":
                     for a in s[2]:
                         want(at, NUMBER, a, s[1])
@@ -1621,6 +1681,7 @@ def check(prog: Program) -> Program:
     for r in prog.routines.values():
         shape(r.body, r, in_loop=False)
         check_scope(prog, r)
+        check_unread(r)
         if r.kind == "processor":
             check_declarations(prog, r)
         if any(r.name in fires(prog, t, set()) for t in runs_of(r.body)):
