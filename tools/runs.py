@@ -763,6 +763,8 @@ class Machine:
             raise RunsError(f"{s[1]}: reached unreachable")
 
     def bound(self, e, scope: "Scope", where: str) -> int:
+        if e[0] == "num":
+            return e[1]                         # a count, though it may not fit a word's sign (0400001)
         try:
             return as_count(self.eval(e, scope))
         except RunsError as x:
