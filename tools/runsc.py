@@ -3180,7 +3180,7 @@ class Function:
         (c, arm), where = last[1][0], last[3]
         if c[0] != "bin" or c[1] not in NEGATED:
             raise BindError(f"{where}: cannot negate {c!r}")
-        leave = ("if", [(("bin", NEGATED[c[1]], c[2], c[3]), [("return", None, where)])], [], where)
+        leave = ("if", [(("bin", NEGATED[c[1]], c[2], c[3]), [("return", where)])], [], where)
         return stmts[:-1] + [leave] + self.guards(arm)
 
     def apart_loop(self, s, nxt, depth: int) -> int:
@@ -3424,7 +3424,7 @@ def ignores(routine: runs.Routine, name: str, where: str) -> bool:
                 if any(any(value(a, env)) for a in s[2]):
                     raise Taint()
             elif op == "return":
-                if s[1] is not None and any(value(s[1], env)) or effects(env):
+                if effects(env):
                     raise Taint()
             elif op in ("break", "continue"):
                 exits[-1].append(dict(env))
@@ -3705,8 +3705,6 @@ class Occupancy:
                 self.loops[-1][0 if op == "break" else 1].append(state)
             return None
         if op in ("return", "stop", "unreachable"):
-            if op == "return" and s[1] is not None:
-                self.reads(s[1], state, where)
             if op == "return":
                 self.leave(state, where)
             return None

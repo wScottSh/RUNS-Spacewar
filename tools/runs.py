@@ -403,10 +403,10 @@ def statement(line: Line):
         dots = t.index("..")
         return ("for", t[1], whole(t[3:dots], where), whole(t[dots + 1:-1], where),
                 block(line.children), where)
-    if head in ("break", "continue", "stop", "unreachable", "wait"):
+    if head in ("break", "continue", "stop", "unreachable", "wait", "return"):
+        if len(t) > 1:
+            raise RunsError(f"{where}: {head} takes nothing after it")
         return (head, where)
-    if head == "return":
-        return ("return", whole(t[1:], where) if len(t) > 1 else None, where)
     if head == "jump":
         if t[-3:-1] != ["at", "most"]:
             raise RunsError(f"{where}: jump <word of code> at most N")
@@ -576,12 +576,12 @@ def shape(stmts: list, r: Routine, in_loop: bool):
         if r.kind == "network":
             if op not in NETWORK_OPS:
                 raise RunsError(f"{where}: a network only fires and chooses ({op})")
-            if op == "break" and not in_loop:
-                raise RunsError(f"{where}: break outside a loop")
             if op == "loop" and not any(guarded_exit(x) for x in s[2]):
                 raise RunsError(f"{where}: a network loop needs an exit: an if with an arm that ends in break")
         elif op in FIRING_OPS:
             raise RunsError(f"{where}: {op} belongs to a network")
+        if op in ("break", "continue") and not in_loop:
+            raise RunsError(f"{where}: {op} outside a loop")
         if op == "if":
             for _, body in s[1]:
                 shape(body, r, in_loop)
@@ -600,9 +600,7 @@ class Continue(Exception): pass
 class Stop(Exception): pass
 
 
-class Return(Exception):
-    def __init__(self, value):
-        self.value = value
+class Return(Exception): pass
 
 
 class NotPorted(RunsError):
@@ -730,7 +728,7 @@ class Machine:
         elif op == "continue":
             raise Continue()
         elif op == "return":
-            raise Return(self.eval(s[1], scope) if s[1] is not None else None)
+            raise Return()
         elif op == "emit":
             _, name, args, _ = s
             scope.check(name, write=True)
@@ -1161,12 +1159,19 @@ def check_scope(prog: Program, r: Routine) -> None:
         if (e[0] == "index") != (rec.count is not None) or rec.stream:
             fail(at, f"{rec.name}.{base[2]} is {'a collection' if rec.count else 'one word'}")
         if e[0] == "index":
+            slot_of(rec, e[2], at)
             expr(e[2], at, defined)
         if r.kind == "processor" and rec.name not in r.writes and (write or rec.name not in r.reads):
             fail(at, f"{r.name} does not declare {'writes' if write else 'reads'}: {rec.name}")
 
+    def slot_of(rec: Record, e, at: str):
+        if e[0] == "num" and e[1] >= rec.count:
+            fail(at, f"{rec.name} has {rec.count} slots, not slot {e[1]:o}")
+
     def expr(e, at: str, defined: set[str]):
         op = e[0]
+        if op == "num" and e[1] > MASK:
+            fail(at, f"{e[1]:o} does not fit a word")
         if op in ("num", "bool"):
             return
         if op == "name":
@@ -1188,6 +1193,7 @@ def check_scope(prog: Program, r: Routine) -> None:
                         and base[2] in prog.records[base[1][1]].fields):
                     fail(at, f"{e[1]} names a word of a Record{' or a routine' if kind == 'target' else ''}")
                 if x[0] == "index":
+                    slot_of(prog.records[base[1][1]], x[2], at)
                     expr(x[2], at, defined)
         elif op == "call":
             for a in e[2]:
@@ -1195,6 +1201,9 @@ def check_scope(prog: Program, r: Routine) -> None:
         elif op in ("neg", "not"):
             expr(e[1], at, defined)
         elif op == "bin":
+            if e[1] in ("<", "<=", ">", ">=") and e[3] != ("num", 0) \
+                    and not (e[2][0] == "name" and e[2][1] in counts):
+                fail(at, f"{e[1]} compares a word with 0 only, or a slot or count with a number")
             expr(e[2], at, defined)
             expr(e[3], at, defined)
         elif op == "tuple":
@@ -1252,11 +1261,7 @@ def check_scope(prog: Program, r: Routine) -> None:
             expr(s[3], at, defined)
             block(s[4], defined | {s[1]})
             return defined
-        if op in ("break", "continue", "stop", "unreachable"):
-            return None
-        if op == "return":
-            if s[1] is not None:
-                expr(s[1], at, defined)
+        if op in ("break", "continue", "stop", "unreachable", "return"):
             return None
         if op == "wait":
             return defined
@@ -1294,6 +1299,7 @@ def check_scope(prog: Program, r: Routine) -> None:
             return defined
         fail(at, f"unknown statement {op}")
 
+    counts = set(r.params) | {s[1] for s in walk_statements(r.body) if s[0] == "for"}
     for c in r.requires:
         expr(c, where, set(r.params))
     block(r.body, set(r.params))
@@ -1420,8 +1426,6 @@ def touches(prog: Program, r: Routine) -> tuple[set[str], set[str]]:
                 expr_touches(s[2], prog, read)
                 expr_touches(s[3], prog, read)
                 block(s[4])
-            elif op == "return" and s[1] is not None:
-                expr_touches(s[1], prog, read)
             elif op == "emit":
                 written.add(s[1])
                 for a in s[2]:
@@ -1538,6 +1542,9 @@ def check_types(prog: Program) -> None:
             if left is None:
                 expr(b, at)
                 return BOOL if o in ("==", "!=", "<", "<=", ">", ">=") else NUMBER
+            if o in ("==", "!=", "<", "<=", ">", ">=") and all(
+                    x[0] == "num" or x[0] == "name" and x[1] not in local for x in (a, b)):
+                fail(at, f"{o} of two constants is constant: {e!r}")
             if o in ("==", "!=") and isinstance(left, frozenset):
                 want(at, left, b, o)
                 return BOOL
@@ -1584,8 +1591,6 @@ def check_types(prog: Program) -> None:
                     want(at, NUMBER, s[3], "a counted loop")
                     local[s[1]] = NUMBER
                     block(s[4])
-                elif op == "return" and s[1] is not None:
-                    expr(s[1], at)
                 elif op == "emit":
                     for a in s[2]:
                         want(at, NUMBER, a, s[1])
