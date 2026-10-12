@@ -2,6 +2,10 @@
 
 Re-deriving Spacewar! 3.1 (1962 PDP-1 assembly) as RUNS source, under a verification-first discipline: nothing is asserted, everything is checked against the original. This context's language is currently the *verification method*; game-domain terms (ship, torpedo, gravity, sense switch, object table) will be added as the source is read against the Oracle.
 
+## The port
+
+The whole game is written in RUNS: Records and Networks in `runs/*.runs`, Processors in `runs/*.runs-prim`. `INTENT.md` says what RUNS is for and what the port settled. `tools/runs.py` is the reference evaluator, and `tools/runsc.py` compiles the RUNS text with the PDP-1 binding (`pdp1/`) back to the original tape image, byte for byte. `tools/check_all.sh` runs every check. It needs `../spacewar-c` beside this repository, for its `pdp1cc` back end and its SIMH driver. The decision log is `docs/decisions.tsv`.
+
 ## Language
 
 ### Verification method
