@@ -709,7 +709,7 @@ class Machine:
             self.bind(target, self.eval(e, scope), scope, where, new=False)
         elif op == "loop":
             _, bound, body, where = s
-            n = bound[1] if bound[0] == "num" else as_count(self.eval(bound, scope))
+            n = self.bound(bound, scope, where)
             for _ in range(n):
                 try:
                     self.block(body, scope)
@@ -756,9 +756,15 @@ class Machine:
             rec, fld, at = self.place(target, scope, where)
             if at is None:
                 raise RunsError(f"{where}: code is a slot of a collection")
-            self.jumped_to = self.execute(Place(rec, fld, at), as_count(self.eval(bound, scope)), scope, where)
+            self.jumped_to = self.execute(Place(rec, fld, at), self.bound(bound, scope, where), scope, where)
         elif op == "unreachable":
             raise RunsError(f"{s[1]}: reached unreachable")
+
+    def bound(self, e, scope: "Scope", where: str) -> int:
+        try:
+            return as_count(self.eval(e, scope))
+        except RunsError as x:
+            raise RunsError(f"{where}: the bound is no count: {x}") from None
 
     def truth(self, v) -> bool:
         if not isinstance(v, bool):

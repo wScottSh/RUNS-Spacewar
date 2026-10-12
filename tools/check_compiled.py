@@ -81,6 +81,7 @@ TRIALS = 200                # seeded Record states a silent mutant is fired on
 CLEAN = TRIALS // 4         # firings that must run without error and reach the mutated routine
 PLAYS = 60                  # Records as play leaves them, kept before a routine's firings
 EDGES = [0, runs.MASK, 1, runs.MASK ^ 1, 0o377777, 0o400000, 0o777, 0o400777]   # 0, -0, 1, -1, the extremes
+AT_BOUND = re.compile(r"ran past (its bound of )?\d+|the bound is no count")   # a firing a bound stops
 BOUNDED = ("number", "field", "field type", "field record", "operator", "member")   # kinds a loop's bound holds
 
 
@@ -576,7 +577,7 @@ def bounded(prog: runs.Program, mutated: runs.Program, m: Mutant) -> tuple[bool,
         state = random_state(prog, rng)
         args = arguments(prog, m.routine, calls, rng)
         (a, _), (b, _) = fire(prog, m.routine, args, state), fire(mutated, m.routine, args, state)
-        if a != b and not any(re.search(r"ran past (its bound of )?\d+", str(x[0])) for x in (a, b)):
+        if a != b and not any(AT_BOUND.search(str(x[0])) for x in (a, b)):
             return False, f"{m.routine}{tuple(args)} trial {k}: {str(a[0])[:80]} / {str(b[0])[:80]}"
         stopped += a != b
     return True, f"{m.routine}: {TRIALS} firings, {stopped} stopped at a bound, the rest the same"
